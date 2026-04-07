@@ -313,17 +313,16 @@ export const appRouter = router({
     myDebt: protectedProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
       const email = (user.email || "").toLowerCase().trim();
-      const paymentId = (user.paymentId || "").trim();
 
       const [mySignups, allPayments] = await Promise.all([
         getAllSignupsByEmail(email),
         getPayments(),
       ]);
 
-      const paymentIdLower = paymentId.toLowerCase();
       const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
+      // Match payments by email (col G of the Payments sheet)
       const totalPaid = allPayments
-        .filter(p => p.paymentId && p.paymentId.trim().toLowerCase() === paymentIdLower)
+        .filter(p => p.email === email)
         .reduce((sum, p) => sum + p.amount, 0);
 
       return {
@@ -372,13 +371,6 @@ export const appRouter = router({
       const email = (user.email || "").toLowerCase().trim();
       const paymentId = (user.paymentId || "").trim();
 
-      if (!paymentId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Payment ID not found — please log out and log back in to sync your account.",
-        });
-      }
-
       const [mySignups, allPayments] = await Promise.all([
         getAllSignupsByEmail(email),
         getPayments(),
@@ -391,9 +383,9 @@ export const appRouter = router({
         actualFee: s.actualFees,
       }));
 
-      const paymentIdLower = paymentId.toLowerCase();
+      // Match payments by email (col G of the Payments sheet)
       const myPayments = allPayments
-        .filter(p => p.paymentId && p.paymentId.trim().toLowerCase() === paymentIdLower)
+        .filter(p => p.email === email)
         .map(p => ({ amount: p.amount, date: p.date }));
 
       const totalFees = fees.reduce((sum, f) => sum + f.actualFee, 0);
@@ -486,12 +478,10 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
       }
       const payments = await getPayments();
-      const parseDate = (s: string) => {
-        const parts = s.split("/");
-        if (parts.length === 3) return new Date(+parts[2], +parts[1] - 1, +parts[0]).getTime();
-        return new Date(s).getTime() || 0;
-      };
-      return [...payments].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+      // Date format from sheet is "M/D/YYYY H:MM:SS" — parseable directly by Date constructor
+      return [...payments].sort((a, b) =>
+        (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0)
+      );
     }),
 
     allSessions: protectedProcedure.query(async ({ ctx }) => {

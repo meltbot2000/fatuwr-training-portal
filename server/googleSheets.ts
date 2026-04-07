@@ -61,9 +61,13 @@ export interface UserRow {
 }
 
 export interface PaymentRow {
+  /** The matched reference/name from the sheet (col F — "PaymentID Match") */
   paymentId: string;
   amount: number;
+  /** Raw date string from col C, e.g. "3/20/2026 16:47:13" */
   date: string;
+  /** Matched email from col G — used to filter payments per user */
+  email: string;
 }
 
 export interface SignUpRow {
@@ -343,21 +347,31 @@ function datesMatch(date1: string, date2: string): boolean {
   return date1.trim().toLowerCase() === date2.trim().toLowerCase();
 }
 
+// Real Payments tab column layout (verified against live sheet):
+//   [0]  Maybank Payment Message (raw email body)
+//   [1]  Subject
+//   [2]  Date          e.g. "3/20/2026 16:47:13"
+//   [3]  Amount        numeric, e.g. "100"
+//   [4]  OTHR Message  the PayNow reference text the sender typed
+//   [5]  PaymentID Match  matched name/handle, or "#N/A" if unmatched
+//   [6]  Email         matched user email, or "#N/A" if unmatched
 export async function getPayments(): Promise<PaymentRow[]> {
   const rows = await fetchSheetRange(TAB_NAMES.payments);
   if (rows.length < 2) return [];
   const payments: PaymentRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    // Need at least col B (paymentId) and col C (amount); col D (date) is optional
-    if (!row || row.length < 2) continue;
-    const paymentId = (row[1] || "").trim();
-    const amount = parseNumber(row[2] || "0");
-    if (!paymentId && amount === 0) continue; // skip genuinely empty rows
+    if (!row || row.length < 4) continue;
+    const email = (row[6] || "").trim();
+    // Skip rows where the payment hasn't been matched to a user yet
+    if (!email || email === "#N/A") continue;
+    const amount = parseNumber(row[3] || "0");
+    if (amount === 0) continue; // skip zero-amount rows
     payments.push({
-      paymentId,
+      paymentId: (row[5] || "").trim(),  // col F — matched name/reference
       amount,
-      date: row[3] || "",        // col D
+      date: row[2] || "",                // col C — datetime string
+      email: email.toLowerCase(),
     });
   }
   return payments;
