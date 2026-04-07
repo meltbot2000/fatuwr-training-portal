@@ -39,20 +39,20 @@
  *   [9]  Actual Fee
  *   [10] Member on Training Date
  *
- * User tab columns (0-indexed):
- *   [0]  ID
- *   [1]  Name
- *   [2]  User Email (col C)
- *   [3]  Email (col D)
- *   [4]  Image
- *   [5]  (empty)
- *   [6]  (empty)
- *   [7]  Payment ID
- *   [8]  Membership Status
- *   [9]  Club Role
- *   [10] Trial Start Date
- *   [11] Trial End Date
- *   [12] Student Start Date
+ * User tab columns (0-indexed) — verified against live sheet:
+ *   [0]  ID                          (col A)
+ *   [1]  Name                        (col B)
+ *   [2]  User Email                  (col C)
+ *   [3]  Email                       (col D)
+ *   [4]  Image                       (col E)
+ *   [5]  Club Role                   (col F)  ← getRange uses column 6
+ *   [6]  Annual Membership Start     (col G)
+ *   [7]  Payment ID / Phone (Paynow) (col H)  ← getRange uses column 8
+ *   [8]  Birth Date                  (col I)  ← empty, NOT membership status
+ *   [9]  Membership Status           (col J)  ← getRange uses column 10
+ *   [10] Trial Start Date            (col K)  ← getRange uses column 11
+ *   [11] Trial End Date              (col L)  ← getRange uses column 12
+ *   [12] Date Created                (col M)
  */
 
 var SHEET_ID = "19Vxpj2AoJizVwhkSxEtV70yKDlWMyrfQGDIu6k6RSRM";
@@ -235,21 +235,21 @@ function createUser(params) {
 
   var id = "USR-" + Date.now();
 
-  // Column order matches User tab layout read by googleSheets.ts getUsers()
+  // Column order matches User tab layout — verified against live sheet
   sheet.appendRow([
     id,            // [0]  col A — ID
     name,          // [1]  col B — Name
     email,         // [2]  col C — User Email
     email,         // [3]  col D — Email (duplicate)
     "",            // [4]  col E — Image
-    "",            // [5]  col F — (empty)
-    "",            // [6]  col G — (empty)
+    "",            // [5]  col F — Club Role (empty for new users)
+    "",            // [6]  col G — Annual Membership Start Date
     "",            // [7]  col H — Payment ID (empty for new users)
-    "Non-Member",  // [8]  col I — Membership Status
-    "",            // [9]  col J — Club Role
+    "",            // [8]  col I — Birth Date
+    "Non-Member",  // [9]  col J — Membership Status
     "NA",          // [10] col K — Trial Start Date (NA = never trialled)
     "",            // [11] col L — Trial End Date
-    "",            // [12] col M — Student Start Date
+    new Date(),    // [12] col M — Date Created
   ]);
 
   return jsonResponse({ status: "success" });
@@ -275,7 +275,7 @@ function updateTrialSignup(params) {
       endDate.setDate(endDate.getDate() + 30);
 
       var sheetRow = i + 2;
-      sheet.getRange(sheetRow, 9).setValue("Trial");              // col I — Membership Status
+      sheet.getRange(sheetRow, 10).setValue("Trial");             // col J — Membership Status
       sheet.getRange(sheetRow, 11).setValue(formatDate(today));   // col K — Trial Start Date
       sheet.getRange(sheetRow, 12).setValue(formatDate(endDate)); // col L — Trial End Date
       return jsonResponse({ status: "success" });
@@ -300,7 +300,7 @@ function updateMemberSignup(params) {
       normalizeEmail(String(row[2])) === email ||
       normalizeEmail(String(row[3])) === email
     ) {
-      sheet.getRange(i + 2, 9).setValue("Member"); // col I — Membership Status
+      sheet.getRange(i + 2, 10).setValue("Member"); // col J — Membership Status
       return jsonResponse({ status: "success" });
     }
   }
@@ -325,8 +325,7 @@ function grantStudentStatus(params) {
       normalizeEmail(String(row[3])) === email
     ) {
       var sheetRow = i + 2;
-      sheet.getRange(sheetRow, 9).setValue("Student");                      // col I — Membership Status
-      sheet.getRange(sheetRow, 13).setValue(formatDate(new Date()));        // col M — Student Start Date
+      sheet.getRange(sheetRow, 10).setValue("Student"); // col J — Membership Status
       return jsonResponse({ status: "success" });
     }
   }
@@ -354,7 +353,7 @@ function updateUser(params) {
     ) {
       var sheetRow = i + 2;
       if (memberStatus !== undefined && memberStatus !== null) {
-        sheet.getRange(sheetRow, 9).setValue(memberStatus); // col I — Membership Status
+        sheet.getRange(sheetRow, 10).setValue(memberStatus); // col J — Membership Status
         if (memberStatus === "Trial") {
           var today   = new Date();
           var endDate = new Date(today);
@@ -362,12 +361,9 @@ function updateUser(params) {
           sheet.getRange(sheetRow, 11).setValue(formatDate(today));   // col K — Trial Start Date
           sheet.getRange(sheetRow, 12).setValue(formatDate(endDate)); // col L — Trial End Date
         }
-        if (memberStatus === "Student") {
-          sheet.getRange(sheetRow, 13).setValue(formatDate(new Date())); // col M — Student Start Date
-        }
       }
       if (clubRole !== undefined && clubRole !== null) {
-        sheet.getRange(sheetRow, 10).setValue(clubRole); // col J — Club Role
+        sheet.getRange(sheetRow, 6).setValue(clubRole); // col F — Club Role
       }
       return jsonResponse({ status: "success" });
     }

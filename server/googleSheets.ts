@@ -281,9 +281,15 @@ export async function getUsers(): Promise<UserRow[]> {
       userEmail: row[2] || "",
       email: row[3] || "",
       image: row[4] || "",
+      // Real sheet column layout (verified against live data):
+      //   col F  (index 5)  = Club role
+      //   col H  (index 7)  = Phone / Paynow (used as Payment ID)
+      //   col J  (index 9)  = Membership status
+      //   col K  (index 10) = Trial Membership Start Date
+      //   col L  (index 11) = Trial Membership End Date
+      clubRole: row[5] || "",
       paymentId: row[7] || "",
-      memberStatus: row[8] || "Non-Member",
-      clubRole: row[9] || "",
+      memberStatus: row[9] || "Non-Member",
       trialStartDate: row[10] || "",
       trialEndDate: row[11] || "",
     });
