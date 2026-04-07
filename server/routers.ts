@@ -84,12 +84,13 @@ export const appRouter = router({
         } catch (err: any) {
           console.error("[Auth] Could not fetch sheet user:", err.message);
         }
+        console.log("[Auth] sheetUser found:", JSON.stringify(sheetUser));
 
         if (!user) {
           isNewUser = true;
           const openId = `email_${nanoid(16)}`;
-          const memberStatus = sheetUser ? (sheetUser.memberStatus || "Non-Member") : "Non-Member";
-          const name = sheetUser ? sheetUser.name : email.split("@")[0];
+          const memberStatus = sheetUser?.memberStatus || "Non-Member";
+          const name = sheetUser?.name || email.split("@")[0];
 
           // Use existing paymentId from sheet, or auto-generate a unique one
           let paymentId = sheetUser?.paymentId ?? "";
@@ -117,21 +118,34 @@ export const appRouter = router({
             lastSignedIn: new Date(),
           });
           user = await db.getUserByEmail(email);
-          try {
-            await appsScript.createUser({ name, email, paymentId });
-          } catch (e) {
-            console.warn("[GAS] createUser failed (non-blocking):", e);
+
+          // Only create in sheet if the user wasn't already there
+          if (!sheetUser) {
+            try {
+              await appsScript.createUser({ name, email, paymentId });
+            } catch (e) {
+              console.warn("[GAS] createUser failed (non-blocking):", e);
+            }
           }
-        } else {
-          const updates: any = { openId: user.openId, lastSignedIn: new Date() };
-          if (sheetUser?.memberStatus) updates.memberStatus = sheetUser.memberStatus;
-          if (sheetUser?.clubRole !== undefined) updates.clubRole = sheetUser.clubRole;
-          if (sheetUser?.paymentId !== undefined) updates.paymentId = sheetUser.paymentId;
-          if (sheetUser?.trialStartDate !== undefined) updates.trialStartDate = sheetUser.trialStartDate;
-          if (sheetUser?.trialEndDate !== undefined) updates.trialEndDate = sheetUser.trialEndDate;
-          await db.upsertUser(updates);
+        }
+
+        // Always sync latest sheet data on every login (covers both new and existing users)
+        if (user && sheetUser) {
+          const syncUpdates: any = { openId: user.openId, lastSignedIn: new Date() };
+          if (sheetUser.memberStatus) syncUpdates.memberStatus = sheetUser.memberStatus;
+          if (sheetUser.clubRole !== undefined) syncUpdates.clubRole = sheetUser.clubRole;
+          if (sheetUser.paymentId) syncUpdates.paymentId = sheetUser.paymentId;
+          if (sheetUser.trialStartDate !== undefined) syncUpdates.trialStartDate = sheetUser.trialStartDate;
+          if (sheetUser.trialEndDate !== undefined) syncUpdates.trialEndDate = sheetUser.trialEndDate;
+          await db.upsertUser(syncUpdates);
+          user = await db.getUserByEmail(email);
+        } else if (user) {
+          // No sheet data available — just update lastSignedIn
+          await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
           user = await db.getUserByEmail(email);
         }
+
+        console.log("[Auth] DB user after upsert:", JSON.stringify(user));
 
         if (!user) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user account" });
@@ -355,6 +369,13 @@ export const appRouter = router({
       const user = ctx.user;
       const email = (user.email || "").toLowerCase().trim();
       const paymentId = (user.paymentId || "").trim();
+
+      if (!paymentId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Payment ID not found — please log out and log back in to sync your account.",
+        });
+      }
 
       const [mySignups, allPayments] = await Promise.all([
         getAllSignupsByEmail(email),

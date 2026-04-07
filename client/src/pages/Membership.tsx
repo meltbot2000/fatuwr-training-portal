@@ -35,11 +35,7 @@ function PaymentInstructionsCard({ paymentId }: { paymentId: string }) {
           </li>
           <li>
             Use your Payment ID{" "}
-            {paymentId ? (
-              <span className="font-mono font-semibold">{paymentId}</span>
-            ) : (
-              <span className="italic text-amber-700">(contact admin to get your Payment ID first)</span>
-            )}{" "}
+            <span className="font-mono font-semibold">{paymentId || "—"}</span>{" "}
             as the <span className="font-semibold">only text</span> in the transfer notes/reference field.
           </li>
           <li>Send your receipt to the club admin.</li>
@@ -121,7 +117,7 @@ export default function Membership() {
         )}
 
         {/* ── TRIAL (active) ───────────────────────────────────── */}
-        {memberStatus === "Trial" && trialActive && (
+        {memberStatus === "Trial" && trialEndParsed !== null && trialActive && (
           <>
             <div className="flex items-center gap-3 rounded-lg bg-gold/10 border border-gold/30 px-4 py-3">
               <CheckCircle2 className="w-5 h-5 text-gold shrink-0" />
@@ -141,14 +137,15 @@ export default function Membership() {
           </>
         )}
 
-        {/* ── TRIAL (expired) ──────────────────────────────────── */}
-        {memberStatus === "Trial" && !trialActive && (
+        {/* ── TRIAL (expired or missing end date) ──────────────── */}
+        {memberStatus === "Trial" && (trialEndParsed === null || !trialActive) && (
           <>
             <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <p>
-                Your trial expired on{" "}
-                <span className="font-semibold">{formatDisplayDate(trialEndDate)}</span>.
+                {trialEndParsed !== null
+                  ? <>Your trial expired on <span className="font-semibold">{formatDisplayDate(trialEndDate)}</span>.</>
+                  : "Your trial period has ended."}
               </p>
             </div>
 
