@@ -87,12 +87,11 @@ export const appRouter = router({
         console.log("[Auth] sheetUser found:", JSON.stringify(sheetUser));
 
         if (!user) {
+          // ── New user: create DB record ──────────────────────────────
           isNewUser = true;
           const openId = `email_${nanoid(16)}`;
-          const memberStatus = sheetUser?.memberStatus || "Non-Member";
           const name = sheetUser?.name || email.split("@")[0];
 
-          // Use existing paymentId from sheet, or auto-generate a unique one
           let paymentId = sheetUser?.paymentId ?? "";
           if (!paymentId) {
             let allUsers: { paymentId: string }[] = [];
@@ -110,7 +109,7 @@ export const appRouter = router({
             email,
             name,
             loginMethod: "email",
-            memberStatus,
+            memberStatus: sheetUser?.memberStatus || "Non-Member",
             paymentId,
             clubRole: sheetUser?.clubRole ?? "",
             trialStartDate: sheetUser?.trialStartDate ?? "",
@@ -119,7 +118,6 @@ export const appRouter = router({
           });
           user = await db.getUserByEmail(email);
 
-          // Only create in sheet if the user wasn't already there
           if (!sheetUser) {
             try {
               await appsScript.createUser({ name, email, paymentId });
@@ -129,18 +127,22 @@ export const appRouter = router({
           }
         }
 
-        // Always sync latest sheet data on every login (covers both new and existing users)
+        // ── Always sync sheet → DB on every login (new AND existing users) ──
+        // This ensures admin changes in the sheet (e.g. Non-Member → Member)
+        // take effect immediately on next login without any manual intervention.
         if (user && sheetUser) {
-          const syncUpdates: any = { openId: user.openId, lastSignedIn: new Date() };
-          if (sheetUser.memberStatus) syncUpdates.memberStatus = sheetUser.memberStatus;
-          if (sheetUser.clubRole !== undefined) syncUpdates.clubRole = sheetUser.clubRole;
-          if (sheetUser.paymentId) syncUpdates.paymentId = sheetUser.paymentId;
-          if (sheetUser.trialStartDate !== undefined) syncUpdates.trialStartDate = sheetUser.trialStartDate;
-          if (sheetUser.trialEndDate !== undefined) syncUpdates.trialEndDate = sheetUser.trialEndDate;
-          await db.upsertUser(syncUpdates);
+          console.log(`[Auth] Syncing sheet data for ${email}: memberStatus=${sheetUser.memberStatus}, clubRole=${sheetUser.clubRole}, paymentId=${sheetUser.paymentId}`);
+          await db.upsertUser({
+            openId: user.openId,
+            lastSignedIn: new Date(),
+            memberStatus: sheetUser.memberStatus || "Non-Member",
+            clubRole: sheetUser.clubRole ?? "",
+            paymentId: sheetUser.paymentId || user.paymentId || "",
+            trialStartDate: sheetUser.trialStartDate ?? "",
+            trialEndDate: sheetUser.trialEndDate ?? "",
+          });
           user = await db.getUserByEmail(email);
         } else if (user) {
-          // No sheet data available — just update lastSignedIn
           await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
           user = await db.getUserByEmail(email);
         }
