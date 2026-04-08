@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { ENV } from "./_core/env";
 
 export function generateOtp(): string {
@@ -54,38 +55,81 @@ function buildOtpHtml(code: string): string {
 </html>`;
 }
 
-export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
-  console.log(`[OTP] Sending code to ${email}`);
-  console.log(`[OTP] RESEND_API_KEY is ${ENV.resendApiKey ? "set" : "NOT set"}`);
-  console.log(`[OTP] FROM address: ${ENV.resendApiFrom}`);
+/**
+ * Send OTP via Gmail SMTP (Google App Password).
+ * Works for any recipient with no domain verification required.
+ * Requires GMAIL_USER and GMAIL_APP_PASSWORD env vars.
+ */
+async function sendViaGmail(to: string, code: string): Promise<boolean> {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: ENV.gmailUser,
+      pass: ENV.gmailAppPassword,
+    },
+  });
 
-  if (ENV.resendApiKey) {
-    const resend = new Resend(ENV.resendApiKey);
+  const result = await transporter.sendMail({
+    from: `"FATUWR Training Portal" <${ENV.gmailUser}>`,
+    to,
+    subject: "Your FATUWR Training Portal Login Code",
+    html: buildOtpHtml(code),
+  });
+
+  console.log(`[OTP] Gmail sent to ${to}, messageId: ${result.messageId}`);
+  return true;
+}
+
+/**
+ * Send OTP via Resend.
+ * Requires RESEND_API_KEY and a verified sending domain set in RESEND_API_FROM.
+ * Note: onboarding@resend.dev (Resend sandbox) can only send to the Resend account
+ * owner's email. Use a verified domain to send to any recipient.
+ */
+async function sendViaResend(to: string, code: string): Promise<boolean> {
+  const resend = new Resend(ENV.resendApiKey);
+  const result = await resend.emails.send({
+    from: ENV.resendApiFrom,
+    to,
+    subject: "Your FATUWR Training Portal Login Code",
+    html: buildOtpHtml(code),
+  });
+
+  if (result.error) {
+    console.warn(`[OTP] Resend error — name: ${result.error.name}, message: ${result.error.message}`);
+    return false;
+  }
+
+  console.log(`[OTP] Resend sent to ${to}, id: ${result.data?.id}`);
+  return true;
+}
+
+export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
+  // --- Provider 1: Gmail SMTP (works for any recipient, no domain needed) ------
+  if (ENV.gmailUser && ENV.gmailAppPassword) {
+    console.log(`[OTP] Sending via Gmail to ${email}`);
     try {
-      const result = await resend.emails.send({
-        from: ENV.resendApiFrom,
-        to: email,
-        subject: "Your FATUWR Training Portal Login Code",
-        html: buildOtpHtml(code),
-      });
-      console.log(`[OTP] Resend response:`, JSON.stringify(result, null, 2));
-      if (!result.error) {
-        console.log(`[OTP] Email sent successfully to ${email}`);
-        return true;
-      }
-      console.warn(`[OTP] Resend returned an error:`);
-      console.warn(`[OTP]   name:    ${result.error.name}`);
-      console.warn(`[OTP]   message: ${result.error.message}`);
-      console.warn(`[OTP]   full:   `, JSON.stringify(result.error, null, 2));
+      return await sendViaGmail(email, code);
     } catch (err) {
-      console.warn("[OTP] Exception thrown while calling Resend:", err);
+      console.warn("[OTP] Gmail failed:", err);
     }
   }
 
-  // Fallback for local dev (no API key configured)
-  console.log(`[OTP] ===== VERIFICATION CODE =====`);
+  // --- Provider 2: Resend (requires verified sending domain) -------------------
+  if (ENV.resendApiKey) {
+    console.log(`[OTP] Sending via Resend to ${email} (from: ${ENV.resendApiFrom})`);
+    try {
+      const sent = await sendViaResend(email, code);
+      if (sent) return true;
+    } catch (err) {
+      console.warn("[OTP] Resend exception:", err);
+    }
+  }
+
+  // --- Fallback: print to console (local dev only) -----------------------------
+  console.log(`[OTP] ===== VERIFICATION CODE (no email provider configured) =====`);
   console.log(`[OTP] Email: ${email}`);
   console.log(`[OTP] Code:  ${code}`);
-  console.log(`[OTP] ==============================`);
+  console.log(`[OTP] ================================================================`);
   return true;
 }
