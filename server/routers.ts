@@ -72,7 +72,8 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { email } = input;
         const code = generateOtp();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        // Truncate to second precision — MySQL TIMESTAMP doesn't support milliseconds
+        const expiresAt = new Date(Math.floor((Date.now() + 10 * 60 * 1000) / 1000) * 1000);
         await db.createOtp(email.toLowerCase().trim(), code, expiresAt);
         await sendOtpEmail(email, code);
         return { success: true, message: "Verification code sent" };
