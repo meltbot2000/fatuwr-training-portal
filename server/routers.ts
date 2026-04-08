@@ -314,16 +314,17 @@ export const appRouter = router({
       const user = ctx.user;
       const email = (user.email || "").toLowerCase().trim();
 
-      const [mySignups, allPayments] = await Promise.all([
-        getAllSignupsByEmail(email),
-        getPayments(),
-      ]);
+      // Fetch payments first so we can extract payment refs for membership fee matching
+      const allPayments = await getPayments();
+      const myPayments = allPayments.filter(p => p.email === email);
+      const myPaymentRefs = new Set(
+        myPayments.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean),
+      );
+
+      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
-      // Match payments by email (col G of the Payments sheet)
-      const totalPaid = allPayments
-        .filter(p => p.email === email)
-        .reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = myPayments.reduce((sum, p) => sum + p.amount, 0);
 
       return {
         totalFees,
@@ -371,30 +372,47 @@ export const appRouter = router({
       const email = (user.email || "").toLowerCase().trim();
       const paymentId = (user.paymentId || "").trim();
 
-      const [mySignups, allPayments] = await Promise.all([
-        getAllSignupsByEmail(email),
-        getPayments(),
-      ]);
+      // Fetch payments first so we can extract payment refs for membership fee matching
+      const allPayments = await getPayments();
+      const myPaymentsRaw = allPayments.filter(p => p.email === email);
+      const myPaymentRefs = new Set(
+        myPaymentsRaw.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean),
+      );
 
-      const fees = mySignups.map(s => ({
-        trainingDate: s.dateOfTraining,
-        pool: s.pool,
-        activity: s.activity,
-        actualFee: s.actualFees,
-      }));
+      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
-      // Match payments by email (col G of the Payments sheet)
-      const myPayments = allPayments
-        .filter(p => p.email === email)
-        .map(p => ({ amount: p.amount, date: p.date }));
+      // Separate training sign-ups from membership fee entries
+      const trainingFees = mySignups
+        .filter(s => s.activity !== "Membership Fee")
+        .map(s => ({
+          trainingDate: s.dateOfTraining,
+          pool: s.pool,
+          activity: s.activity,
+          actualFee: s.actualFees,
+        }));
 
-      const totalFees = fees.reduce((sum, f) => sum + f.actualFee, 0);
+      const membershipFees = mySignups
+        .filter(s => s.activity === "Membership Fee")
+        .map(s => ({
+          date: s.dateTimeOfSignUp,  // date they signed up / paid
+          activity: s.activity,
+          actualFee: s.actualFees,
+        }));
+
+      const myPayments = myPaymentsRaw.map(p => ({ amount: p.amount, date: p.date }));
+
+      const totalTrainingFees  = trainingFees.reduce((sum, f) => sum + f.actualFee, 0);
+      const totalMembershipFees = membershipFees.reduce((sum, f) => sum + f.actualFee, 0);
+      const totalFees = totalTrainingFees + totalMembershipFees;
       const totalPaid = myPayments.reduce((sum, p) => sum + p.amount, 0);
 
       return {
         paymentId,
-        fees,
+        trainingFees,
+        membershipFees,
         payments: myPayments,
+        totalTrainingFees,
+        totalMembershipFees,
         totalFees,
         totalPaid,
         debt: Math.max(0, totalFees - totalPaid),

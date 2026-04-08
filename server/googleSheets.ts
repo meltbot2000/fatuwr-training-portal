@@ -377,7 +377,19 @@ export async function getPayments(): Promise<PaymentRow[]> {
   return payments;
 }
 
-export async function getAllSignupsByEmail(email: string): Promise<SignUpRow[]> {
+/**
+ * Returns all sign-up rows for a given email.
+ *
+ * Regular training rows store the user's email in col B (index 1).
+ * "Membership Fee" rows have no email — they are identified by the
+ * payment reference in col C (index 2), e.g. "Mel".
+ * Pass `membershipFeeRefs` (the set of PaymentID Match values from the
+ * Payments sheet for this user) to also capture those rows.
+ */
+export async function getAllSignupsByEmail(
+  email: string,
+  membershipFeeRefs?: Set<string>,
+): Promise<SignUpRow[]> {
   const rows = await fetchSheetRange(TAB_NAMES.signups);
   if (rows.length < 2) return [];
   const normalizedEmail = email.toLowerCase().trim();
@@ -385,15 +397,31 @@ export async function getAllSignupsByEmail(email: string): Promise<SignUpRow[]> 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 7) continue;
-    if ((row[1] || "").toLowerCase().trim() !== normalizedEmail) continue;
+    const rowEmail   = (row[1] || "").toLowerCase().trim();
+    const activity   = row[6] || "";
+    const rowPayRef  = (row[2] || "").toLowerCase().trim();
+
+    const matchByEmail = rowEmail === normalizedEmail;
+    // Membership Fee rows have no email — match by payment reference instead
+    const matchByRef = Boolean(
+      membershipFeeRefs &&
+      membershipFeeRefs.size > 0 &&
+      !rowEmail &&
+      activity === "Membership Fee" &&
+      rowPayRef &&
+      membershipFeeRefs.has(rowPayRef),
+    );
+
+    if (!matchByEmail && !matchByRef) continue;
+
     signups.push({
       name: row[0] || "",
-      email: row[1] || "",
+      email: rowEmail || normalizedEmail, // fill in the user's email for ref-matched rows
       paymentId: row[2] || "",
       dateTimeOfSignUp: row[3] || "",
       pool: row[4] || "",
       dateOfTraining: row[5] || "",
-      activity: row[6] || "",
+      activity,
       activityValue: row[7] || "",
       baseFee: parseNumber(row[8] || "0"),
       actualFees: parseNumber(row[9] || "0"),

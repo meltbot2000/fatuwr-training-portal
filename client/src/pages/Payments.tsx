@@ -13,6 +13,14 @@ function formatFee(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+/** Format ISO / Maybank date strings to "3 Jan 2026" */
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function CopyButton({ value, label }: { value: string; label: string }) {
   const handleCopy = async () => {
     try {
@@ -160,32 +168,57 @@ export default function Payments() {
               </p>
             </div>
 
-            {/* Fees accrued */}
+            {/* Training fees */}
             <CollapsibleSection
-              title="Fees Accrued"
-              count={data.fees.length}
-              total={formatFee(data.totalFees)}
+              title="Training Fees"
+              count={data.trainingFees.length}
+              total={formatFee(data.totalTrainingFees)}
             >
-              {data.fees.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-2">No sign-ups yet.</p>
+              {data.trainingFees.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-2">No training sign-ups yet.</p>
               ) : (
                 <div className="divide-y text-sm">
-                  {data.fees.map((f, i) => (
+                  {data.trainingFees.map((f, i) => (
                     <div key={i} className="flex items-center justify-between py-2">
                       <div>
-                        <p className="font-medium text-navy">{f.trainingDate}</p>
-                        <p className="text-xs text-muted-foreground">{f.pool} · {f.activity}</p>
+                        <p className="font-medium text-navy">{formatDate(f.trainingDate)}</p>
+                        <p className="text-xs text-muted-foreground">{f.pool}{f.pool && f.activity ? " · " : ""}{f.activity}</p>
                       </div>
                       <p className="font-semibold tabular-nums">{formatFee(f.actualFee)}</p>
                     </div>
                   ))}
                   <div className="flex items-center justify-between py-2 font-semibold text-navy">
                     <p>Total</p>
-                    <p>{formatFee(data.totalFees)}</p>
+                    <p>{formatFee(data.totalTrainingFees)}</p>
                   </div>
                 </div>
               )}
             </CollapsibleSection>
+
+            {/* Membership fees — only shown if there are any */}
+            {data.membershipFees.length > 0 && (
+              <CollapsibleSection
+                title="Membership Fee"
+                count={data.membershipFees.length}
+                total={formatFee(data.totalMembershipFees)}
+              >
+                <div className="divide-y text-sm">
+                  {data.membershipFees.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium text-navy">{f.activity}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(f.date)}</p>
+                      </div>
+                      <p className="font-semibold tabular-nums">{formatFee(f.actualFee)}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between py-2 font-semibold text-navy">
+                    <p>Total</p>
+                    <p>{formatFee(data.totalMembershipFees)}</p>
+                  </div>
+                </div>
+              </CollapsibleSection>
+            )}
 
             {/* Payments received */}
             <CollapsibleSection
@@ -195,13 +228,13 @@ export default function Payments() {
             >
               {data.payments.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-2">
-                  {"No payments recorded yet."}
+                  No payments recorded yet.
                 </p>
               ) : (
                 <div className="divide-y text-sm">
                   {data.payments.map((p, i) => (
                     <div key={i} className="flex items-center justify-between py-2">
-                      <p className="text-muted-foreground">{p.date}</p>
+                      <p className="text-muted-foreground">{formatDate(p.date)}</p>
                       <p className="font-semibold tabular-nums text-green-700">{formatFee(p.amount)}</p>
                     </div>
                   ))}
