@@ -65,6 +65,15 @@ export function updateMemberSignup(email: string) {
   return gasPost("updateMemberSignup", { email });
 }
 
+export function addMembershipSignup(payload: {
+  email: string;
+  name: string;
+  activity: "Trial Membership" | "Membership Fee";
+  actualFee: number;
+}) {
+  return gasPost("addMembershipSignup", payload);
+}
+
 export function grantStudentStatus(email: string) {
   return gasPost("grantStudentStatus", { email });
 }

@@ -79,8 +79,9 @@ function doPost(e) {
     if (action === "updateMemberSignup") return updateMemberSignup(params);
     if (action === "grantStudentStatus") return grantStudentStatus(params);
     if (action === "updateUser")         return updateUser(params);
-    if (action === "addSession")         return addSession(params);
-    if (action === "closeSession")       return closeSession(params);
+    if (action === "addSession")            return addSession(params);
+    if (action === "closeSession")          return closeSession(params);
+    if (action === "addMembershipSignup")   return addMembershipSignup(params);
 
     return jsonResponse({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
@@ -370,6 +371,42 @@ function updateUser(params) {
   }
 
   return jsonResponse({ status: "error", message: "User not found" });
+}
+
+// ─── addMembershipSignup ─────────────────────────────────────────────────────
+// Records a membership purchase as a sign-up row in Training Sign-ups.
+// Unlike submitSignUp, this skips session/duplicate checks — the caller is
+// responsible for ensuring it is only called once per membership purchase.
+// Expected params: email, name, activity ("Trial Membership" | "Membership Fee"), actualFee
+
+function addMembershipSignup(params) {
+  var email    = normalizeEmail(params.email);
+  var name     = params.name || "";
+  var activity = params.activity || "Membership Fee";
+  var actualFee = Number(params.actualFee) || 0;
+
+  // Look up Payment ID from User tab (col H = column 8, index 7)
+  var paymentId = lookupPaymentId(email);
+
+  var now = new Date();
+  var dateTimeStr = formatDateTime(now);
+
+  var sheet = getSheet(TAB_SIGNUPS);
+  sheet.appendRow([
+    name,         // [0]  col A — Name
+    email,        // [1]  col B — Email  ← always populated by this function
+    paymentId,    // [2]  col C — Payment ID
+    dateTimeStr,  // [3]  col D — DateTime of action
+    "",           // [4]  col E — Pool (none for membership)
+    dateTimeStr,  // [5]  col F — Date of training (same as action time)
+    activity,     // [6]  col G — Activity
+    "",           // [7]  col H — ActivityValue
+    "",           // [8]  col I — Base fee
+    actualFee,    // [9]  col J — Actual fee
+    "",           // [10] col K — Member on training date
+  ]);
+
+  return jsonResponse({ status: "success" });
 }
 
 // ─── addSession ───────────────────────────────────────────────────────────────

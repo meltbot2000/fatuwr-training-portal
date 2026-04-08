@@ -23,6 +23,26 @@ import { nanoid } from "nanoid";
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Returns all payment rows that belong to a given user, using a two-pass strategy:
+ *  Pass 1 — rows where col G email matches the user's email directly
+ *  Pass 2 — rows where col G is absent/empty (carry-over rows without email lookup)
+ *            matched by the PaymentID Match ref (col F) extracted from Pass 1
+ *
+ * This handles the "PATCH Carry over from 2025" rows that were migrated without
+ * the email formula, so a user's full payment history is always captured.
+ */
+async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typeof getPayments>>) {
+  const payments = allPayments ?? await getPayments();
+  // Pass 1: direct email match
+  const byEmail = payments.filter(p => p.email === email);
+  // Collect the user's known payment refs from pass-1 rows
+  const myRefs = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean));
+  // Pass 2: carry-over rows (no email) whose ref is in the user's known refs
+  const byRef = payments.filter(p => !p.email && p.paymentId && myRefs.has(p.paymentId.toLowerCase().trim()));
+  return { myPayments: [...byEmail, ...byRef], myPaymentRefs: myRefs };
+}
+
 function generatePaymentId(name: string, existingIds: Set<string>): string {
   const firstName = name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
   const base = firstName.slice(0, 8) || "user";
@@ -314,13 +334,8 @@ export const appRouter = router({
       const user = ctx.user;
       const email = (user.email || "").toLowerCase().trim();
 
-      // Fetch payments first so we can extract payment refs for membership fee matching
       const allPayments = await getPayments();
-      const myPayments = allPayments.filter(p => p.email === email);
-      const myPaymentRefs = new Set(
-        myPayments.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean),
-      );
-
+      const { myPayments, myPaymentRefs } = await getMyPayments(email, allPayments);
       const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
@@ -372,13 +387,8 @@ export const appRouter = router({
       const email = (user.email || "").toLowerCase().trim();
       const paymentId = (user.paymentId || "").trim();
 
-      // Fetch payments first so we can extract payment refs for membership fee matching
       const allPayments = await getPayments();
-      const myPaymentsRaw = allPayments.filter(p => p.email === email);
-      const myPaymentRefs = new Set(
-        myPaymentsRaw.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean),
-      );
-
+      const { myPayments: myPaymentsRaw, myPaymentRefs } = await getMyPayments(email, allPayments);
       const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       // Separate training sign-ups from membership fee entries
@@ -423,7 +433,15 @@ export const appRouter = router({
   membership: router({
     signupTrial: protectedProcedure.mutation(async ({ ctx }) => {
       const user = ctx.user;
+      // Update User tab membership status + trial dates
       await appsScript.updateTrialSignup(user.email ?? "");
+      // Record the trial membership fee in Training Sign-ups (email-stamped, not manual)
+      await appsScript.addMembershipSignup({
+        email: user.email ?? "",
+        name: user.name ?? "",
+        activity: "Trial Membership",
+        actualFee: 10,
+      });
 
       const today = new Date();
       const trialEnd = new Date(today);
@@ -473,12 +491,26 @@ export const appRouter = router({
         email: z.string().email(),
         memberStatus: z.string().optional(),
         clubRole: z.string().optional(),
+        /** When setting memberStatus to "Member", optionally record the membership fee in Training Sign-ups */
+        membershipFee: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.clubRole !== "Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
         await appsScript.updateUser({ email: input.email, memberStatus: input.memberStatus, clubRole: input.clubRole });
+
+        // When promoting to Member and a fee is provided, log it in Training Sign-ups
+        if (input.memberStatus === "Member" && input.membershipFee && input.membershipFee > 0) {
+          const targetUser = await findUserByEmail(input.email);
+          await appsScript.addMembershipSignup({
+            email: input.email,
+            name: targetUser?.name ?? "",
+            activity: "Membership Fee",
+            actualFee: input.membershipFee,
+          });
+        }
+
         const dbUser = await db.getUserByEmail(input.email.toLowerCase().trim());
         if (dbUser) {
           await db.upsertUser({

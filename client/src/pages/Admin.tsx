@@ -48,10 +48,12 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const utils = trpc.useUtils();
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
   const [clubRole, setClubRole] = useState(user.clubRole || "");
+  const [membershipFee, setMembershipFee] = useState("");
 
   useEffect(() => {
     setMemberStatus(user.memberStatus || "Non-Member");
     setClubRole(user.clubRole || "");
+    setMembershipFee("");
   }, [user]);
 
   const mutation = trpc.admin.updateUserStatus.useMutation({
@@ -67,6 +69,8 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const hasChanges =
     memberStatus !== (user.memberStatus || "Non-Member") ||
     clubRole !== (user.clubRole || "");
+
+  const isSettingMember = memberStatus === "Member" && user.memberStatus !== "Member";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -95,6 +99,27 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
             </Select>
           </div>
 
+          {/* Membership fee — shown only when promoting to Member */}
+          {isSettingMember && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                Membership Fee Paid <span className="text-muted-foreground/60">(optional)</span>
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.50"
+                placeholder="e.g. 80"
+                value={membershipFee}
+                onChange={e => setMembershipFee(e.target.value)}
+                className="h-10"
+              />
+              <p className="text-xs text-muted-foreground">
+                If entered, a Membership Fee entry will be recorded in Training Sign-ups.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Club Role</Label>
             <Select value={clubRole} onValueChange={setClubRole}>
@@ -112,7 +137,12 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
 
         <div className="mt-6 space-y-2">
           <Button
-            onClick={() => mutation.mutate({ email: user.email, memberStatus, clubRole })}
+            onClick={() => mutation.mutate({
+              email: user.email,
+              memberStatus,
+              clubRole,
+              ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
+            })}
             disabled={mutation.isPending || !hasChanges}
             className="w-full bg-navy text-white hover:bg-navy/90"
           >

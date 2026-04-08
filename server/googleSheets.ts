@@ -351,10 +351,14 @@ function datesMatch(date1: string, date2: string): boolean {
 //   [0]  Maybank Payment Message (raw email body)
 //   [1]  Subject
 //   [2]  Date          e.g. "3/20/2026 16:47:13"
-//   [3]  Amount        numeric, e.g. "100"
+//   [3]  Amount        numeric, e.g. "100" — carry-over rows may have "$7.00" format
 //   [4]  OTHR Message  the PayNow reference text the sender typed
 //   [5]  PaymentID Match  matched name/handle, or "#N/A" if unmatched
-//   [6]  Email         matched user email, or "#N/A" if unmatched
+//   [6]  Email         matched user email, or "#N/A"/absent for carry-over rows
+//
+// Note: The "PATCH Carry over from 2025" rows (12/31/2025) were migrated without
+// the email lookup formula, so col G is absent. They are still valid payments and
+// are included here with email="" so the router can match them by payment ref.
 export async function getPayments(): Promise<PaymentRow[]> {
   const rows = await fetchSheetRange(TAB_NAMES.payments);
   if (rows.length < 2) return [];
@@ -362,16 +366,19 @@ export async function getPayments(): Promise<PaymentRow[]> {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 4) continue;
-    const email = (row[6] || "").trim();
-    // Skip rows where the payment hasn't been matched to a user yet
-    if (!email || email === "#N/A") continue;
+    // A row is "matched" if col F (PaymentID Match) is present and not #N/A
+    const matched = (row[5] || "").trim();
+    if (!matched || matched === "#N/A") continue;
     const amount = parseNumber(row[3] || "0");
-    if (amount === 0) continue; // skip zero-amount rows
+    if (amount === 0) continue;
+    // Col G (email) may be absent (carry-over rows) or "#N/A" (unresolved)
+    const rawEmail = (row[6] || "").trim();
+    const email = (!rawEmail || rawEmail === "#N/A" || rawEmail === "undefined") ? "" : rawEmail.toLowerCase();
     payments.push({
-      paymentId: (row[5] || "").trim(),  // col F — matched name/reference
+      paymentId: matched,       // col F — matched name/reference
       amount,
-      date: row[2] || "",                // col C — datetime string
-      email: email.toLowerCase(),
+      date: row[2] || "",       // col C — datetime string
+      email,                    // "" for carry-over rows without email lookup
     });
   }
   return payments;
