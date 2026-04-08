@@ -28,7 +28,6 @@ export default function SignUpForm() {
   );
 
   const [activity, setActivity] = useState<"Regular Training" | "Swims only">("Regular Training");
-  const [paymentMethod, setPaymentMethod] = useState("PayNow");
   const [numberOfPeople, setNumberOfPeople] = useState(1);
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -81,7 +80,6 @@ export default function SignUpForm() {
       activity,
       fee: totalFee,
       memberOnTrainingDate: membershipOnDate,
-      paymentMethod,
       numberOfPeople,
       notes: notes || undefined,
     });
@@ -124,7 +122,7 @@ export default function SignUpForm() {
             <span className="font-medium">{session.trainingDate}</span>.
           </p>
           <p className="text-sm text-muted-foreground mb-6">
-            Total: {formatFee(totalFee)} via {paymentMethod}
+            Total: {formatFee(totalFee)} via PayNow
           </p>
           <Link href="/">
             <Button className="bg-navy hover:bg-navy-light text-white font-semibold">
@@ -239,26 +237,6 @@ export default function SignUpForm() {
           </div>
         </div>
 
-        {/* Payment method */}
-        <div className="mb-4">
-          <Label className="text-sm font-medium text-navy mb-2 block">Payment Method</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {["PayNow", "Cash"].map((method) => (
-              <button
-                key={method}
-                onClick={() => setPaymentMethod(method)}
-                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                  paymentMethod === method
-                    ? "border-gold bg-gold/10 text-navy"
-                    : "border-border bg-card text-muted-foreground hover:border-gold/50"
-                }`}
-              >
-                {method}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Number of people */}
         <div className="mb-4">
           <Label className="text-sm font-medium text-navy mb-2 block">Number of People</Label>
@@ -307,7 +285,7 @@ export default function SignUpForm() {
               <div className="text-right text-sm opacity-80">
                 <p>{activity}</p>
                 <p>{numberOfPeople} {numberOfPeople === 1 ? "person" : "people"}</p>
-                <p>via {paymentMethod}</p>
+                <p>via PayNow</p>
               </div>
             </div>
           </CardContent>

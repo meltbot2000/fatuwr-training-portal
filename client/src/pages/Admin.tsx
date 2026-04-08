@@ -391,13 +391,15 @@ export default function Admin() {
               </div>
             )}
 
-            {filteredUsers.map((u) => {
-              const displayEmail = u.email || u.userEmail;
+            {filteredUsers.map((u, idx) => {
+              const displayEmail = u.email || u.userEmail || "";
+              // Only allow editing if we have a valid email — the server requires one
+              const canEdit = isAdmin && !!displayEmail;
               return (
                 <button
-                  key={displayEmail}
-                  onClick={() => isAdmin ? setEditingUser({ name: u.name, email: displayEmail, memberStatus: u.memberStatus, clubRole: u.clubRole }) : undefined}
-                  className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${isAdmin ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
+                  key={displayEmail || `user-${idx}`}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, memberStatus: u.memberStatus, clubRole: u.clubRole }) : undefined}
+                  className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm text-navy truncate">{u.name || "(no name)"}</span>
@@ -408,10 +410,10 @@ export default function Admin() {
                       <Badge className={`text-xs ${STATUS_COLORS[u.memberStatus] || STATUS_COLORS["Non-Member"]} hover:opacity-100`}>
                         {u.memberStatus || "Non-Member"}
                       </Badge>
-                      {!isAdmin && <Lock className="w-3 h-3 text-muted-foreground" />}
+                      {!canEdit && <Lock className="w-3 h-3 text-muted-foreground" />}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">{displayEmail}</p>
+                  <p className="text-xs text-muted-foreground">{displayEmail || "(no email)"}</p>
                 </button>
               );
             })}
