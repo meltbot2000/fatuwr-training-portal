@@ -574,3 +574,80 @@ function jsonResponse(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// ─── Gmail trigger — replaces the time-based cronjob ─────────────────────────
+//
+// HOW IT WORKS
+// The installable "onFiltersMatched" trigger fires the moment an incoming email
+// matches an existing Gmail filter — typically within seconds of delivery.
+// This replaces the ~5-minute polling cronjob entirely.
+//
+// PREREQUISITE
+// You must already have a Gmail filter that applies the "Maybank" label to
+// incoming Maybank PayNow alert emails. The trigger piggybacks on that filter.
+//
+// ONE-TIME SETUP (run once from the Apps Script editor):
+//   1. Open this script in the Apps Script editor
+//   2. Select "createPaymentTrigger" in the function dropdown
+//   3. Click ▶ Run — grant Gmail permission when prompted
+//   4. Open Triggers (clock icon) to confirm the trigger appears
+//   5. Delete / disable your existing time-based cronjob for permfix1
+//
+// TO REMOVE the trigger later, run deletePaymentTrigger() the same way.
+
+/**
+ * Handler called by the Gmail trigger when a new email matches a Gmail filter.
+ * Runs permfix1 (parse + write to sheet) then removeDuplicatesAndSortByTime.
+ * The event object `e` is unused — permfix1 already scans all Maybank-labelled
+ * threads each time it runs, so no per-message routing is needed.
+ */
+function onNewPaymentEmail(e) {
+  Logger.log("Gmail trigger fired — processing new payment email");
+  try {
+    permfix1();
+    removeDuplicatesAndSortByTime();
+    Logger.log("Payment processing complete");
+  } catch (err) {
+    Logger.log("Error in onNewPaymentEmail: " + err.message);
+  }
+}
+
+/**
+ * Creates the installable Gmail trigger.
+ * Run this ONCE from the Apps Script editor.
+ * Safe to re-run — removes any existing trigger for onNewPaymentEmail first.
+ */
+function createPaymentTrigger() {
+  // Remove any existing triggers for onNewPaymentEmail to avoid duplicates
+  var existing = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === "onNewPaymentEmail") {
+      ScriptApp.deleteTrigger(existing[i]);
+      Logger.log("Removed existing trigger");
+    }
+  }
+
+  ScriptApp.newTrigger("onNewPaymentEmail")
+    .forGmail()
+    .onFiltersMatched()
+    .create();
+
+  Logger.log("Gmail trigger created — onNewPaymentEmail will fire on matching emails");
+  Logger.log("You can now disable the time-based cronjob for permfix1.");
+}
+
+/**
+ * Removes the Gmail trigger.
+ * Run this from the Apps Script editor if you want to revert to the cronjob.
+ */
+function deletePaymentTrigger() {
+  var existing = ScriptApp.getProjectTriggers();
+  var removed = 0;
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === "onNewPaymentEmail") {
+      ScriptApp.deleteTrigger(existing[i]);
+      removed++;
+    }
+  }
+  Logger.log("Removed " + removed + " trigger(s) for onNewPaymentEmail");
+}
