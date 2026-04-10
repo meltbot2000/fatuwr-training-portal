@@ -105,31 +105,92 @@ async function sendViaResend(to: string, code: string): Promise<boolean> {
 }
 
 export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
+  console.log(`[OTP] Starting sendOtpEmail to: ${email}`);
+  console.log(`[OTP] GMAIL_USER set: ${Boolean(ENV.gmailUser)}, GMAIL_APP_PASSWORD set: ${Boolean(ENV.gmailAppPassword)}`);
+  console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}`);
+
   // --- Provider 1: Gmail SMTP (works for any recipient, no domain needed) ------
   if (ENV.gmailUser && ENV.gmailAppPassword) {
-    console.log(`[OTP] Sending via Gmail to ${email}`);
+    console.log(`[OTP] Attempting Gmail SMTP to ${email} from ${ENV.gmailUser}`);
     try {
-      return await sendViaGmail(email, code);
-    } catch (err) {
-      console.warn("[OTP] Gmail failed:", err);
+      const ok = await sendViaGmail(email, code);
+      if (ok) return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[OTP] Gmail SMTP failed: ${msg}`);
+      // Log the full error for Railway logs
+      console.error("[OTP] Gmail error detail:", err);
     }
+  } else {
+    console.warn("[OTP] Gmail SMTP skipped — GMAIL_USER or GMAIL_APP_PASSWORD not set");
   }
 
   // --- Provider 2: Resend (requires verified sending domain) -------------------
   if (ENV.resendApiKey) {
-    console.log(`[OTP] Sending via Resend to ${email} (from: ${ENV.resendApiFrom})`);
+    console.log(`[OTP] Attempting Resend to ${email} (from: ${ENV.resendApiFrom})`);
     try {
       const sent = await sendViaResend(email, code);
       if (sent) return true;
-    } catch (err) {
-      console.warn("[OTP] Resend exception:", err);
+      console.warn("[OTP] Resend returned false — check Resend dashboard for errors");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[OTP] Resend exception: ${msg}`);
     }
+  } else {
+    console.warn("[OTP] Resend skipped — RESEND_API_KEY not set");
   }
 
   // --- Fallback: print to console (local dev only) -----------------------------
+  console.warn(`[OTP] ⚠️  NO EMAIL PROVIDER SUCCEEDED — code will only appear in logs`);
   console.log(`[OTP] ===== VERIFICATION CODE (no email provider configured) =====`);
   console.log(`[OTP] Email: ${email}`);
   console.log(`[OTP] Code:  ${code}`);
   console.log(`[OTP] ================================================================`);
   return true;
+}
+
+/**
+ * Diagnostic: test email sending without needing a real OTP flow.
+ * Returns a detailed status object for the /api/test-email endpoint.
+ */
+export async function testEmailSending(to: string): Promise<{
+  gmailConfigured: boolean;
+  resendConfigured: boolean;
+  gmailResult: "success" | "skipped" | "failed";
+  gmailError?: string;
+  resendResult: "success" | "skipped" | "failed";
+  resendError?: string;
+}> {
+  const testCode = "123456";
+  const result = {
+    gmailConfigured: Boolean(ENV.gmailUser && ENV.gmailAppPassword),
+    resendConfigured: Boolean(ENV.resendApiKey),
+    gmailResult: "skipped" as "success" | "skipped" | "failed",
+    gmailError: undefined as string | undefined,
+    resendResult: "skipped" as "success" | "skipped" | "failed",
+    resendError: undefined as string | undefined,
+  };
+
+  if (ENV.gmailUser && ENV.gmailAppPassword) {
+    try {
+      await sendViaGmail(to, testCode);
+      result.gmailResult = "success";
+    } catch (err: unknown) {
+      result.gmailResult = "failed";
+      result.gmailError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  if (ENV.resendApiKey) {
+    try {
+      const ok = await sendViaResend(to, testCode);
+      result.resendResult = ok ? "success" : "failed";
+      if (!ok) result.resendError = "Resend returned error (check Resend dashboard)";
+    } catch (err: unknown) {
+      result.resendResult = "failed";
+      result.resendError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  return result;
 }

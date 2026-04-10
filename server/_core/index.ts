@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { testEmailSending } from "../email";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,23 @@ async function startServer() {
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Email diagnostic endpoint — sends a real test email and returns the result
+  // Usage: GET /api/test-email?to=youremail@example.com
+  app.get("/api/test-email", async (req, res) => {
+    const to = (req.query.to as string) || "";
+    if (!to || !to.includes("@")) {
+      res.status(400).json({ error: "Provide ?to=your@email.com" });
+      return;
+    }
+    try {
+      const result = await testEmailSending(to);
+      res.json({ to, ...result });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: msg });
+    }
   });
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
