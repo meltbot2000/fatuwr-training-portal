@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +10,6 @@ import { toast } from "sonner";
 const RESEND_COOLDOWN = 30;
 
 export default function Login() {
-  const [, navigate] = useLocation();
-  const utils = trpc.useUtils();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
@@ -50,10 +47,11 @@ export default function Login() {
   });
 
   const verifyOtpMutation = trpc.auth.verifyOtp.useMutation({
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       toast.success(data.isNewUser ? "Account created! Welcome to FATUWR." : "Welcome back!");
-      await utils.auth.me.invalidate();
-      navigate("/");
+      // Full page reload ensures the new session cookie is picked up cleanly
+      // across all tRPC query caches rather than relying on cache invalidation.
+      window.location.href = "/";
     },
     onError: (error) => {
       toast.error(error.message || "Invalid or expired code");
