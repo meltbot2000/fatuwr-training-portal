@@ -1,4 +1,4 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, sql, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, otpCodes } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -132,7 +132,7 @@ export async function getLatestOtp(email: string): Promise<string | null> {
   if (!db) return null;
   const result = await db.select().from(otpCodes)
     .where(and(eq(otpCodes.email, email), eq(otpCodes.used, 0)))
-    .orderBy(otpCodes.id)
+    .orderBy(desc(otpCodes.id))
     .limit(1);
   return result.length > 0 ? result[0].code : null;
 }
