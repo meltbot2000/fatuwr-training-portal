@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
-import sgMail from "@sendgrid/mail";
 import { ENV } from "./_core/env";
 
 export function generateOtp(): string {
@@ -116,13 +115,25 @@ async function sendViaResend(to: string, code: string): Promise<boolean> {
  * Uses HTTPS (not SMTP), so works on Railway.
  */
 async function sendViaSendGrid(to: string, code: string): Promise<boolean> {
-  sgMail.setApiKey(ENV.sendgridApiKey);
-  await sgMail.send({
-    to,
-    from: ENV.sendgridFrom,
-    subject: "Your FATUWR Training Portal Login Code",
-    html: buildOtpHtml(code),
+  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${ENV.sendgridApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: { email: ENV.sendgridFrom },
+      subject: "Your FATUWR Training Portal Login Code",
+      content: [{ type: "text/html", value: buildOtpHtml(code) }],
+    }),
   });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SendGrid HTTP ${res.status}: ${body}`);
+  }
+
   console.log(`[OTP] SendGrid sent to ${to}`);
   return true;
 }
