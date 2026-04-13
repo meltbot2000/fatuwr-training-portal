@@ -11,6 +11,8 @@ export const ENV = {
   resendApiFrom: process.env.RESEND_API_FROM ?? "onboarding@resend.dev",
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
+  sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
+  sendgridFrom: process.env.SENDGRID_FROM ?? "",
   gasUrl: process.env.GOOGLE_APPS_SCRIPT_URL ?? "",
   appsScriptSecret: process.env.APPS_SCRIPT_SECRET ?? "",
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "",

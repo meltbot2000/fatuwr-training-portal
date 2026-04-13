@@ -24,9 +24,9 @@ export const otpCodes = mysqlTable("otp_codes", {
   id: int("id").autoincrement().primaryKey(),
   email: varchar("email", { length: 320 }).notNull(),
   code: varchar("code", { length: 6 }).notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
+  expiresAt: timestamp("expiresAt", { fsp: 0 }).notNull(),
   used: int("used").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { fsp: 0 }).defaultNow().notNull(),
 });
 
 export type OtpCode = typeof otpCodes.$inferSelect;

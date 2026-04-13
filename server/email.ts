@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import { ENV } from "./_core/env";
 
 export function generateOtp(): string {
@@ -96,7 +97,11 @@ async function sendViaResend(to: string, code: string): Promise<boolean> {
   });
 
   if (result.error) {
-    console.warn(`[OTP] Resend error — name: ${result.error.name}, message: ${result.error.message}`);
+    const hint =
+      result.error.name === "validation_error"
+        ? " — RESEND_API_FROM may be using an unverified domain (onboarding@resend.dev only works for the Resend account owner's email)"
+        : "";
+    console.warn(`[OTP] Resend error — name: ${result.error.name}, message: ${result.error.message}${hint}`);
     return false;
   }
 
@@ -104,25 +109,42 @@ async function sendViaResend(to: string, code: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Send OTP via SendGrid Web API.
+ * Requires SENDGRID_API_KEY and a sender-verified address/domain in SENDGRID_FROM.
+ * Domain verification uses only CNAME records — works with Wix DNS.
+ * Uses HTTPS (not SMTP), so works on Railway.
+ */
+async function sendViaSendGrid(to: string, code: string): Promise<boolean> {
+  sgMail.setApiKey(ENV.sendgridApiKey);
+  await sgMail.send({
+    to,
+    from: ENV.sendgridFrom,
+    subject: "Your FATUWR Training Portal Login Code",
+    html: buildOtpHtml(code),
+  });
+  console.log(`[OTP] SendGrid sent to ${to}`);
+  return true;
+}
+
 export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
   console.log(`[OTP] Starting sendOtpEmail to: ${email}`);
-  console.log(`[OTP] GMAIL_USER set: ${Boolean(ENV.gmailUser)}, GMAIL_APP_PASSWORD set: ${Boolean(ENV.gmailAppPassword)}`);
+  console.log(`[OTP] SENDGRID_API_KEY set: ${Boolean(ENV.sendgridApiKey)}, SENDGRID_FROM set: ${Boolean(ENV.sendgridFrom)}`);
   console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}`);
 
-  // --- Provider 1: Gmail SMTP (works for any recipient, no domain needed) ------
-  if (ENV.gmailUser && ENV.gmailAppPassword) {
-    console.log(`[OTP] Attempting Gmail SMTP to ${email} from ${ENV.gmailUser}`);
+  // --- Provider 1: SendGrid Web API (HTTPS — works on Railway, CNAME verification works with Wix) ---
+  if (ENV.sendgridApiKey && ENV.sendgridFrom) {
+    console.log(`[OTP] Attempting SendGrid to ${email} from ${ENV.sendgridFrom}`);
     try {
-      const ok = await sendViaGmail(email, code);
+      const ok = await sendViaSendGrid(email, code);
       if (ok) return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[OTP] Gmail SMTP failed: ${msg}`);
-      // Log the full error for Railway logs
-      console.error("[OTP] Gmail error detail:", err);
+      console.error(`[OTP] SendGrid failed: ${msg}`);
+      console.error("[OTP] SendGrid error detail:", err);
     }
   } else {
-    console.warn("[OTP] Gmail SMTP skipped — GMAIL_USER or GMAIL_APP_PASSWORD not set");
+    console.warn("[OTP] SendGrid skipped — SENDGRID_API_KEY or SENDGRID_FROM not set");
   }
 
   // --- Provider 2: Resend (requires verified sending domain) -------------------
@@ -154,30 +176,30 @@ export async function sendOtpEmail(email: string, code: string): Promise<boolean
  * Returns a detailed status object for the /api/test-email endpoint.
  */
 export async function testEmailSending(to: string): Promise<{
-  gmailConfigured: boolean;
+  sendgridConfigured: boolean;
   resendConfigured: boolean;
-  gmailResult: "success" | "skipped" | "failed";
-  gmailError?: string;
+  sendgridResult: "success" | "skipped" | "failed";
+  sendgridError?: string;
   resendResult: "success" | "skipped" | "failed";
   resendError?: string;
 }> {
   const testCode = "123456";
   const result = {
-    gmailConfigured: Boolean(ENV.gmailUser && ENV.gmailAppPassword),
+    sendgridConfigured: Boolean(ENV.sendgridApiKey && ENV.sendgridFrom),
     resendConfigured: Boolean(ENV.resendApiKey),
-    gmailResult: "skipped" as "success" | "skipped" | "failed",
-    gmailError: undefined as string | undefined,
+    sendgridResult: "skipped" as "success" | "skipped" | "failed",
+    sendgridError: undefined as string | undefined,
     resendResult: "skipped" as "success" | "skipped" | "failed",
     resendError: undefined as string | undefined,
   };
 
-  if (ENV.gmailUser && ENV.gmailAppPassword) {
+  if (ENV.sendgridApiKey && ENV.sendgridFrom) {
     try {
-      await sendViaGmail(to, testCode);
-      result.gmailResult = "success";
+      await sendViaSendGrid(to, testCode);
+      result.sendgridResult = "success";
     } catch (err: unknown) {
-      result.gmailResult = "failed";
-      result.gmailError = err instanceof Error ? err.message : String(err);
+      result.sendgridResult = "failed";
+      result.sendgridError = err instanceof Error ? err.message : String(err);
     }
   }
 
