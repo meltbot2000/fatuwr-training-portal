@@ -106,12 +106,25 @@ export async function getUserByEmail(email: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+function fmtDatetime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
 export async function createOtp(email: string, code: string, expiresAt: Date): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const formatted = `${expiresAt.getUTCFullYear()}-${pad(expiresAt.getUTCMonth() + 1)}-${pad(expiresAt.getUTCDate())} ${pad(expiresAt.getUTCHours())}:${pad(expiresAt.getUTCMinutes())}:${pad(expiresAt.getUTCSeconds())}`;
-  await db.execute(sql`INSERT INTO otp_codes (email, code, expiresAt, used) VALUES (${email}, ${code}, ${formatted}, 0)`);
+  const expiresAtStr = fmtDatetime(expiresAt);
+  const createdAtStr = fmtDatetime(new Date());
+  try {
+    await db.execute(sql`INSERT INTO otp_codes (email, code, expiresAt, used, createdAt) VALUES (${email}, ${code}, ${expiresAtStr}, 0, ${createdAtStr})`);
+  } catch (err: unknown) {
+    // Log the full error cause so the real MySQL error is visible in Railway logs
+    const cause = (err as { cause?: unknown })?.cause;
+    console.error("[OTP] createOtp failed — top-level:", err);
+    if (cause) console.error("[OTP] createOtp MySQL cause:", cause);
+    throw err;
+  }
 }
 
 export async function verifyOtp(email: string, code: string): Promise<boolean> {
