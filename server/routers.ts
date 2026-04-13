@@ -494,6 +494,8 @@ export const appRouter = router({
         email: z.string().email(),
         memberStatus: z.string().optional(),
         clubRole: z.string().optional(),
+        trialStartDate: z.string().optional(),
+        trialEndDate: z.string().optional(),
         /** When setting memberStatus to "Member", optionally record the membership fee in Training Sign-ups */
         membershipFee: z.number().optional(),
       }))
@@ -520,6 +522,8 @@ export const appRouter = router({
             openId: dbUser.openId,
             ...(input.memberStatus !== undefined && { memberStatus: input.memberStatus }),
             ...(input.clubRole !== undefined && { clubRole: input.clubRole }),
+            ...(input.trialStartDate !== undefined && { trialStartDate: input.trialStartDate }),
+            ...(input.trialEndDate !== undefined && { trialEndDate: input.trialEndDate }),
           });
         }
         return { success: true };

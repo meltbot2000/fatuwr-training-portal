@@ -40,7 +40,7 @@ function formatFee(n: number) {
 interface EditUserSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { name: string; email: string; memberStatus: string; clubRole: string };
+  user: { name: string; email: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string };
   onDone: () => void;
 }
 
@@ -48,11 +48,15 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const utils = trpc.useUtils();
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
   const [clubRole, setClubRole] = useState(user.clubRole || "");
+  const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
+  const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
 
   useEffect(() => {
     setMemberStatus(user.memberStatus || "Non-Member");
     setClubRole(user.clubRole || "");
+    setTrialStartDate(user.trialStartDate || "");
+    setTrialEndDate(user.trialEndDate || "");
     setMembershipFee("");
   }, [user]);
 
@@ -66,15 +70,12 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
     onError: (err) => toast.error(err.message || "Failed to update user."),
   });
 
-  const hasChanges =
-    memberStatus !== (user.memberStatus || "Non-Member") ||
-    clubRole !== (user.clubRole || "");
-
   const isSettingMember = memberStatus === "Member" && user.memberStatus !== "Member";
+  const showTrialDates = memberStatus === "Trial";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
         <SheetHeader className="mb-4">
           <SheetTitle className="text-navy">Edit User</SheetTitle>
         </SheetHeader>
@@ -120,6 +121,30 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
             </div>
           )}
 
+          {/* Trial dates — shown when status is Trial */}
+          {showTrialDates && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Trial Start Date <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                <Input
+                  placeholder="e.g. 01/04/2026"
+                  value={trialStartDate}
+                  onChange={e => setTrialStartDate(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Trial End Date <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                <Input
+                  placeholder="e.g. 01/05/2026"
+                  value={trialEndDate}
+                  onChange={e => setTrialEndDate(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Club Role</Label>
             <Select value={clubRole} onValueChange={setClubRole}>
@@ -141,9 +166,10 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
               email: user.email,
               memberStatus,
               clubRole,
+              ...(showTrialDates ? { trialStartDate, trialEndDate } : {}),
               ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
             })}
-            disabled={mutation.isPending || !hasChanges}
+            disabled={mutation.isPending}
             className="w-full bg-navy text-white hover:bg-navy/90"
           >
             {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -328,7 +354,7 @@ export default function Admin() {
   }, [loading, user, isAdminOrHelper, navigate]);
 
   const [search, setSearch] = useState("");
-  const [editingUser, setEditingUser] = useState<{ name: string; email: string; memberStatus: string; clubRole: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ name: string; email: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
   const utils = trpc.useUtils();
@@ -398,7 +424,7 @@ export default function Admin() {
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, memberStatus: u.memberStatus, clubRole: u.clubRole }) : undefined}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, memberStatus: u.memberStatus, clubRole: u.clubRole, trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">

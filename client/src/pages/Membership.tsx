@@ -5,8 +5,42 @@ import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+function FeeScheduleCard() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="text-sm font-bold text-navy mb-3">Fee Schedule</h3>
+        <div className="space-y-2 text-sm">
+          <div className="grid grid-cols-3 text-xs font-medium text-muted-foreground mb-1">
+            <span>Membership</span>
+            <span className="text-right">Full Training</span>
+            <span className="text-right">Swim Only</span>
+          </div>
+          <Separator />
+          {[
+            { label: "Annual Member", full: "$13", swim: "$7" },
+            { label: "Student", full: "$13", swim: "$7" },
+            { label: "Trial Member", full: "$13", swim: "$7" },
+            { label: "Non-Member", full: "$20", swim: "$10" },
+          ].map(({ label, full, swim }) => (
+            <div key={label} className="grid grid-cols-3 py-1">
+              <span className="text-navy font-medium">{label}</span>
+              <span className="text-right tabular-nums">{full}</span>
+              <span className="text-right tabular-nums">{swim}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Fees may vary by session. Check session details for exact pricing.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 const CLUB_UEN = "T14SS0144D";
 
@@ -202,6 +236,9 @@ export default function Membership() {
             </div>
           </>
         )}
+
+        {/* Fee schedule — always visible */}
+        <FeeScheduleCard />
 
       </main>
     </div>

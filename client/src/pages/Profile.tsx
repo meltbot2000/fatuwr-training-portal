@@ -100,32 +100,6 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Fee reference */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <h3 className="text-sm font-bold text-navy mb-3">Your Fee Rates</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Full Training</p>
-                <p className="font-bold text-navy">
-                  {displayProfile.memberStatus === "Member" ? "$5.00" :
-                   displayProfile.memberStatus === "Student" ? "$5.00" : "$10.00"}
-                </p>
-              </div>
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Swim Only</p>
-                <p className="font-bold text-navy">
-                  {displayProfile.memberStatus === "Member" ? "$3.00" :
-                   displayProfile.memberStatus === "Student" ? "$3.00" : "$5.00"}
-                </p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Fees may vary by session. Check session details for exact pricing.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Logout */}
         <Button
           onClick={handleLogout}

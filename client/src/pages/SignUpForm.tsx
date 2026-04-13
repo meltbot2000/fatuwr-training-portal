@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { useParams, useLocation, Link } from "wouter";
+import { useParams, Link } from "wouter";
 import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,9 +17,10 @@ function formatFee(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+type Activity = "Regular Training" | "Swims only" | "First Timer" | "Trainer";
+
 export default function SignUpForm() {
   const { rowId } = useParams<{ rowId: string }>();
-  const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
 
   const { data: session, isLoading } = trpc.sessions.detail.useQuery(
@@ -27,15 +28,12 @@ export default function SignUpForm() {
     { enabled: !!rowId }
   );
 
-  const [activity, setActivity] = useState<"Regular Training" | "Swims only">("Regular Training");
-  const [numberOfPeople, setNumberOfPeople] = useState(1);
-  const [notes, setNotes] = useState("");
+  const [activity, setActivity] = useState<Activity>("Regular Training");
   const [submitted, setSubmitted] = useState(false);
 
   const currentStatus: string = (user as any)?.memberStatus || "Non-Member";
   const trialEndDate: string = (user as any)?.trialEndDate || "";
   const trialStartDate: string = (user as any)?.trialStartDate || "";
-  const hasTrialled = trialStartDate !== "" && trialStartDate !== "NA";
 
   const membershipOnDate = useMemo(() => {
     if (!session) return currentStatus;
@@ -53,12 +51,12 @@ export default function SignUpForm() {
   const debtBlocking = debt >= 54;
   const debtWarning = debt >= 26 && debt < 54;
 
-  const fee = useMemo(() => {
-    if (!session) return 0;
-    return calculateFee(session, membershipOnDate, activity);
-  }, [session, membershipOnDate, activity]);
+  const isFreeActivity = activity === "First Timer" || activity === "Trainer";
 
-  const totalFee = fee * numberOfPeople;
+  const fee = useMemo(() => {
+    if (!session || isFreeActivity) return 0;
+    return calculateFee(session, membershipOnDate, activity);
+  }, [session, membershipOnDate, activity, isFreeActivity]);
 
   const submitMutation = trpc.signups.submit.useMutation({
     onSuccess: (data) => {
@@ -78,10 +76,9 @@ export default function SignUpForm() {
       sessionPool: session.pool,
       name: user.name || "",
       activity,
-      fee: totalFee,
+      fee,
       memberOnTrainingDate: membershipOnDate,
-      numberOfPeople,
-      notes: notes || undefined,
+      numberOfPeople: 1,
     });
   };
 
@@ -121,9 +118,11 @@ export default function SignUpForm() {
             See you at <span className="font-medium">{session.pool}</span> on{" "}
             <span className="font-medium">{session.trainingDate}</span>.
           </p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Total: {formatFee(totalFee)} via PayNow
-          </p>
+          {fee > 0 && (
+            <p className="text-sm text-muted-foreground mb-6">
+              Total: {formatFee(fee)}
+            </p>
+          )}
           <Link href="/">
             <Button className="bg-navy hover:bg-navy-light text-white font-semibold">
               Back to Sessions
@@ -136,6 +135,13 @@ export default function SignUpForm() {
 
   const trainingFee = calculateFee(session, membershipOnDate, "Regular Training");
   const swimFee = calculateFee(session, membershipOnDate, "Swims only");
+
+  const ACTIVITY_OPTIONS: { value: Activity; label: string; subLabel: string }[] = [
+    { value: "Regular Training", label: "Full Training", subLabel: formatFee(trainingFee) },
+    { value: "Swims only", label: "Swim Only", subLabel: formatFee(swimFee) },
+    { value: "First Timer", label: "First Timer", subLabel: "$0.00" },
+    { value: "Trainer", label: "Trainer", subLabel: "$0.00" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -212,63 +218,21 @@ export default function SignUpForm() {
         <div className="mb-4">
           <Label className="text-sm font-medium text-navy mb-2 block">Session Type</Label>
           <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setActivity("Regular Training")}
-              className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                activity === "Regular Training"
-                  ? "border-gold bg-gold/10 text-navy"
-                  : "border-border bg-card text-muted-foreground hover:border-gold/50"
-              }`}
-            >
-              Full Training
-              <p className="text-xs mt-1 opacity-70">{formatFee(trainingFee)}</p>
-            </button>
-            <button
-              onClick={() => setActivity("Swims only")}
-              className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                activity === "Swims only"
-                  ? "border-gold bg-gold/10 text-navy"
-                  : "border-border bg-card text-muted-foreground hover:border-gold/50"
-              }`}
-            >
-              Swim Only
-              <p className="text-xs mt-1 opacity-70">{formatFee(swimFee)}</p>
-            </button>
+            {ACTIVITY_OPTIONS.map(({ value, label, subLabel }) => (
+              <button
+                key={value}
+                onClick={() => setActivity(value)}
+                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                  activity === value
+                    ? "border-gold bg-gold/10 text-navy"
+                    : "border-border bg-card text-muted-foreground hover:border-gold/50"
+                }`}
+              >
+                {label}
+                <p className="text-xs mt-1 opacity-70">{subLabel}</p>
+              </button>
+            ))}
           </div>
-        </div>
-
-        {/* Number of people */}
-        <div className="mb-4">
-          <Label className="text-sm font-medium text-navy mb-2 block">Number of People</Label>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setNumberOfPeople(Math.max(1, numberOfPeople - 1))}
-              disabled={numberOfPeople <= 1}
-            >
-              -
-            </Button>
-            <span className="text-lg font-bold text-navy w-8 text-center">{numberOfPeople}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setNumberOfPeople(numberOfPeople + 1)}
-            >
-              +
-            </Button>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="mb-4">
-          <Label className="text-sm font-medium text-navy mb-2 block">Notes (optional)</Label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any special requests or notes..."
-            className="w-full p-3 rounded-lg border border-input bg-card text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
         </div>
 
         <Separator className="my-4" />
@@ -279,13 +243,13 @@ export default function SignUpForm() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm opacity-80">Total Fee</p>
-                <p className="text-2xl font-bold">{formatFee(totalFee)}</p>
-                <p className="text-xs opacity-60 mt-0.5">{membershipOnDate} rate</p>
+                <p className="text-2xl font-bold">{formatFee(fee)}</p>
+                <p className="text-xs opacity-60 mt-0.5">
+                  {isFreeActivity ? "Complimentary" : `${membershipOnDate} rate`}
+                </p>
               </div>
               <div className="text-right text-sm opacity-80">
                 <p>{activity}</p>
-                <p>{numberOfPeople} {numberOfPeople === 1 ? "person" : "people"}</p>
-                <p>via PayNow</p>
               </div>
             </div>
           </CardContent>
