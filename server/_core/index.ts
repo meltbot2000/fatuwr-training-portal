@@ -49,6 +49,13 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Header echo endpoint for debugging — protected by DEV_SECRET
+  app.get("/api/dev/headers", (req, res) => {
+    const devSecret = process.env.DEV_SECRET;
+    if (!devSecret || req.query.secret !== devSecret) { res.status(403).json({ error: "Forbidden" }); return; }
+    res.json({ headers: req.headers });
+  });
+
   // OTP retrieval endpoint for automated testing — protected by DEV_SECRET env var
   // Usage: GET /api/dev/otp?email=x@y.com&secret=YOUR_DEV_SECRET
   app.get("/api/dev/otp", async (req, res) => {
