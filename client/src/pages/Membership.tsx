@@ -9,34 +9,68 @@ import { Separator } from "@/components/ui/separator";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-function FeeScheduleCard() {
+// ── TODO: Set to the actual full-year annual membership fee ──────────────────
+const ANNUAL_FEE = 80; // e.g. 80 → $80 for January (full year)
+
+// Pro-rated by calendar year: member joining in month M pays for (12-M+1)/12 of the year.
+// Rounded to nearest dollar. Update ANNUAL_FEE above to change all values at once.
+const PRORATED_SCHEDULE = (function () {
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  return months.map(function (month, i) {
+    return { month, fee: "$" + Math.round((ANNUAL_FEE * (12 - i)) / 12) };
+  });
+})();
+
+function MembershipFeeCard() {
   return (
     <Card>
       <CardContent className="p-4">
-        <h3 className="text-sm font-bold text-navy mb-3">Fee Schedule</h3>
-        <div className="space-y-2 text-sm">
+        <h3 className="text-sm font-bold text-navy mb-1">Annual Membership Fee</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Fees are pro-rated based on the month you join, valid until end of the calendar year.
+        </p>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+          {PRORATED_SCHEDULE.map(({ month, fee }) => (
+            <div key={month} className="flex justify-between">
+              <span className="text-navy/80">{month}</span>
+              <span className="font-semibold tabular-nums">{fee}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TrainingFeeCard() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="text-sm font-bold text-navy mb-1">Training Fees (Reference)</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Fees vary by pool — check session details for exact pricing.
+        </p>
+        <div className="space-y-1 text-sm">
           <div className="grid grid-cols-3 text-xs font-medium text-muted-foreground mb-1">
             <span>Membership</span>
-            <span className="text-right">Full Training</span>
-            <span className="text-right">Swim Only</span>
+            <span className="text-right">Full</span>
+            <span className="text-right">Swim</span>
           </div>
           <Separator />
           {[
-            { label: "Annual Member", full: "$13", swim: "$7" },
-            { label: "Student", full: "$13", swim: "$7" },
-            { label: "Trial Member", full: "$13", swim: "$7" },
+            { label: "Member / Student / Trial", full: "$13", swim: "$7" },
             { label: "Non-Member", full: "$20", swim: "$10" },
           ].map(({ label, full, swim }) => (
             <div key={label} className="grid grid-cols-3 py-1">
-              <span className="text-navy font-medium">{label}</span>
+              <span className="text-navy/80 text-xs">{label}</span>
               <span className="text-right tabular-nums">{full}</span>
               <span className="text-right tabular-nums">{swim}</span>
             </div>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Fees may vary by session. Check session details for exact pricing.
-        </p>
       </CardContent>
     </Card>
   );
@@ -237,8 +271,9 @@ export default function Membership() {
           </>
         )}
 
-        {/* Fee schedule — always visible */}
-        <FeeScheduleCard />
+        {/* Fee schedules — always visible */}
+        <MembershipFeeCard />
+        <TrainingFeeCard />
 
       </main>
     </div>
