@@ -80,9 +80,17 @@ const CLUB_UEN = "T14SS0144D";
 
 function parseDDMMYYYY(str: string): Date | null {
   if (!str || str === "NA") return null;
-  const [d, m, y] = str.split("/").map(Number);
-  if (!d || !m || !y) return null;
-  return new Date(y, m - 1, d);
+  // Try JS Date first — handles M/D/YYYY returned by the Sheets API (e.g. "1/16/2026")
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+  // Fallback: DD/MM/YYYY written by the app (e.g. "16/01/2026")
+  const parts = str.split("/").map(Number);
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+    const [dd, mm, yy] = parts;
+    const d2 = new Date(yy, mm - 1, dd);
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  return null;
 }
 
 function formatDisplayDate(str: string): string {

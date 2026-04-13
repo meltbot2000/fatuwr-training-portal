@@ -24,6 +24,41 @@ import { nanoid } from "nanoid";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Parses a date string that may be in either:
+ *   - M/D/YYYY  (what the Google Sheets API returns for date cells, e.g. "1/16/2026")
+ *   - DD/MM/YYYY (what the app writes when setting trial dates, e.g. "16/01/2026")
+ * Uses JS Date constructor first (handles M/D/YYYY), then falls back to manual DD/MM/YYYY.
+ * Ambiguous cases like "3/10/2026" are resolved as M/D/YYYY (the dominant format from Sheets).
+ */
+function parseFlexDate(str: string): Date | null {
+  if (!str || str === "NA") return null;
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+  // Fallback: try DD/MM/YYYY
+  const parts = str.split("/").map(Number);
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+    const [dd, mm, yy] = parts;
+    const d2 = new Date(yy, mm - 1, dd);
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  return null;
+}
+
+/**
+ * Normalises a date string from the Sheets API (M/D/YYYY) to DD/MM/YYYY
+ * so the DB consistently stores DD/MM/YYYY and frontend parseDDMMYYYY works correctly.
+ * Returns the input unchanged if it's already DD/MM/YYYY or unrecognised.
+ */
+function normalizeToddmmyyyy(str: string): string {
+  if (!str || str === "NA") return str;
+  const d = parseFlexDate(str);
+  if (!d) return str;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+/**
  * Returns all payment rows that belong to a given user, using a two-pass strategy:
  *  Pass 1 — rows where col G email matches the user's email directly
  *  Pass 2 — rows where col G is absent/empty (carry-over rows without email lookup)
@@ -64,10 +99,8 @@ export const appRouter = router({
       if (!user) return user;
       // Auto-demote expired trial members to Non-Member
       if (user.memberStatus === "Trial" && user.trialEndDate && user.trialEndDate !== "NA") {
-        const parts = user.trialEndDate.split("/").map(Number);
-        if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-          const [d, m, y] = parts;
-          const endDate = new Date(y, m - 1, d);
+        const endDate = parseFlexDate(user.trialEndDate);
+        if (endDate) {
           endDate.setHours(23, 59, 59, 999);
           if (endDate < new Date()) {
             await db.upsertUser({ openId: user.openId, memberStatus: "Non-Member" });
@@ -176,8 +209,8 @@ export const appRouter = router({
             memberStatus: sheetUser.memberStatus || "Non-Member",
             clubRole: sheetUser.clubRole ?? "",
             paymentId: sheetUser.paymentId || user.paymentId || "",
-            trialStartDate: sheetUser.trialStartDate ?? "",
-            trialEndDate: sheetUser.trialEndDate ?? "",
+            trialStartDate: normalizeToddmmyyyy(sheetUser.trialStartDate ?? ""),
+            trialEndDate: normalizeToddmmyyyy(sheetUser.trialEndDate ?? ""),
           });
           user = await db.getUserByEmail(email);
         } else if (user) {
