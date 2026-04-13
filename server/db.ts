@@ -127,6 +127,16 @@ export async function createOtp(email: string, code: string, expiresAt: Date): P
   }
 }
 
+export async function getLatestOtp(email: string): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(otpCodes)
+    .where(and(eq(otpCodes.email, email), eq(otpCodes.used, 0)))
+    .orderBy(otpCodes.id)
+    .limit(1);
+  return result.length > 0 ? result[0].code : null;
+}
+
 export async function verifyOtp(email: string, code: string): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

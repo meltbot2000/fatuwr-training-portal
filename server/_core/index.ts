@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
+import { getLatestOtp } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -46,6 +47,18 @@ async function startServer() {
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // OTP retrieval endpoint for automated testing — protected by DEV_SECRET env var
+  // Usage: GET /api/dev/otp?email=x@y.com&secret=YOUR_DEV_SECRET
+  app.get("/api/dev/otp", async (req, res) => {
+    const devSecret = process.env.DEV_SECRET;
+    if (!devSecret) { res.status(404).json({ error: "Not found" }); return; }
+    if (req.query.secret !== devSecret) { res.status(403).json({ error: "Forbidden" }); return; }
+    const email = (req.query.email as string) || "";
+    if (!email) { res.status(400).json({ error: "Provide ?email=" }); return; }
+    const code = await getLatestOtp(email.toLowerCase().trim());
+    res.json({ code });
   });
 
   // Email diagnostic endpoint — sends a real test email and returns the result
