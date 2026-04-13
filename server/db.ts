@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, otpCodes } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -106,17 +106,12 @@ export async function getUserByEmail(email: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-function toMysqlDatetime(d: Date): string {
-  // Format as "YYYY-MM-DD HH:MM:SS" — no fractional seconds, avoids MySQL TIMESTAMP rejection
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
-}
-
 export async function createOtp(email: string, code: string, expiresAt: Date): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(otpCodes).values({ email, code, expiresAt: toMysqlDatetime(expiresAt) as unknown as Date, used: 0 });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const formatted = `${expiresAt.getUTCFullYear()}-${pad(expiresAt.getUTCMonth() + 1)}-${pad(expiresAt.getUTCDate())} ${pad(expiresAt.getUTCHours())}:${pad(expiresAt.getUTCMinutes())}:${pad(expiresAt.getUTCSeconds())}`;
+  await db.execute(sql`INSERT INTO otp_codes (email, code, expiresAt, used) VALUES (${email}, ${code}, ${formatted}, 0)`);
 }
 
 export async function verifyOtp(email: string, code: string): Promise<boolean> {
