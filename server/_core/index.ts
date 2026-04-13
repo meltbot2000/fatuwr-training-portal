@@ -34,9 +34,12 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Prevent Railway's Fastly CDN from stripping Set-Cookie headers on API responses
+  // Prevent Railway's Fastly CDN from stripping Set-Cookie headers on API responses.
+  // Fastly uses Surrogate-Control (not Cache-Control) to decide pass-through behaviour.
   app.use("/api", (_req, res, next) => {
     res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Surrogate-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
     next();
   });
 
