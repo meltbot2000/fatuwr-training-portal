@@ -35,6 +35,17 @@ function formatFee(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
+function formatMonthLabel(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-SG", { month: "long", year: "numeric" });
+}
+
+function formatPaymentDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+}
+
 // ─── EditUserSheet ────────────────────────────────────────────────────────────
 
 interface EditUserSheetProps {
@@ -354,6 +365,13 @@ export default function Admin() {
   }, [loading, user, isAdminOrHelper, navigate]);
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [sessionMonthFilter, setSessionMonthFilter] = useState("All");
+  const [sessionPoolFilter, setSessionPoolFilter] = useState("All");
+  const [sessionDayFilter, setSessionDayFilter] = useState("All");
+  const [sessionStatusFilter, setSessionStatusFilter] = useState("All");
   const [editingUser, setEditingUser] = useState<{ name: string; email: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
@@ -377,16 +395,85 @@ export default function Admin() {
     onError: (err) => toast.error(err.message || "Failed to close session."),
   });
 
+  const statusCounts = useMemo(() => {
+    if (!users) return {} as Record<string, number>;
+    const counts: Record<string, number> = { All: users.length };
+    for (const u of users) {
+      const s = u.memberStatus || "Non-Member";
+      counts[s] = (counts[s] || 0) + 1;
+    }
+    return counts;
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
     if (!users) return [];
+    let result = users;
+    if (statusFilter !== "All") {
+      result = result.filter(u => (u.memberStatus || "Non-Member") === statusFilter);
+    }
     const q = search.toLowerCase().trim();
-    if (!q) return users;
-    return users.filter(u =>
+    if (!q) return result;
+    return result.filter(u =>
       u.name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
       u.userEmail.toLowerCase().includes(q)
     );
-  }, [users, search]);
+  }, [users, search, statusFilter]);
+
+  const filteredPayments = useMemo(() => {
+    if (!payments) return [];
+    const q = paymentSearch.toLowerCase().trim();
+    if (!q) return payments;
+    return payments.filter(p =>
+      p.paymentId.toLowerCase().includes(q) ||
+      ((p as any).reference || "").toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q)
+    );
+  }, [payments, paymentSearch]);
+
+  const sessionMeta = useMemo(() => {
+    if (!sessions) return { months: [] as string[], pools: [] as string[], days: [] as string[] };
+    const monthSet = new Set<string>();
+    const poolSet = new Set<string>();
+    const daySet = new Set<string>();
+    for (const s of sessions) {
+      const d = new Date(s.trainingDate);
+      if (!isNaN(d.getTime())) monthSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      if (s.pool) poolSet.add(s.pool);
+      if (s.day) daySet.add(s.day);
+    }
+    const dayOrder = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+    return {
+      months: [...monthSet].sort().reverse(),
+      pools: [...poolSet].sort(),
+      days: [...daySet].sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)),
+    };
+  }, [sessions]);
+
+  const filteredSessions = useMemo(() => {
+    if (!sessions) return sessions;
+    let result = sessions;
+    if (sessionSearch) {
+      const q = sessionSearch.toLowerCase();
+      result = result.filter(s =>
+        s.trainingDate.toLowerCase().includes(q) ||
+        s.pool.toLowerCase().includes(q) ||
+        s.day.toLowerCase().includes(q)
+      );
+    }
+    if (sessionMonthFilter !== "All") {
+      result = result.filter(s => {
+        const d = new Date(s.trainingDate);
+        if (isNaN(d.getTime())) return false;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === sessionMonthFilter;
+      });
+    }
+    if (sessionPoolFilter !== "All") result = result.filter(s => s.pool === sessionPoolFilter);
+    if (sessionDayFilter !== "All") result = result.filter(s => s.day === sessionDayFilter);
+    if (sessionStatusFilter === "Open") result = result.filter(s => !s.isClosed || s.isClosed.trim() === "");
+    else if (sessionStatusFilter === "Closed") result = result.filter(s => s.isClosed && s.isClosed.trim() !== "");
+    return result;
+  }, [sessions, sessionSearch, sessionMonthFilter, sessionPoolFilter, sessionDayFilter, sessionStatusFilter]);
 
   if (loading || !user || !isAdminOrHelper) return null;
 
@@ -410,6 +497,33 @@ export default function Admin() {
               onChange={e => setSearch(e.target.value)}
               className="h-10"
             />
+
+            {/* Status filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
+              {(["All", "Member", "Trial", "Student", "Non-Member"] as const).map(s => {
+                const active = statusFilter === s;
+                const colorMap: Record<string, string> = {
+                  All: "bg-navy text-white",
+                  Member: "bg-green-500 text-white",
+                  Trial: "bg-amber-400 text-navy",
+                  Student: "bg-blue-500 text-white",
+                  "Non-Member": "bg-slate-500 text-white",
+                };
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                      active
+                        ? `${colorMap[s]} border-transparent`
+                        : "bg-background text-muted-foreground border-border hover:border-navy/40"
+                    }`}
+                  >
+                    {s}{statusCounts[s] !== undefined ? ` (${statusCounts[s]})` : ""}
+                  </button>
+                );
+              })}
+            </div>
 
             {usersLoading && (
               <div className="space-y-2">
@@ -450,30 +564,47 @@ export default function Admin() {
           </TabsContent>
 
           {/* ── Payments tab ────────────────────────────────────────── */}
-          <TabsContent value="payments">
+          <TabsContent value="payments" className="space-y-3">
+            <Input
+              placeholder="Search by reference, ID, or email…"
+              value={paymentSearch}
+              onChange={e => setPaymentSearch(e.target.value)}
+              className="h-10"
+            />
+
             {paymentsLoading && (
               <div className="space-y-2">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
             )}
 
-            {payments && payments.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">No payments recorded.</p>
+            {!paymentsLoading && filteredPayments.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-8">No payments found.</p>
             )}
 
-            {payments && payments.length > 0 && (
+            {filteredPayments.length > 0 && (
               <div className="rounded-lg border overflow-hidden">
-                <div className="bg-muted/50 grid grid-cols-3 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
-                  <span>Payment ID</span>
-                  <span className="text-right">Amount</span>
-                  <span className="text-right">Date</span>
+                <div className="bg-muted/50 grid grid-cols-[1fr_auto] px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+                  <span>Reference / Payment ID</span>
+                  <span className="text-right">Amount · Date</span>
                 </div>
                 <div className="divide-y">
-                  {payments.map((p, i) => (
-                    <div key={i} className="grid grid-cols-3 px-4 py-2.5 text-sm">
-                      <span className="font-mono text-xs text-muted-foreground truncate pr-2">{p.paymentId || "—"}</span>
-                      <span className="text-right font-semibold text-green-700 tabular-nums">{`$${p.amount.toFixed(2)}`}</span>
-                      <span className="text-right text-muted-foreground text-xs">{p.date}</span>
+                  {filteredPayments.map((p, i) => (
+                    <div key={i} className="px-4 py-2.5 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-navy truncate">{(p as any).reference || p.paymentId || "—"}</p>
+                        {p.paymentId ? (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            ID: <span className="font-mono">{p.paymentId}</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-600 mt-0.5">Unmatched</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-green-700 tabular-nums">{`$${p.amount.toFixed(2)}`}</p>
+                        <p className="text-xs text-muted-foreground">{formatPaymentDate(p.date)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -492,17 +623,76 @@ export default function Admin() {
                 Add Session
               </Button>
 
+              <Input
+                placeholder="Search by date, pool, or day…"
+                value={sessionSearch}
+                onChange={e => setSessionSearch(e.target.value)}
+                className="h-10"
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={sessionMonthFilter} onValueChange={setSessionMonthFilter}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="All months" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All months</SelectItem>
+                    {sessionMeta.months.map(m => (
+                      <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={sessionPoolFilter} onValueChange={setSessionPoolFilter}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="All pools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All pools</SelectItem>
+                    {sessionMeta.pools.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={sessionDayFilter} onValueChange={setSessionDayFilter}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="All days" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All days</SelectItem>
+                    {sessionMeta.days.map(d => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex gap-1">
+                  {["All", "Open", "Closed"].map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setSessionStatusFilter(s)}
+                      className={`flex-1 h-9 rounded-md text-xs font-medium border transition-colors ${
+                        sessionStatusFilter === s
+                          ? "bg-navy text-white border-navy"
+                          : "bg-background text-muted-foreground border-border hover:border-navy/40"
+                      }`}
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+
               {sessionsLoading && (
                 <div className="space-y-2">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                 </div>
               )}
 
-              {sessions && sessions.length === 0 && (
+              {!sessionsLoading && filteredSessions && filteredSessions.length === 0 && (
                 <p className="text-center text-sm text-muted-foreground py-8">No sessions found.</p>
               )}
 
-              {sessions && sessions.map((s) => {
+              {filteredSessions && filteredSessions.map((s) => {
                 const isClosed = s.isClosed && s.isClosed.trim().length > 0;
                 return (
                   <div key={s.rowId} className="rounded-lg border bg-card px-4 py-3">

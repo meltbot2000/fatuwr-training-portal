@@ -61,8 +61,10 @@ export interface UserRow {
 }
 
 export interface PaymentRow {
-  /** The matched reference/name from the sheet (col F — "PaymentID Match") */
+  /** The matched reference/name from the sheet (col F — "PaymentID Match"), or "" if unmatched */
   paymentId: string;
+  /** Raw PayNow reference text the sender typed (col E — "OTHR Message") */
+  reference: string;
   amount: number;
   /** Raw date string from col C, e.g. "3/20/2026 16:47:13" */
   date: string;
@@ -366,19 +368,22 @@ export async function getPayments(): Promise<PaymentRow[]> {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 4) continue;
-    // A row is "matched" if col F (PaymentID Match) is present and not #N/A
-    const matched = (row[5] || "").trim();
-    if (!matched || matched === "#N/A") continue;
     const amount = parseNumber(row[3] || "0");
     if (amount === 0) continue;
-    // Col G (email) may be absent (carry-over rows) or "#N/A" (unresolved)
+    // Col F (PaymentID Match): matched name/reference, or "" if "#N/A" / absent
+    const rawMatched = (row[5] || "").trim();
+    const paymentId = (!rawMatched || rawMatched === "#N/A") ? "" : rawMatched;
+    // Col E (OTHR Message): raw PayNow reference text typed by sender
+    const reference = (row[4] || "").trim();
+    // Col G (email): matched user email, or "" if "#N/A" / absent
     const rawEmail = (row[6] || "").trim();
     const email = (!rawEmail || rawEmail === "#N/A" || rawEmail === "undefined") ? "" : rawEmail.toLowerCase();
     payments.push({
-      paymentId: matched,       // col F — matched name/reference
+      paymentId,
+      reference,
       amount,
       date: row[2] || "",       // col C — datetime string
-      email,                    // "" for carry-over rows without email lookup
+      email,
     });
   }
   return payments;

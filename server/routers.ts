@@ -59,7 +59,24 @@ export const appRouter = router({
   system: systemRouter,
 
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(async (opts) => {
+      const user = opts.ctx.user;
+      if (!user) return user;
+      // Auto-demote expired trial members to Non-Member
+      if (user.memberStatus === "Trial" && user.trialEndDate && user.trialEndDate !== "NA") {
+        const parts = user.trialEndDate.split("/").map(Number);
+        if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+          const [d, m, y] = parts;
+          const endDate = new Date(y, m - 1, d);
+          endDate.setHours(23, 59, 59, 999);
+          if (endDate < new Date()) {
+            await db.upsertUser({ openId: user.openId, memberStatus: "Non-Member" });
+            return { ...user, memberStatus: "Non-Member" };
+          }
+        }
+      }
+      return user;
+    }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -436,6 +453,14 @@ export const appRouter = router({
   membership: router({
     signupTrial: protectedProcedure.mutation(async ({ ctx }) => {
       const user = ctx.user;
+      // Prevent re-trial: if trialStartDate is set, the user has already used their trial
+      const hasTrialled = user.trialStartDate && user.trialStartDate !== "" && user.trialStartDate !== "NA";
+      if (hasTrialled) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "You have already used your free trial membership." });
+      }
+      if (user.memberStatus === "Trial" || user.memberStatus === "Member" || user.memberStatus === "Student") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "You already have an active membership." });
+      }
       // Update User tab membership status + trial dates
       await appsScript.updateTrialSignup(user.email ?? "");
       // Record the trial membership fee in Training Sign-ups (email-stamped, not manual)
