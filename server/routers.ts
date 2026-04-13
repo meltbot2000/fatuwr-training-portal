@@ -185,6 +185,8 @@ export const appRouter = router({
         return {
           success: true,
           isNewUser,
+          // Also return token in body so client can store it when CDN strips Set-Cookie
+          token,
           user: {
             id: user.id,
             name: user.name,

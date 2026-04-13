@@ -32,15 +32,33 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const SESSION_TOKEN_KEY = "app_session_token";
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+export function setStoredToken(token: string) {
+  localStorage.setItem(SESSION_TOKEN_KEY, token);
+}
+
+export function clearStoredToken() {
+  localStorage.removeItem(SESSION_TOKEN_KEY);
+}
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
+        const token = getStoredToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
+          headers: { ...(init?.headers as Record<string, string> ?? {}), ...headers },
         });
       },
     }),

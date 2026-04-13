@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { setStoredToken } from "@/main";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -49,8 +50,9 @@ export default function Login() {
   const verifyOtpMutation = trpc.auth.verifyOtp.useMutation({
     onSuccess: (data) => {
       toast.success(data.isNewUser ? "Account created! Welcome to FATUWR." : "Welcome back!");
-      // Full page reload ensures the new session cookie is picked up cleanly
-      // across all tRPC query caches rather than relying on cache invalidation.
+      // Store token in localStorage — Railway's CDN strips Set-Cookie headers
+      // so we send the token as Authorization: Bearer on every request instead.
+      if (data.token) setStoredToken(data.token);
       window.location.href = "/";
     },
     onError: (error) => {
