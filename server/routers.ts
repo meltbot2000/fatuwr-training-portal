@@ -79,15 +79,28 @@ async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typ
 }
 
 function generatePaymentId(name: string, existingIds: Set<string>): string {
-  const firstName = name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-  const base = firstName.slice(0, 8) || "user";
-  if (!existingIds.has(base)) return base;
-  for (let n = 2; n <= 99; n++) {
+  const clean = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const firstName = clean(parts[0] || "") || "user";
+  const lastName  = parts.length > 1 ? clean(parts[parts.length - 1]) : "";
+
+  // Step 1: first name only
+  if (!existingIds.has(firstName)) return firstName;
+  // Step 2: first name + first initial of last name
+  if (lastName) {
+    const withInitial = firstName + lastName[0];
+    if (!existingIds.has(withInitial)) return withInitial;
+  }
+  // Step 3: first name + full last name
+  const withSurname = lastName ? firstName + lastName : firstName;
+  if (withSurname !== firstName && !existingIds.has(withSurname)) return withSurname;
+  // Step 4: append number starting at 1
+  const base = withSurname !== firstName ? withSurname : firstName;
+  for (let n = 1; n <= 999; n++) {
     const candidate = `${base}${n}`;
     if (!existingIds.has(candidate)) return candidate;
   }
-  // Fallback: append a short random suffix
-  return `${base}${nanoid(4)}`;
+  return `${firstName}${nanoid(4)}`;
 }
 
 export const appRouter = router({
