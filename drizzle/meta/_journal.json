@@ -15,6 +15,20 @@
       "when": 1775152385389,
       "tag": "0001_happy_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776148319571,
+      "tag": "0002_calm_living_lightning",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1776182359522,
+      "tag": "0003_slow_red_hulk",
+      "breakpoints": true
     }
   ]
 }

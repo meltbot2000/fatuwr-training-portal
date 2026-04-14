@@ -39,7 +39,7 @@ export type InsertOtpCode = typeof otpCodes.$inferInsert;
 export const sheetSessions = mysqlTable("sheet_sessions", {
   rowIndex: int("rowIndex").primaryKey(),
   trainingDate: varchar("trainingDate", { length: 64 }).notNull(),
-  day: varchar("day", { length: 32 }).default(""),
+  day: varchar("day", { length: 256 }).default(""),
   trainingTime: varchar("trainingTime", { length: 64 }).default(""),
   pool: varchar("pool", { length: 128 }).default(""),
   poolImageUrl: text("poolImageUrl"),

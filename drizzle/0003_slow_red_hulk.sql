@@ -1,0 +1,1 @@
+ALTER TABLE `sheet_sessions` MODIFY COLUMN `day` varchar(256) DEFAULT '';
