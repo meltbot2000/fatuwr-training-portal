@@ -9,6 +9,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
 import { getLatestOtp } from "../db";
+import { startBackgroundSync, syncTab, getSyncStatus } from "../sync";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -68,6 +70,29 @@ async function startServer() {
     res.json({ code });
   });
 
+  // Sheets → DB sync webhook (called by GAS after each write)
+  // POST /api/sync?tab=payments&token=APPS_SCRIPT_SECRET
+  // Also accepts GET for manual testing: GET /api/sync/status
+  app.post("/api/sync", async (req, res) => {
+    const { tab, token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const validTabs = ["sessions", "payments", "signups", "users"] as const;
+    if (!validTabs.includes(tab as any)) {
+      res.status(400).json({ error: `Invalid tab. Use one of: ${validTabs.join(", ")}` });
+      return;
+    }
+    // Fire sync asynchronously — don't block GAS waiting for it
+    syncTab(tab as any).catch(e => console.error(`[Sync webhook] ${tab}:`, e));
+    res.json({ status: "sync queued", tab });
+  });
+
+  app.get("/api/sync/status", (_req, res) => {
+    res.json(getSyncStatus());
+  });
+
   // Email diagnostic endpoint — sends a real test email and returns the result
   // Usage: GET /api/test-email?to=youremail@example.com
   app.get("/api/test-email", async (req, res) => {
@@ -110,6 +135,8 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // Start background Sheets → DB sync after server is up
+    startBackgroundSync();
   });
 }
 

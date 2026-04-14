@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { double, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -31,3 +31,75 @@ export const otpCodes = mysqlTable("otp_codes", {
 
 export type OtpCode = typeof otpCodes.$inferSelect;
 export type InsertOtpCode = typeof otpCodes.$inferInsert;
+
+// ─── Sheets cache tables ──────────────────────────────────────────────────────
+// These mirror the four Google Sheets tabs and are kept in sync by server/sync.ts.
+// Reads go to DB first (< 5 ms); Sheets API is only hit on cold start / fallback.
+
+export const sheetSessions = mysqlTable("sheet_sessions", {
+  rowIndex: int("rowIndex").primaryKey(),
+  trainingDate: varchar("trainingDate", { length: 64 }).notNull(),
+  day: varchar("day", { length: 32 }).default(""),
+  trainingTime: varchar("trainingTime", { length: 64 }).default(""),
+  pool: varchar("pool", { length: 128 }).default(""),
+  poolImageUrl: text("poolImageUrl"),
+  memberFee: double("memberFee").default(0),
+  nonMemberFee: double("nonMemberFee").default(0),
+  memberSwimFee: double("memberSwimFee").default(0),
+  nonMemberSwimFee: double("nonMemberSwimFee").default(0),
+  studentFee: double("studentFee").default(0),
+  studentSwimFee: double("studentSwimFee").default(0),
+  trainerFee: double("trainerFee").default(0),
+  notes: text("notes"),
+  rowId: varchar("rowId", { length: 64 }).default(""),
+  attendance: int("attendance").default(0),
+  isClosed: varchar("isClosed", { length: 64 }).default(""),
+  trainingObjective: text("trainingObjective"),
+  signUpCloseTime: varchar("signUpCloseTime", { length: 64 }).default(""),
+  syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
+});
+export type SheetSession = typeof sheetSessions.$inferSelect;
+
+export const sheetPayments = mysqlTable("sheet_payments", {
+  id: int("id").primaryKey().autoincrement(),
+  paymentId: varchar("paymentId", { length: 128 }).default(""),
+  reference: text("reference"),
+  amount: double("amount").notNull(),
+  date: varchar("date", { length: 64 }).default(""),
+  email: varchar("email", { length: 320 }).default(""),
+  syncedAt: timestamp("syncedAt").defaultNow(),
+});
+export type SheetPayment = typeof sheetPayments.$inferSelect;
+
+export const sheetSignups = mysqlTable("sheet_signups", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 256 }).default(""),
+  email: varchar("email", { length: 320 }).default(""),
+  paymentId: varchar("paymentId", { length: 128 }).default(""),
+  dateTimeOfSignUp: varchar("dateTimeOfSignUp", { length: 64 }).default(""),
+  pool: varchar("pool", { length: 128 }).default(""),
+  dateOfTraining: varchar("dateOfTraining", { length: 64 }).default(""),
+  activity: varchar("activity", { length: 128 }).default(""),
+  activityValue: varchar("activityValue", { length: 128 }).default(""),
+  baseFee: double("baseFee").default(0),
+  actualFees: double("actualFees").default(0),
+  memberOnTrainingDate: varchar("memberOnTrainingDate", { length: 64 }).default(""),
+  syncedAt: timestamp("syncedAt").defaultNow(),
+});
+export type SheetSignup = typeof sheetSignups.$inferSelect;
+
+export const sheetUsers = mysqlTable("sheet_users", {
+  id: int("id").primaryKey().autoincrement(),
+  sheetId: varchar("sheetId", { length: 64 }).default(""),
+  name: varchar("name", { length: 256 }).default(""),
+  userEmail: varchar("userEmail", { length: 320 }).default(""),
+  email: varchar("email", { length: 320 }).notNull(),
+  image: text("image"),
+  paymentId: varchar("paymentId", { length: 128 }).default(""),
+  memberStatus: varchar("memberStatus", { length: 64 }).default("Non-Member"),
+  clubRole: varchar("clubRole", { length: 64 }).default(""),
+  trialStartDate: varchar("trialStartDate", { length: 64 }).default(""),
+  trialEndDate: varchar("trialEndDate", { length: 64 }).default(""),
+  syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
+});
+export type SheetUser = typeof sheetUsers.$inferSelect;

@@ -19,6 +19,7 @@ import {
   clearSessionsCache,
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
+import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
 
 
@@ -364,6 +365,7 @@ export const appRouter = router({
         });
 
         clearSessionsCache();
+        syncTab("signups").catch(e => console.error("[Sync] signups post-submit:", e));
         return {
           success: true,
           message: `You're signed up! See you at ${input.sessionPool} on ${input.sessionDate}.`,
@@ -389,6 +391,7 @@ export const appRouter = router({
           actualFee: input.actualFee,
         });
         clearSessionsCache();
+        syncTab("signups").catch(e => console.error("[Sync] signups post-edit:", e));
         return { success: true };
       }),
 
@@ -405,6 +408,7 @@ export const appRouter = router({
           pool: input.sessionPool,
         });
         clearSessionsCache();
+        syncTab("signups").catch(e => console.error("[Sync] signups post-delete:", e));
         return { success: true };
       }),
 
@@ -540,6 +544,8 @@ export const appRouter = router({
         activity: "Trial Membership",
         actualFee: 10,
       });
+      syncTab("users").catch(e => console.error("[Sync] users post-trial:", e));
+      syncTab("signups").catch(e => console.error("[Sync] signups post-trial:", e));
 
       const today = new Date();
       const trialEnd = new Date(today);
@@ -570,6 +576,7 @@ export const appRouter = router({
         memberStatus: "Member",
       });
 
+      syncTab("users").catch(e => console.error("[Sync] users post-member:", e));
       const updated = await db.getUserByOpenId(user.openId);
       return { success: true, user: updated };
     }),
@@ -599,6 +606,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
         await appsScript.updateUser({ email: input.email, memberStatus: input.memberStatus, clubRole: input.clubRole });
+        syncTab("users").catch(e => console.error("[Sync] users post-updateUser:", e));
 
         // When promoting to Member and a fee is provided, log it in Training Sign-ups
         if (input.memberStatus === "Member" && input.membershipFee && input.membershipFee > 0) {
@@ -609,6 +617,7 @@ export const appRouter = router({
             activity: "Membership Fee",
             actualFee: input.membershipFee,
           });
+          syncTab("signups").catch(e => console.error("[Sync] signups post-memberFee:", e));
         }
 
         const dbUser = await db.getUserByEmail(input.email.toLowerCase().trim());
@@ -671,6 +680,7 @@ export const appRouter = router({
         }
         await appsScript.addSession(input);
         clearSessionsCache();
+        syncTab("sessions").catch(e => console.error("[Sync] sessions post-addSession:", e));
         return { success: true };
       }),
 
@@ -682,6 +692,7 @@ export const appRouter = router({
         }
         await appsScript.closeSession({ rowId: input.rowId });
         clearSessionsCache();
+        syncTab("sessions").catch(e => console.error("[Sync] sessions post-closeSession:", e));
         return { success: true };
       }),
   }),

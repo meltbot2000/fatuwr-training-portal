@@ -3,10 +3,25 @@
  * Reads data from the FATUWR Google Sheet via the Google Sheets API (service account).
  * Falls back to the public CSV export when GOOGLE_SERVICE_ACCOUNT_JSON is not set.
  * Sheet ID: 19Vxpj2AoJizVwhkSxEtV70yKDlWMyrfQGDIu6k6RSRM
+ *
+ * Read strategy (DB-first):
+ *  1. Try Railway MySQL DB (sheet_* cache tables) — < 5 ms
+ *  2. Fall back to Sheets API if DB is empty (cold start / first boot)
+ * The DB is kept fresh by server/sync.ts (5-min background + GAS webhook).
+ *
+ * The fetchSheets*() exports are called only by sync.ts to populate the DB.
  */
 
 import { google } from "googleapis";
+import { and, eq } from "drizzle-orm";
 import { ENV } from "./_core/env";
+import { getDb } from "./db";
+import {
+  sheetSessions,
+  sheetPayments,
+  sheetSignups,
+  sheetUsers,
+} from "../drizzle/schema";
 
 const SHEET_ID = "19Vxpj2AoJizVwhkSxEtV70yKDlWMyrfQGDIu6k6RSRM";
 
@@ -86,20 +101,6 @@ export interface SignUpRow {
   memberOnTrainingDate: string;
 }
 
-const SHEETS_TIMEOUT_MS = 15_000;
-
-function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`[Sheets] ${label} timed out after ${SHEETS_TIMEOUT_MS}ms`)),
-        SHEETS_TIMEOUT_MS
-      )
-    ),
-  ]);
-}
-
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -136,6 +137,20 @@ function parseNumber(val: string): number {
 }
 
 // ─── Sheets API (primary) ─────────────────────────────────────────────────────
+
+const SHEETS_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`[Sheets] ${label} timed out after ${SHEETS_TIMEOUT_MS}ms`)),
+        SHEETS_TIMEOUT_MS
+      )
+    ),
+  ]);
+}
 
 // Singleton auth client — reuse across requests so tokens are cached & refreshed
 let _authClient: InstanceType<typeof google.auth.GoogleAuth> | null = null;
@@ -182,7 +197,6 @@ async function fetchSheetRange(tabName: string): Promise<string[][]> {
     const status = (err as any)?.response?.status ?? (err as any)?.status;
     const message = (err as any)?.message ?? String(err);
     console.error(`[Sheets] fetchSheetRange("${tabName}") failed — HTTP ${status ?? "?"}: ${message}`);
-    // Re-throw so callers surface a proper error rather than returning stale/empty data silently
     throw err;
   }
 }
@@ -208,14 +222,10 @@ async function fetchSheetCSVFallback(gid: string): Promise<string[][]> {
   }
 }
 
-let sessionsCache: { data: SessionRow[]; timestamp: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+// ─── Raw Sheets fetch functions (used by sync.ts to populate DB) ──────────────
 
-export async function getSessions(): Promise<SessionRow[]> {
-  if (sessionsCache && Date.now() - sessionsCache.timestamp < CACHE_TTL) {
-    return sessionsCache.data;
-  }
-
+/** Fetch ALL sessions directly from Sheets. Used by sync.ts only. */
+export async function fetchSheetsSessions(): Promise<Omit<SessionRow, never>[]> {
   const rows = await fetchSheetRange(TAB_NAMES.sessions);
   if (rows.length < 2) return [];
 
@@ -250,9 +260,162 @@ export async function getSessions(): Promise<SessionRow[]> {
       signUpCloseTime: row[19] || "",
     });
   }
-
-  sessionsCache = { data: sessions, timestamp: Date.now() };
   return sessions;
+}
+
+/** Fetch ALL users directly from Sheets. Used by sync.ts and as fallback. */
+export async function fetchSheetsUsers(): Promise<UserRow[]> {
+  const rows = await fetchSheetRange(TAB_NAMES.user);
+  if (rows.length < 2) return [];
+
+  const users: UserRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 4) continue;
+    const email = (row[3] || "").toLowerCase().trim();
+    if (!email) continue; // skip rows with no email
+    users.push({
+      id: row[0] || "",        // col A — sheet's own ID (stored as sheetId in DB)
+      name: row[1] || "",
+      userEmail: row[2] || "",
+      email,
+      image: row[4] || "",
+      clubRole: row[5] || "",
+      paymentId: row[7] || "",
+      memberStatus: row[9] || "Non-Member",
+      trialStartDate: row[10] || "",
+      trialEndDate: row[11] || "",
+    });
+  }
+  return users;
+}
+
+/** Fetch ALL payments directly from Sheets. Used by sync.ts only. */
+export async function fetchSheetsPayments(): Promise<PaymentRow[]> {
+  const rows = await fetchSheetRange(TAB_NAMES.payments);
+  if (rows.length < 2) return [];
+
+  const payments: PaymentRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 4) continue;
+    const amount = parseNumber(row[3] || "0");
+    if (amount === 0) continue;
+    const rawMatched = (row[5] || "").trim();
+    const paymentId = (!rawMatched || rawMatched === "#N/A") ? "" : rawMatched;
+    const reference = (row[4] || "").trim();
+    const rawEmail = (row[6] || "").trim();
+    const email = (!rawEmail || rawEmail === "#N/A" || rawEmail === "undefined") ? "" : rawEmail.toLowerCase();
+    payments.push({ paymentId, reference, amount, date: row[2] || "", email });
+  }
+  return payments;
+}
+
+/** Fetch ALL signup rows directly from Sheets. Used by sync.ts only. */
+export async function fetchSheetsSignups(): Promise<SignUpRow[]> {
+  const rows = await fetchSheetRange(TAB_NAMES.signups);
+  if (rows.length < 2) return [];
+
+  const signups: SignUpRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 7) continue;
+    signups.push({
+      name: row[0] || "",
+      email: (row[1] || "").toLowerCase().trim(),
+      paymentId: row[2] || "",
+      dateTimeOfSignUp: row[3] || "",
+      pool: row[4] || "",
+      dateOfTraining: row[5] || "",
+      activity: row[6] || "",
+      activityValue: row[7] || "",
+      baseFee: parseNumber(row[8] || "0"),
+      actualFees: parseNumber(row[9] || "0"),
+      memberOnTrainingDate: row[10] || "",
+    });
+  }
+  return signups;
+}
+
+// ─── DB-first read functions (app-facing) ─────────────────────────────────────
+
+function dbSessionToSessionRow(r: any): SessionRow {
+  return {
+    rowIndex: r.rowIndex,
+    trainingDate: r.trainingDate ?? "",
+    day: r.day ?? "",
+    trainingTime: r.trainingTime ?? "",
+    pool: r.pool ?? "",
+    poolImageUrl: r.poolImageUrl ?? "",
+    memberFee: r.memberFee ?? 0,
+    nonMemberFee: r.nonMemberFee ?? 0,
+    memberSwimFee: r.memberSwimFee ?? 0,
+    nonMemberSwimFee: r.nonMemberSwimFee ?? 0,
+    studentFee: r.studentFee ?? 0,
+    studentSwimFee: r.studentSwimFee ?? 0,
+    trainerFee: r.trainerFee ?? 0,
+    notes: r.notes ?? "",
+    rowId: r.rowId ?? "",
+    attendance: r.attendance ?? 0,
+    isClosed: r.isClosed ?? "",
+    trainingObjective: r.trainingObjective ?? "",
+    signUpCloseTime: r.signUpCloseTime ?? "",
+  };
+}
+
+function dbPaymentToPaymentRow(r: any): PaymentRow {
+  return {
+    paymentId: r.paymentId ?? "",
+    reference: r.reference ?? "",
+    amount: r.amount ?? 0,
+    date: r.date ?? "",
+    email: r.email ?? "",
+  };
+}
+
+function dbSignupToSignupRow(r: any): SignUpRow {
+  return {
+    name: r.name ?? "",
+    email: r.email ?? "",
+    paymentId: r.paymentId ?? "",
+    dateTimeOfSignUp: r.dateTimeOfSignUp ?? "",
+    pool: r.pool ?? "",
+    dateOfTraining: r.dateOfTraining ?? "",
+    activity: r.activity ?? "",
+    activityValue: r.activityValue ?? "",
+    baseFee: r.baseFee ?? 0,
+    actualFees: r.actualFees ?? 0,
+    memberOnTrainingDate: r.memberOnTrainingDate ?? "",
+  };
+}
+
+function dbUserToUserRow(r: any): UserRow {
+  return {
+    id: r.sheetId ?? "",
+    name: r.name ?? "",
+    userEmail: r.userEmail ?? "",
+    email: r.email ?? "",
+    image: r.image ?? "",
+    paymentId: r.paymentId ?? "",
+    memberStatus: r.memberStatus ?? "Non-Member",
+    clubRole: r.clubRole ?? "",
+    trialStartDate: r.trialStartDate ?? "",
+    trialEndDate: r.trialEndDate ?? "",
+  };
+}
+
+export async function getSessions(): Promise<SessionRow[]> {
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(sheetSessions);
+      if (rows.length > 0) return rows.map(dbSessionToSessionRow);
+    }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for sessions, falling back to Sheets API:", (e as any)?.message);
+  }
+  console.log("[Sheets] sessions DB empty — fetching from Sheets API");
+  return fetchSheetsSessions();
 }
 
 export async function getUpcomingSessions(): Promise<SessionRow[]> {
@@ -296,37 +459,38 @@ function parseCloseTime(timeStr: string): Date | null {
 }
 
 export async function getUsers(): Promise<UserRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.user);
-  if (rows.length < 2) return [];
-  const users: UserRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 4) continue;
-    users.push({
-      id: row[0] || "",
-      name: row[1] || "",
-      userEmail: row[2] || "",
-      email: row[3] || "",
-      image: row[4] || "",
-      // Real sheet column layout (verified against live data):
-      //   col F  (index 5)  = Club role
-      //   col H  (index 7)  = Phone / Paynow (used as Payment ID)
-      //   col J  (index 9)  = Membership status
-      //   col K  (index 10) = Trial Membership Start Date
-      //   col L  (index 11) = Trial Membership End Date
-      clubRole: row[5] || "",
-      paymentId: row[7] || "",
-      memberStatus: row[9] || "Non-Member",
-      trialStartDate: row[10] || "",
-      trialEndDate: row[11] || "",
-    });
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(sheetUsers);
+      if (rows.length > 0) return rows.map(dbUserToUserRow);
+    }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for users, falling back to Sheets API:", (e as any)?.message);
   }
-  return users;
+  console.log("[Sheets] users DB empty — fetching from Sheets API");
+  return fetchSheetsUsers();
 }
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
-  const users = await getUsers();
   const normalizedEmail = email.toLowerCase().trim();
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(sheetUsers).where(eq(sheetUsers.email, normalizedEmail));
+      if (rows.length > 0) return dbUserToUserRow(rows[0]);
+      // Also check userEmail column
+      const rows2 = await db.select().from(sheetUsers).where(eq(sheetUsers.userEmail, normalizedEmail));
+      if (rows2.length > 0) return dbUserToUserRow(rows2[0]);
+      // If DB has rows but no match, user genuinely not found
+      const total = await db.select().from(sheetUsers);
+      if (total.length > 0) return null;
+    }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for findUserByEmail, falling back to Sheets API:", (e as any)?.message);
+  }
+  // Fallback to Sheets API
+  const users = await fetchSheetsUsers();
   return users.find(u =>
     u.email.toLowerCase().trim() === normalizedEmail ||
     u.userEmail.toLowerCase().trim() === normalizedEmail
@@ -334,31 +498,28 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
 }
 
 export async function getSignUpsForSession(sessionDate: string, pool: string): Promise<SignUpRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.signups);
-  if (rows.length < 2) return [];
-  const signups: SignUpRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 7) continue;
-    const dateOfTraining = row[5] || "";
-    const signupPool = row[4] || "";
-    if (datesMatch(dateOfTraining, sessionDate) && signupPool.toLowerCase().trim() === pool.toLowerCase().trim()) {
-      signups.push({
-        name: row[0] || "",
-        email: row[1] || "",
-        paymentId: row[2] || "",
-        dateTimeOfSignUp: row[3] || "",
-        pool: signupPool,
-        dateOfTraining,
-        activity: row[6] || "",
-        activityValue: row[7] || "",
-        baseFee: parseNumber(row[8] || "0"),
-        actualFees: parseNumber(row[9] || "0"),
-        memberOnTrainingDate: row[10] || "",
-      });
+  try {
+    const db = await getDb();
+    if (db) {
+      const allSignups = await db.select().from(sheetSignups);
+      if (allSignups.length > 0) {
+        return allSignups
+          .filter(s =>
+            datesMatch(s.dateOfTraining ?? "", sessionDate) &&
+            (s.pool ?? "").toLowerCase().trim() === pool.toLowerCase().trim()
+          )
+          .map(dbSignupToSignupRow);
+      }
     }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for getSignUpsForSession, falling back:", (e as any)?.message);
   }
-  return signups;
+  // Fallback
+  const rows = await fetchSheetsSignups();
+  return rows.filter(s =>
+    datesMatch(s.dateOfTraining, sessionDate) &&
+    s.pool.toLowerCase().trim() === pool.toLowerCase().trim()
+  );
 }
 
 function datesMatch(date1: string, date2: string): boolean {
@@ -378,64 +539,53 @@ function datesMatch(date1: string, date2: string): boolean {
 //   [4]  OTHR Message  the PayNow reference text the sender typed
 //   [5]  PaymentID Match  matched name/handle, or "#N/A" if unmatched
 //   [6]  Email         matched user email, or "#N/A"/absent for carry-over rows
-//
-// Note: The "PATCH Carry over from 2025" rows (12/31/2025) were migrated without
-// the email lookup formula, so col G is absent. They are still valid payments and
-// are included here with email="" so the router can match them by payment ref.
 export async function getPayments(): Promise<PaymentRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.payments);
-  if (rows.length < 2) return [];
-  const payments: PaymentRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 4) continue;
-    const amount = parseNumber(row[3] || "0");
-    if (amount === 0) continue;
-    // Col F (PaymentID Match): matched name/reference, or "" if "#N/A" / absent
-    const rawMatched = (row[5] || "").trim();
-    const paymentId = (!rawMatched || rawMatched === "#N/A") ? "" : rawMatched;
-    // Col E (OTHR Message): raw PayNow reference text typed by sender
-    const reference = (row[4] || "").trim();
-    // Col G (email): matched user email, or "" if "#N/A" / absent
-    const rawEmail = (row[6] || "").trim();
-    const email = (!rawEmail || rawEmail === "#N/A" || rawEmail === "undefined") ? "" : rawEmail.toLowerCase();
-    payments.push({
-      paymentId,
-      reference,
-      amount,
-      date: row[2] || "",       // col C — datetime string
-      email,
-    });
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(sheetPayments);
+      if (rows.length > 0) return rows.map(dbPaymentToPaymentRow);
+    }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for payments, falling back to Sheets API:", (e as any)?.message);
   }
-  return payments;
+  console.log("[Sheets] payments DB empty — fetching from Sheets API");
+  return fetchSheetsPayments();
 }
 
 /**
  * Returns all sign-up rows for a given email.
- *
- * Regular training rows store the user's email in col B (index 1).
- * "Membership Fee" rows have no email — they are identified by the
- * payment reference in col C (index 2), e.g. "Mel".
- * Pass `membershipFeeRefs` (the set of PaymentID Match values from the
- * Payments sheet for this user) to also capture those rows.
  */
 export async function getAllSignupsByEmail(
   email: string,
   membershipFeeRefs?: Set<string>,
 ): Promise<SignUpRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.signups);
-  if (rows.length < 2) return [];
   const normalizedEmail = email.toLowerCase().trim();
-  const signups: SignUpRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 7) continue;
-    const rowEmail   = (row[1] || "").toLowerCase().trim();
-    const activity   = row[6] || "";
-    const rowPayRef  = (row[2] || "").toLowerCase().trim();
+
+  let allSignups: SignUpRow[];
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(sheetSignups);
+      if (rows.length > 0) {
+        allSignups = rows.map(dbSignupToSignupRow);
+      } else {
+        allSignups = await fetchSheetsSignups();
+      }
+    } else {
+      allSignups = await fetchSheetsSignups();
+    }
+  } catch (e) {
+    console.warn("[Sheets] DB read failed for getAllSignupsByEmail, falling back:", (e as any)?.message);
+    allSignups = await fetchSheetsSignups();
+  }
+
+  return allSignups.filter(s => {
+    const rowEmail = (s.email || "").toLowerCase().trim();
+    const activity = s.activity || "";
+    const rowPayRef = (s.paymentId || "").toLowerCase().trim();
 
     const matchByEmail = rowEmail === normalizedEmail;
-    // Membership Fee rows have no email — match by payment reference instead
     const matchByRef = Boolean(
       membershipFeeRefs &&
       membershipFeeRefs.size > 0 &&
@@ -444,28 +594,17 @@ export async function getAllSignupsByEmail(
       rowPayRef &&
       membershipFeeRefs.has(rowPayRef),
     );
-
-    if (!matchByEmail && !matchByRef) continue;
-
-    signups.push({
-      name: row[0] || "",
-      email: rowEmail || normalizedEmail, // fill in the user's email for ref-matched rows
-      paymentId: row[2] || "",
-      dateTimeOfSignUp: row[3] || "",
-      pool: row[4] || "",
-      dateOfTraining: row[5] || "",
-      activity,
-      activityValue: row[7] || "",
-      baseFee: parseNumber(row[8] || "0"),
-      actualFees: parseNumber(row[9] || "0"),
-      memberOnTrainingDate: row[10] || "",
-    });
-  }
-  return signups;
+    return matchByEmail || matchByRef;
+  }).map(s => ({
+    ...s,
+    email: s.email || normalizedEmail,
+  }));
 }
 
+/** No-op kept for backward compatibility — DB cache is now the cache layer. */
 export function clearSessionsCache(): void {
-  sessionsCache = null;
+  // Intentionally empty: cache invalidation is handled by syncTab() in sync.ts,
+  // called directly from routers.ts after each mutation.
 }
 
 export function convertDriveUrl(url: string): string {

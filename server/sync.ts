@@ -1,0 +1,113 @@
+/**
+ * Sheets → DB sync service.
+ *
+ * Keeps the four `sheet_*` cache tables in Railway MySQL in sync with the
+ * corresponding Google Sheets tabs.  All app reads go to DB first (< 5 ms);
+ * Sheets API is only called on cold-start or if the DB table is empty.
+ *
+ * Sync is triggered three ways:
+ *  1. On server startup (2 s delay so the DB connection is ready)
+ *  2. Every 5 minutes (background interval)
+ *  3. On demand via POST /api/sync?tab=X&token=SECRET (called by GAS after writes)
+ */
+
+import { getDb } from "./db";
+import {
+  sheetSessions,
+  sheetPayments,
+  sheetSignups,
+  sheetUsers,
+} from "../drizzle/schema";
+import {
+  fetchSheetsSessions,
+  fetchSheetsPayments,
+  fetchSheetsSignups,
+  fetchSheetsUsers,
+} from "./googleSheets";
+
+export type SyncTab = "sessions" | "payments" | "signups" | "users";
+
+const syncStatus: Record<SyncTab, { lastSync: number; error: string | null }> = {
+  sessions: { lastSync: 0, error: null },
+  payments:  { lastSync: 0, error: null },
+  signups:   { lastSync: 0, error: null },
+  users:     { lastSync: 0, error: null },
+};
+
+export async function syncTab(tab: SyncTab): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn(`[Sync] DB not available — skipping ${tab} sync`);
+    return;
+  }
+  try {
+    if (tab === "sessions") {
+      const rows = await fetchSheetsSessions();
+      await db.transaction(async (tx) => {
+        await tx.delete(sheetSessions);
+        if (rows.length) await tx.insert(sheetSessions).values(rows);
+      });
+    } else if (tab === "payments") {
+      const rows = await fetchSheetsPayments();
+      await db.transaction(async (tx) => {
+        await tx.delete(sheetPayments);
+        if (rows.length) await tx.insert(sheetPayments).values(rows);
+      });
+    } else if (tab === "signups") {
+      const rows = await fetchSheetsSignups();
+      await db.transaction(async (tx) => {
+        await tx.delete(sheetSignups);
+        if (rows.length) await tx.insert(sheetSignups).values(rows);
+      });
+    } else if (tab === "users") {
+      const rows = await fetchSheetsUsers();
+      await db.transaction(async (tx) => {
+        await tx.delete(sheetUsers);
+        if (rows.length) {
+          await tx.insert(sheetUsers).values(
+            rows.map(u => ({
+              sheetId: u.id,         // UserRow.id = sheet col A value
+              name: u.name,
+              userEmail: u.userEmail,
+              email: u.email,
+              image: u.image,
+              paymentId: u.paymentId,
+              memberStatus: u.memberStatus,
+              clubRole: u.clubRole,
+              trialStartDate: u.trialStartDate,
+              trialEndDate: u.trialEndDate,
+            }))
+          );
+        }
+      });
+    }
+    syncStatus[tab] = { lastSync: Date.now(), error: null };
+    console.log(`[Sync] ${tab} synced OK at ${new Date().toISOString()}`);
+  } catch (err: any) {
+    syncStatus[tab].error = err?.message ?? String(err);
+    console.error(`[Sync] ${tab} failed:`, err?.message ?? err);
+  }
+}
+
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function startBackgroundSync(): void {
+  // Stagger the initial syncs by a few ms so they don't all hit Sheets at once
+  setTimeout(() => syncTab("sessions").catch(console.error), 2_000);
+  setTimeout(() => syncTab("payments").catch(console.error), 2_500);
+  setTimeout(() => syncTab("signups").catch(console.error),  3_000);
+  setTimeout(() => syncTab("users").catch(console.error),    3_500);
+
+  setInterval(() => {
+    syncTab("sessions").catch(console.error);
+    syncTab("payments").catch(console.error);
+    syncTab("signups").catch(console.error);
+    syncTab("users").catch(console.error);
+  }, SYNC_INTERVAL_MS);
+
+  console.log("[Sync] Background sync started (5-min interval)");
+}
+
+export function getSyncStatus() {
+  return syncStatus;
+}
