@@ -86,6 +86,20 @@ export interface SignUpRow {
   memberOnTrainingDate: string;
 }
 
+const SHEETS_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`[Sheets] ${label} timed out after ${SHEETS_TIMEOUT_MS}ms`)),
+        SHEETS_TIMEOUT_MS
+      )
+    ),
+  ]);
+}
+
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -159,10 +173,10 @@ async function fetchSheetRange(tabName: string): Promise<string[][]> {
   try {
     const auth = getAuthClient();
     const sheets = google.sheets({ version: "v4", auth });
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: tabName,
-    });
+    const response = await withTimeout(
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: tabName }),
+      `fetchSheetRange("${tabName}")`
+    );
     return (response.data.values ?? []) as string[][];
   } catch (err: unknown) {
     const status = (err as any)?.response?.status ?? (err as any)?.status;
@@ -177,14 +191,21 @@ async function fetchSheetRange(tabName: string): Promise<string[][]> {
 
 async function fetchSheetCSVFallback(gid: string): Promise<string[][]> {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
-  const response = await fetch(url, {
-    headers: { "User-Agent": "FATUWR-Training-Portal/1.0" },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch sheet data: ${response.status} ${response.statusText}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SHEETS_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": "FATUWR-Training-Portal/1.0" },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sheet data: ${response.status} ${response.statusText}`);
+    }
+    const text = await response.text();
+    return parseCSV(text);
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const text = await response.text();
-  return parseCSV(text);
 }
 
 let sessionsCache: { data: SessionRow[]; timestamp: number } | null = null;

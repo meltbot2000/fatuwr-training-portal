@@ -1,20 +1,29 @@
 import { ENV } from "./_core/env";
 
+const GAS_TIMEOUT_MS = 30_000;
+
 async function gasPost(action: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!ENV.gasUrl) {
     console.warn("[GAS] GOOGLE_APPS_SCRIPT_URL not set — skipping write");
     return { status: "success" };
   }
-  const res = await fetch(ENV.gasUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, token: ENV.appsScriptSecret, ...data }),
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`GAS request failed: ${res.status}`);
-  const json = await res.json() as Record<string, unknown>;
-  if (json.status === "error") throw new Error((json.message as string) || "GAS error");
-  return json;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GAS_TIMEOUT_MS);
+  try {
+    const res = await fetch(ENV.gasUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, token: ENV.appsScriptSecret, ...data }),
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`GAS request failed: ${res.status}`);
+    const json = await res.json() as Record<string, unknown>;
+    if (json.status === "error") throw new Error((json.message as string) || "GAS error");
+    return json;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export function submitSignUp(payload: {
