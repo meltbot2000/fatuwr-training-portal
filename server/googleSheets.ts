@@ -138,15 +138,18 @@ function parseNumber(val: string): number {
 
 // ─── Sheets API (primary) ─────────────────────────────────────────────────────
 
+// User-facing fallback timeout (keep snappy; DB is the primary path)
 const SHEETS_TIMEOUT_MS = 15_000;
+// Background sync timeout — longer because sync runs outside the request path
+const SHEETS_SYNC_TIMEOUT_MS = 90_000;
 
-function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = SHEETS_TIMEOUT_MS): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error(`[Sheets] ${label} timed out after ${SHEETS_TIMEOUT_MS}ms`)),
-        SHEETS_TIMEOUT_MS
+        () => reject(new Error(`[Sheets] ${label} timed out after ${timeoutMs}ms`)),
+        timeoutMs
       )
     ),
   ]);
@@ -178,7 +181,7 @@ function getAuthClient() {
   return _authClient;
 }
 
-async function fetchSheetRange(tabName: string): Promise<string[][]> {
+async function fetchSheetRange(tabName: string, timeoutMs = SHEETS_TIMEOUT_MS): Promise<string[][]> {
   if (!ENV.googleServiceAccountJson) {
     // Fallback to public CSV for local dev without credentials
     const gid = Object.entries(TAB_NAMES).find(([, v]) => v === tabName)?.[0] as keyof typeof GIDS | undefined;
@@ -190,7 +193,8 @@ async function fetchSheetRange(tabName: string): Promise<string[][]> {
     const sheets = google.sheets({ version: "v4", auth });
     const response = await withTimeout(
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: tabName }),
-      `fetchSheetRange("${tabName}")`
+      `fetchSheetRange("${tabName}")`,
+      timeoutMs
     );
     return (response.data.values ?? []) as string[][];
   } catch (err: unknown) {
@@ -226,7 +230,7 @@ async function fetchSheetCSVFallback(gid: string): Promise<string[][]> {
 
 /** Fetch ALL sessions directly from Sheets. Used by sync.ts only. */
 export async function fetchSheetsSessions(): Promise<Omit<SessionRow, never>[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.sessions);
+  const rows = await fetchSheetRange(TAB_NAMES.sessions, SHEETS_SYNC_TIMEOUT_MS);
   if (rows.length < 2) return [];
 
   const sessions: SessionRow[] = [];
@@ -265,7 +269,7 @@ export async function fetchSheetsSessions(): Promise<Omit<SessionRow, never>[]> 
 
 /** Fetch ALL users directly from Sheets. Used by sync.ts and as fallback. */
 export async function fetchSheetsUsers(): Promise<UserRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.user);
+  const rows = await fetchSheetRange(TAB_NAMES.user, SHEETS_SYNC_TIMEOUT_MS);
   if (rows.length < 2) return [];
 
   const users: UserRow[] = [];
@@ -292,7 +296,7 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
 
 /** Fetch ALL payments directly from Sheets. Used by sync.ts only. */
 export async function fetchSheetsPayments(): Promise<PaymentRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.payments);
+  const rows = await fetchSheetRange(TAB_NAMES.payments, SHEETS_SYNC_TIMEOUT_MS);
   if (rows.length < 2) return [];
 
   const payments: PaymentRow[] = [];
@@ -313,7 +317,7 @@ export async function fetchSheetsPayments(): Promise<PaymentRow[]> {
 
 /** Fetch ALL signup rows directly from Sheets. Used by sync.ts only. */
 export async function fetchSheetsSignups(): Promise<SignUpRow[]> {
-  const rows = await fetchSheetRange(TAB_NAMES.signups);
+  const rows = await fetchSheetRange(TAB_NAMES.signups, SHEETS_SYNC_TIMEOUT_MS);
   if (rows.length < 2) return [];
 
   const signups: SignUpRow[] = [];
