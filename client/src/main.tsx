@@ -33,17 +33,46 @@ queryClient.getMutationCache().subscribe(event => {
 });
 
 const SESSION_TOKEN_KEY = "app_session_token";
+const SESSION_COOKIE_KEY = "app_session_backup";
+const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
+
+function setTokenCookie(token: string) {
+  document.cookie = `${SESSION_COOKIE_KEY}=${encodeURIComponent(token)}; max-age=${ONE_YEAR_SECONDS}; path=/; SameSite=Lax`;
+}
+
+function getTokenCookie(): string | null {
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${SESSION_COOKIE_KEY}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.split("=").slice(1).join("="));
+}
+
+function clearTokenCookie() {
+  document.cookie = `${SESSION_COOKIE_KEY}=; max-age=0; path=/`;
+}
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem(SESSION_TOKEN_KEY);
+  const lsToken = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (lsToken) return lsToken;
+  // Fallback: iOS WebKit clears localStorage for home screen apps after inactivity.
+  // Restore from cookie if still present.
+  const cookieToken = getTokenCookie();
+  if (cookieToken) {
+    localStorage.setItem(SESSION_TOKEN_KEY, cookieToken);
+    return cookieToken;
+  }
+  return null;
 }
 
 export function setStoredToken(token: string) {
   localStorage.setItem(SESSION_TOKEN_KEY, token);
+  setTokenCookie(token);
 }
 
 export function clearStoredToken() {
   localStorage.removeItem(SESSION_TOKEN_KEY);
+  clearTokenCookie();
 }
 
 const trpcClient = trpc.createClient({

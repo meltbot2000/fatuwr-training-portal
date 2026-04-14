@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, Plus, Lock } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Lock, RefreshCw } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -380,8 +380,9 @@ export default function Admin() {
   const { data: users, isLoading: usersLoading } = trpc.admin.allUsers.useQuery(undefined, {
     enabled: isAdminOrHelper,
   });
-  const { data: payments, isLoading: paymentsLoading } = trpc.admin.allPayments.useQuery(undefined, {
+  const { data: payments, isLoading: paymentsLoading, isFetching: paymentsRefetching, refetch: refetchPayments } = trpc.admin.allPayments.useQuery(undefined, {
     enabled: isAdminOrHelper,
+    refetchInterval: 30 * 1000,
   });
   const { data: sessions, isLoading: sessionsLoading } = trpc.admin.allSessions.useQuery(undefined, {
     enabled: isAdmin,
@@ -565,12 +566,24 @@ export default function Admin() {
 
           {/* ── Payments tab ────────────────────────────────────────── */}
           <TabsContent value="payments" className="space-y-3">
-            <Input
-              placeholder="Search by reference, ID, or email…"
-              value={paymentSearch}
-              onChange={e => setPaymentSearch(e.target.value)}
-              className="h-10"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search by reference, ID, or email…"
+                value={paymentSearch}
+                onChange={e => setPaymentSearch(e.target.value)}
+                className="h-10"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                onClick={() => refetchPayments()}
+                disabled={paymentsRefetching}
+                title="Refresh payments"
+              >
+                <RefreshCw className={`w-4 h-4 ${paymentsRefetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
 
             {paymentsLoading && (
               <div className="space-y-2">

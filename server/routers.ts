@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -21,7 +21,6 @@ import {
 import * as appsScript from "./appsScript";
 import { nanoid } from "nanoid";
 
-const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Parses a date string that may be in either:
@@ -238,12 +237,12 @@ export const appRouter = router({
         }
 
         const token = await sdk.createSessionToken(user.openId, {
-          expiresInMs: ONE_WEEK_MS,
+          expiresInMs: ONE_YEAR_MS,
           name: user.name || "",
         });
 
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_WEEK_MS });
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return {
           success: true,

@@ -81,6 +81,7 @@ export default function Payments() {
 
   const { data, isLoading, error } = trpc.payments.myData.useQuery(undefined, {
     retry: false,
+    refetchInterval: 60 * 1000,
   });
 
   return (
