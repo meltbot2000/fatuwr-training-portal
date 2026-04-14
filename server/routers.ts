@@ -62,19 +62,43 @@ function normalizeToddmmyyyy(str: string): string {
  *  Pass 1 — rows where col G email matches the user's email directly
  *  Pass 2 — rows where col G is absent/empty (carry-over rows without email lookup)
  *            matched by the PaymentID Match ref (col F) extracted from Pass 1
+ *  Pass 3 — rows where GAS lookup failed (col F and G both empty) but col E reference
+ *            contains the user's paymentId in Maybank format "OTHR-{paymentId}) from..."
+ *            or as an exact match (user typed only their paymentId as the reference)
  *
- * This handles the "PATCH Carry over from 2025" rows that were migrated without
- * the email formula, so a user's full payment history is always captured.
+ * This handles the "PATCH Carry over from 2025" rows and GAS lookup failures.
  */
-async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typeof getPayments>>) {
+function extractPaymentIdFromReference(reference: string): string {
+  // Maybank PayNow format: "OTHR-mel) from TAN LI WEN MELANIE on 14 Apr..."
+  const othrMatch = reference.match(/OTHR[-_](\w+)[)]/i);
+  if (othrMatch) return othrMatch[1].toLowerCase();
+  // Fallback: treat the whole reference as the paymentId (user typed only their ID)
+  return reference.toLowerCase().trim();
+}
+
+async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typeof getPayments>>, userPaymentId?: string) {
   const payments = allPayments ?? await getPayments();
+  const normUserPayId = (userPaymentId || "").toLowerCase().trim();
+
   // Pass 1: direct email match
   const byEmail = payments.filter(p => p.email === email);
-  // Collect the user's known payment refs from pass-1 rows
+  // Collect the user's known payment refs from pass-1 rows; seed with own paymentId
   const myRefs = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean));
-  // Pass 2: carry-over rows (no email) whose ref is in the user's known refs
+  if (normUserPayId) myRefs.add(normUserPayId);
+
+  // Pass 2: carry-over rows (no email) whose col F ref is in the user's known refs
   const byRef = payments.filter(p => !p.email && p.paymentId && myRefs.has(p.paymentId.toLowerCase().trim()));
-  return { myPayments: [...byEmail, ...byRef], myPaymentRefs: myRefs };
+
+  // Pass 3: GAS lookup failed (col F and G empty) — extract paymentId from col E reference text
+  const byRefText = normUserPayId
+    ? payments.filter(p => {
+        if (p.email || p.paymentId) return false;
+        if (!p.reference) return false;
+        return extractPaymentIdFromReference(p.reference) === normUserPayId;
+      })
+    : [];
+
+  return { myPayments: [...byEmail, ...byRef, ...byRefText], myPaymentRefs: myRefs };
 }
 
 function generatePaymentId(name: string, existingIds: Set<string>): string {
@@ -398,9 +422,10 @@ export const appRouter = router({
     myDebt: protectedProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
       const email = (user.email || "").toLowerCase().trim();
+      const paymentId = (user.paymentId || "").trim();
 
       const allPayments = await getPayments();
-      const { myPayments, myPaymentRefs } = await getMyPayments(email, allPayments);
+      const { myPayments, myPaymentRefs } = await getMyPayments(email, allPayments, paymentId);
       const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
@@ -453,7 +478,7 @@ export const appRouter = router({
       const paymentId = (user.paymentId || "").trim();
 
       const allPayments = await getPayments();
-      const { myPayments: myPaymentsRaw, myPaymentRefs } = await getMyPayments(email, allPayments);
+      const { myPayments: myPaymentsRaw, myPaymentRefs } = await getMyPayments(email, allPayments, paymentId);
       const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       // Separate training sign-ups from membership fee entries
