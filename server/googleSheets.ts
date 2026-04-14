@@ -278,14 +278,18 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
     if (!row || row.length < 4) continue;
     const email = (row[3] || "").toLowerCase().trim();
     if (!email) continue; // skip rows with no email
+    // User sheet column mapping (0-indexed):
+    //   A(0) = PaymentID   B(1) = name   C(2) = userEmail   D(3) = email
+    //   E(4) = image       F(5) = clubRole                   H(7) = phone (ignored)
+    //   J(9) = memberStatus   K(10) = trialStartDate   L(11) = trialEndDate
     users.push({
-      id: row[0] || "",        // col A — sheet's own ID (stored as sheetId in DB)
+      id: row[0] || "",        // col A = PaymentID (e.g. "mel", "hayley")
       name: row[1] || "",
       userEmail: row[2] || "",
       email,
       image: row[4] || "",
       clubRole: row[5] || "",
-      paymentId: row[7] || "",
+      paymentId: row[0] || "",  // col A = PaymentID (same as id; col H is phone number)
       memberStatus: row[9] || "Non-Member",
       trialStartDate: row[10] || "",
       trialEndDate: row[11] || "",
