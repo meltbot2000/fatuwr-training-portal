@@ -226,13 +226,8 @@ export const appRouter = router({
           });
           user = await db.getUserByEmail(email);
 
-          if (!sheetUser) {
-            try {
-              await appsScript.createUser({ name, email, paymentId });
-            } catch (e) {
-              console.warn("[GAS] createUser failed (non-blocking):", e);
-            }
-          }
+          // GAS createUser is deferred — called from auth.completeProfile after
+          // the user provides their real name, phone, and DOB in the onboarding step.
         }
 
         // ── Always sync sheet → DB on every login (new AND existing users) ──
@@ -272,6 +267,9 @@ export const appRouter = router({
         return {
           success: true,
           isNewUser,
+          // needsProfileCompletion: new users who have no sheet record must complete
+          // their profile (name/phone/DOB) before being fully onboarded.
+          needsProfileCompletion: isNewUser && !sheetUser,
           // Also return token in body so client can store it when CDN strips Set-Cookie
           token,
           user: {
@@ -285,6 +283,44 @@ export const appRouter = router({
             trialEndDate: user.trialEndDate ?? "",
           },
         };
+      }),
+
+    completeProfile: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1, "Name is required"),
+        phone: z.string().optional(),
+        dob: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ctx.user;
+        const { name, phone, dob } = input;
+
+        // Generate a unique paymentId from the real name
+        let allUsers: { paymentId: string }[] = [];
+        try {
+          allUsers = await getUsers();
+        } catch (err: any) {
+          console.error("[Auth] completeProfile: could not fetch users:", err.message);
+        }
+        const existingIds = new Set(
+          allUsers
+            .map(u => (u.paymentId || "").toLowerCase().trim())
+            .filter(id => id && id !== (user.paymentId || "").toLowerCase().trim())
+        );
+        const paymentId = generatePaymentId(name, existingIds);
+
+        // Update DB with real name and new paymentId
+        await db.upsertUser({ openId: user.openId, name, paymentId });
+
+        // Create sheet row with full profile info
+        try {
+          await appsScript.createUser({ name, email: user.email!, paymentId, phone, dob });
+          syncTab("users").catch(e => console.error("[Sync] completeProfile users:", e));
+        } catch (e) {
+          console.warn("[GAS] completeProfile createUser failed (non-blocking):", e);
+        }
+
+        return { success: true, paymentId };
       }),
   }),
 

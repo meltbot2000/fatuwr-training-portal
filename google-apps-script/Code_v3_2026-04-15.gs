@@ -244,23 +244,16 @@ function createUser(params) {
   var sheet = getSheet(TAB_USERS);
   var data  = getSheetData(sheet);
 
-  // Upsert: if a row with this email already exists, update it rather than append
+  // Duplicate check on col C (index 2 = userEmail) and col D (index 3 = email)
   for (var i = 0; i < data.length; i++) {
     if (
       normalizeEmail(String(data[i][2])) === email ||
       normalizeEmail(String(data[i][3])) === email
     ) {
-      var sheetRow = i + 2; // +1 for header, +1 for 1-based index
-      if (paymentId) sheet.getRange(sheetRow, 1).setValue(paymentId); // col A — PaymentID
-      if (name)      sheet.getRange(sheetRow, 2).setValue(name);      // col B — Name
-      if (phone)     sheet.getRange(sheetRow, 8).setValue(phone);     // col H — Phone Number
-      if (dob)       sheet.getRange(sheetRow, 9).setValue(dob);       // col I — Birth Date
-      notifyRailway("users");
-      return jsonResponse({ status: "updated" });
+      return jsonResponse({ status: "exists" });
     }
   }
 
-  // No existing row — append new one
   // Column order matches User tab layout
   sheet.appendRow([
     paymentId,     // [0]  col A — PaymentID (e.g. "mel", "hayley")

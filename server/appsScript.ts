@@ -62,6 +62,8 @@ export function createUser(payload: {
   name: string;
   email: string;
   paymentId: string;
+  phone?: string;
+  dob?: string;
 }) {
   return gasPost("createUser", payload);
 }
