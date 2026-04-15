@@ -22,7 +22,7 @@ import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
 import { eq, and, sql } from "drizzle-orm";
-import { sheetSignups, sheetSessions } from "../drizzle/schema";
+import { sheetSignups, sheetSessions, sheetUsers } from "../drizzle/schema";
 
 
 /**
@@ -314,12 +314,32 @@ export const appRouter = router({
         // Update DB with real name and new paymentId
         await db.upsertUser({ openId: user.openId, name, paymentId });
 
-        // Create sheet row with full profile info
-        try {
-          await appsScript.createUser({ name, email: user.email!, paymentId, phone, dob });
-          syncTab("users").catch(e => console.error("[Sync] completeProfile users:", e));
-        } catch (e) {
-          console.warn("[GAS] completeProfile createUser failed (non-blocking):", e);
+        // Upsert into sheet_users (DB-primary)
+        const usersDb = await db.getDb();
+        if (usersDb) {
+          const existing = await usersDb
+            .select({ id: sheetUsers.id })
+            .from(sheetUsers)
+            .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()))
+            .limit(1);
+          if (existing.length > 0) {
+            await usersDb.update(sheetUsers)
+              .set({ name, paymentId, sheetId: paymentId })
+              .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+          } else {
+            await usersDb.insert(sheetUsers).values({
+              sheetId: paymentId,
+              name,
+              userEmail: user.email ?? "",
+              email: (user.email ?? "").toLowerCase().trim(),
+              image: "",
+              paymentId,
+              memberStatus: "Non-Member",
+              clubRole: "",
+              trialStartDate: "",
+              trialEndDate: "",
+            });
+          }
         }
 
         return { success: true, paymentId };
@@ -578,8 +598,6 @@ export const appRouter = router({
       if (user.memberStatus === "Trial" || user.memberStatus === "Member" || user.memberStatus === "Student") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "You already have an active membership." });
       }
-      // Update User tab membership status + trial dates
-      await appsScript.updateTrialSignup(user.email ?? "");
       // Record the trial membership fee in Training Sign-ups — direct DB write
       const trialDb = await db.getDb();
       if (trialDb) {
@@ -597,8 +615,6 @@ export const appRouter = router({
           memberOnTrainingDate: "",
         });
       }
-      syncTab("users").catch(e => console.error("[Sync] users post-trial:", e));
-
       const today = new Date();
       const trialEnd = new Date(today);
       trialEnd.setDate(trialEnd.getDate() + 30);
@@ -607,6 +623,13 @@ export const appRouter = router({
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         return `${dd}/${mm}/${d.getFullYear()}`;
       };
+
+      // Update sheet_users (DB-primary)
+      if (trialDb) {
+        await trialDb.update(sheetUsers)
+          .set({ memberStatus: "Trial", trialStartDate: fmt(today), trialEndDate: fmt(trialEnd) })
+          .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+      }
 
       await db.upsertUser({
         openId: user.openId,
@@ -621,14 +644,20 @@ export const appRouter = router({
 
     signupMember: protectedProcedure.mutation(async ({ ctx }) => {
       const user = ctx.user;
-      await appsScript.updateMemberSignup(user.email ?? "");
+
+      // Update sheet_users (DB-primary)
+      const memberDb = await db.getDb();
+      if (memberDb) {
+        await memberDb.update(sheetUsers)
+          .set({ memberStatus: "Member" })
+          .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+      }
 
       await db.upsertUser({
         openId: user.openId,
         memberStatus: "Member",
       });
 
-      syncTab("users").catch(e => console.error("[Sync] users post-member:", e));
       const updated = await db.getUserByOpenId(user.openId);
       return { success: true, user: updated };
     }),
@@ -657,8 +686,20 @@ export const appRouter = router({
         if (ctx.user.clubRole !== "Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
-        await appsScript.updateUser({ email: input.email, memberStatus: input.memberStatus, clubRole: input.clubRole });
-        syncTab("users").catch(e => console.error("[Sync] users post-updateUser:", e));
+        // Update sheet_users (DB-primary)
+        const adminUsersDb = await db.getDb();
+        if (adminUsersDb) {
+          const userFields: Record<string, string> = {};
+          if (input.memberStatus !== undefined) userFields.memberStatus = input.memberStatus;
+          if (input.clubRole !== undefined) userFields.clubRole = input.clubRole;
+          if (input.trialStartDate !== undefined) userFields.trialStartDate = input.trialStartDate;
+          if (input.trialEndDate !== undefined) userFields.trialEndDate = input.trialEndDate;
+          if (Object.keys(userFields).length > 0) {
+            await adminUsersDb.update(sheetUsers)
+              .set(userFields)
+              .where(eq(sheetUsers.email, input.email.toLowerCase().trim()));
+          }
+        }
 
         // When promoting to Member and a fee is provided, log it in Training Sign-ups — direct DB write
         if (input.memberStatus === "Member" && input.membershipFee && input.membershipFee > 0) {
