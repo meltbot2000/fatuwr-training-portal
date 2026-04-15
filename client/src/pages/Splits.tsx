@@ -108,7 +108,7 @@ export default function Splits() {
         {/* Copy-all banner */}
         <button
           onClick={handleCopyAll}
-          className="w-full flex items-center justify-between rounded-lg border border-navy/20 bg-navy/5 px-4 py-3 text-sm text-navy hover:bg-navy/10 transition-colors active:bg-navy/15"
+          className="w-full flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-foreground hover:bg-white/8 transition-colors active:bg-white/10"
         >
           <span className="font-medium">
             Tap to copy all names ({allNames.length})

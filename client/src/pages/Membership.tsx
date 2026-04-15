@@ -64,7 +64,7 @@ function MembershipFeeCard() {
   return (
     <Card>
       <CardContent className="p-4">
-        <h3 className="text-sm font-bold text-navy mb-1">Annual Membership Fee</h3>
+        <h3 className="text-sm font-bold text-foreground mb-1">Annual Membership Fee</h3>
         <p className="text-xs text-muted-foreground mb-3">
           Fees are pro-rated based on the month you join, valid until end of the calendar year.
         </p>
@@ -73,7 +73,7 @@ function MembershipFeeCard() {
             const isCurrent = month === currentMonth;
             return (
               <div key={month} className={`flex justify-between ${isCurrent ? "font-semibold" : ""}`}>
-                <span className={isCurrent ? "text-navy" : "text-navy/80"}>{month}</span>
+                <span className={isCurrent ? "text-navy" : "text-foreground/70"}>{month}</span>
                 <span className={`tabular-nums ${isCurrent ? "text-gold" : ""}`}>${fee}</span>
               </div>
             );
@@ -88,8 +88,8 @@ function MembershipFeeCard() {
 
 function BenefitsNote() {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-navy/15 bg-navy/5 px-3 py-3 text-sm text-navy/80">
-      <Info className="mt-0.5 h-4 w-4 shrink-0 text-navy/50" />
+    <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-foreground/70">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-foreground/40" />
       <p>
         Membership gives you discounted training fees — typically around{" "}
         <span className="font-medium">$4 less per session</span> depending on pool and activity.
@@ -104,11 +104,11 @@ function BenefitsNote() {
 
 function StudentMembershipNote() {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-800">
+    <div className="flex items-start gap-2 rounded-lg border border-blue-400/20 bg-blue-400/10 px-3 py-3 text-sm text-blue-300/90">
       <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
       <div className="space-y-1">
         <p className="font-medium">Interested in Student Membership?</p>
-        <p className="text-blue-700">
+        <p className="text-blue-300/80">
           Please sign up for regular annual membership first, then approach the committee
           to have your student ID verified. The committee will amend the cost of membership
           and update your membership status once your student ID has been verified.
@@ -134,7 +134,7 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
 
   if (succeeded) {
     return (
-      <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+      <div className="flex items-center gap-2 text-green-300 text-sm rounded-lg border border-green-400/20 bg-green-400/10 px-3 py-2.5">
         <CheckCircle2 className="w-4 h-4 shrink-0" />
         Membership activated! Welcome as an Annual Member.
       </div>
@@ -175,7 +175,7 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
                   <p className="font-medium text-navy text-xs uppercase tracking-wide">
                     Payment — if you haven't already
                   </p>
-                  <ol className="list-decimal list-inside space-y-1.5 text-sm text-navy/80">
+                  <ol className="list-decimal list-inside space-y-1.5 text-sm text-foreground/70">
                     <li>
                       Transfer <strong>${fee}</strong> via PayNow to UEN{" "}
                       <span className="font-mono font-semibold">{CLUB_UEN}</span>.
@@ -263,11 +263,11 @@ export default function Membership() {
         {/* ── MEMBER ───────────────────────────────────────────── */}
         {memberStatus === "Member" && (
           <>
-            <div className="flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+            <div className="flex items-center gap-3 rounded-lg bg-green-400/10 border border-green-400/20 px-4 py-3">
               <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
               <div>
-                <p className="font-semibold text-green-800">You're an Annual Member.</p>
-                <p className="text-xs text-green-700 mt-0.5">Enjoy member rates at all training sessions.</p>
+                <p className="font-semibold text-green-300">You're an Annual Member.</p>
+                <p className="text-xs text-green-300/80 mt-0.5">Enjoy member rates at all training sessions.</p>
               </div>
               <Badge className="ml-auto bg-green-500 text-white hover:bg-green-500">Member</Badge>
             </div>
@@ -277,11 +277,11 @@ export default function Membership() {
 
         {/* ── STUDENT ──────────────────────────────────────────── */}
         {memberStatus === "Student" && (
-          <div className="flex items-center gap-3 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-blue-400/10 border border-blue-400/20 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0" />
             <div>
-              <p className="font-semibold text-blue-800">You have Student membership.</p>
-              <p className="text-xs text-blue-700 mt-0.5">Granted by Admin. Contact admin for changes.</p>
+              <p className="font-semibold text-blue-300">You have Student membership.</p>
+              <p className="text-xs text-blue-300/80 mt-0.5">Granted by Admin. Contact admin for changes.</p>
             </div>
             <Badge className="ml-auto bg-blue-500 text-white hover:bg-blue-500">Student</Badge>
           </div>
@@ -294,7 +294,7 @@ export default function Membership() {
               <CheckCircle2 className="w-5 h-5 text-gold shrink-0" />
               <div>
                 <p className="font-semibold text-navy">You're on a 3-month trial.</p>
-                <p className="text-xs text-navy/70 mt-0.5">
+                <p className="text-xs text-foreground/70 mt-0.5">
                   Valid until <span className="font-medium">{formatDisplayDate(trialEndDate)}</span>.
                 </p>
               </div>
@@ -315,7 +315,7 @@ export default function Membership() {
         {/* ── TRIAL (expired or missing end date) ──────────────── */}
         {memberStatus === "Trial" && (trialEndParsed === null || !trialActive) && (
           <>
-            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2.5 text-sm text-amber-300/90">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <p>
                 {trialEndParsed !== null
@@ -348,13 +348,13 @@ export default function Membership() {
                     <p className="font-semibold text-navy">3-Month Trial — $10</p>
                     <Badge className="bg-gold text-navy hover:bg-gold shrink-0">Trial</Badge>
                   </div>
-                  <p className="text-sm text-navy/70 mb-3">
+                  <p className="text-sm text-foreground/70 mb-3">
                     Try training with us at member rates for 3 months. Transfer $10 to UEN{" "}
                     <span className="font-mono font-semibold">{CLUB_UEN}</span> with your Payment ID{" "}
                     <span className="font-mono font-semibold">{paymentId || "—"}</span> as the reference.
                   </p>
                   {trialSuccess ? (
-                    <div className="flex items-center gap-2 text-green-700 text-sm">
+                    <div className="flex items-center gap-2 text-green-300/80 text-sm">
                       <CheckCircle2 className="w-4 h-4" />
                       Trial activated! You have 3 months of member-rate training.
                     </div>

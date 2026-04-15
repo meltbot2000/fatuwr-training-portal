@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { setStoredToken } from "@/main";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Loader2, Mail, ShieldCheck, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,14 +13,10 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
   const [emailError, setEmailError] = useState("");
-
-  // Profile completion fields
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileDob, setProfileDob] = useState("");
   const [profileNameError, setProfileNameError] = useState("");
-
-  // Resend cooldown
   const [resendSeconds, setResendSeconds] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -31,10 +25,7 @@ export default function Login() {
     if (cooldownRef.current) clearInterval(cooldownRef.current);
     cooldownRef.current = setInterval(() => {
       setResendSeconds(s => {
-        if (s <= 1) {
-          clearInterval(cooldownRef.current!);
-          return 0;
-        }
+        if (s <= 1) { clearInterval(cooldownRef.current!); return 0; }
         return s - 1;
       });
     }, 1000);
@@ -43,294 +34,176 @@ export default function Login() {
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const sendOtpMutation = trpc.auth.sendOtp.useMutation({
-    onSuccess: () => {
-      setStep("otp");
-      startCooldown();
-      toast.success("Verification code sent! Check your email.");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to send verification code");
-    },
+    onSuccess: () => { setStep("otp"); startCooldown(); toast.success("Verification code sent!"); },
+    onError: (e) => toast.error(e.message || "Failed to send code"),
   });
 
   const verifyOtpMutation = trpc.auth.verifyOtp.useMutation({
     onSuccess: (data) => {
-      // Store token immediately — needed for completeProfile call too
       if (data.token) setStoredToken(data.token);
-      if (data.needsProfileCompletion) {
-        setStep("profile");
-      } else {
-        toast.success(data.isNewUser ? "Account created! Welcome to FATUWR." : "Welcome back!");
-        window.location.href = "/";
-      }
+      if (data.needsProfileCompletion) { setStep("profile"); }
+      else { toast.success(data.isNewUser ? "Welcome to FATUWR!" : "Welcome back!"); window.location.href = "/"; }
     },
-    onError: (error) => {
-      toast.error(error.message || "Invalid or expired code");
-      setOtpValue("");
-    },
+    onError: (e) => { toast.error(e.message || "Invalid or expired code"); setOtpValue(""); },
   });
 
   const completeProfileMutation = trpc.auth.completeProfile.useMutation({
-    onSuccess: () => {
-      toast.success("Welcome to FATUWR! Your profile has been created.");
-      window.location.href = "/";
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to save profile");
-    },
+    onSuccess: () => { toast.success("Welcome to FATUWR!"); window.location.href = "/"; },
+    onError: (e) => toast.error(e.message || "Failed to save profile"),
   });
 
   const validateEmail = (value: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!value.trim()) {
-      setEmailError("Email is required");
-      return false;
-    }
-    if (!emailRegex.test(value)) {
-      setEmailError("Please enter a valid email address");
-      return false;
-    }
-    setEmailError("");
-    return true;
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+    setEmailError(value.trim() ? (ok ? "" : "Please enter a valid email") : "Email is required");
+    return !!value.trim() && ok;
   };
 
-  const handleSendCode = () => {
-    if (!validateEmail(email)) return;
-    sendOtpMutation.mutate({ email: email.trim() });
-  };
-
-  const handleVerifyCode = () => {
-    if (otpValue.length !== 6) return;
-    verifyOtpMutation.mutate({ email: email.trim(), code: otpValue });
-  };
-
-  const handleResend = () => {
-    setOtpValue("");
-    sendOtpMutation.mutate({ email: email.trim() });
-  };
-
-  const handleCompleteProfile = () => {
-    if (!profileName.trim()) {
-      setProfileNameError("Name is required");
-      return;
-    }
-    setProfileNameError("");
-    completeProfileMutation.mutate({
-      name: profileName.trim(),
-      phone: profilePhone.trim() || undefined,
-      dob: profileDob || undefined,
-    });
-  };
+  const STEP_ICONS = { email: Mail, otp: ShieldCheck, profile: UserCircle2 };
+  const STEP_TITLES = { email: "Sign In", otp: "Check Your Email", profile: "Complete Profile" };
+  const StepIcon = STEP_ICONS[step];
 
   return (
-    <div className="min-h-screen bg-navy flex items-center justify-center p-4">
-      <div className="w-full max-w-[420px]">
+    <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
+      <div className="w-full max-w-[400px]">
+
         {/* Step dots */}
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <div className={`h-1.5 w-12 rounded-full transition-colors ${step === "email" ? "bg-gold" : "bg-white/30"}`} />
-          <div className={`h-1.5 w-12 rounded-full transition-colors ${step === "otp" ? "bg-gold" : "bg-white/30"}`} />
-          <div className={`h-1.5 w-12 rounded-full transition-colors ${step === "profile" ? "bg-gold" : "bg-white/30"}`} />
+        <div className="flex items-center justify-center gap-2 mb-4">
+          {(["email", "otp", "profile"] as const).map(s => (
+            <div key={s} className={`h-1 w-10 rounded-full transition-colors ${step === s ? "bg-[#4DA6FF]" : "bg-white/15"}`} />
+          ))}
         </div>
 
-        {/* Step label */}
-        <p className="text-center text-white/60 text-xs mb-5">
-          {step === "email" ? "Step 1 of 3 — Enter your email"
-            : step === "otp" ? "Step 2 of 3 — Enter code"
-            : "Step 3 of 3 — Complete your profile"}
-        </p>
-
-        <Card className="border-0 shadow-2xl">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-navy flex items-center justify-center">
-              {step === "email" ? (
-                <Mail className="w-8 h-8 text-gold" />
-              ) : step === "otp" ? (
-                <ShieldCheck className="w-8 h-8 text-gold" />
-              ) : (
-                <UserCircle2 className="w-8 h-8 text-gold" />
-              )}
+        {/* Card */}
+        <div className="bg-[#1c1c1c] rounded-2xl px-6 py-8 space-y-6">
+          {/* Icon + title */}
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center">
+              <StepIcon className="w-6 h-6 text-[#4DA6FF]" />
             </div>
-            <CardTitle className="text-2xl font-bold text-navy">
-              {step === "email" ? "Sign In / Create Account"
-                : step === "otp" ? "Check Your Email"
-                : "Complete Your Profile"}
-            </CardTitle>
-            <CardDescription className="text-muted-foreground mt-1">
-              {step === "email"
-                ? "Enter your email to get started"
-                : step === "otp"
-                ? <>We sent a 6-digit code to <span className="font-medium text-navy">{email}</span></>
-                : "Just a few details so we know who you are"}
-            </CardDescription>
-          </CardHeader>
+            <div>
+              <p className="text-[20px] font-bold text-white">{STEP_TITLES[step]}</p>
+              <p className="text-[13px] text-white/45 mt-0.5">
+                {step === "email" ? "Enter your email to get started"
+                  : step === "otp" ? <>6-digit code sent to <span className="text-white/70">{email}</span></>
+                  : "A few details so we know who you are"}
+              </p>
+            </div>
+          </div>
 
-          <CardContent className="pt-4">
-            {step === "profile" ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-navy">Full Name *</label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. Jane Tan"
-                    value={profileName}
-                    onChange={(e) => {
-                      setProfileName(e.target.value);
-                      if (profileNameError) setProfileNameError("");
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleCompleteProfile()}
-                    className={`h-12 text-base mt-1 ${profileNameError ? "border-destructive" : ""}`}
-                    autoFocus
-                    disabled={completeProfileMutation.isPending}
-                  />
-                  {profileNameError && (
-                    <p className="text-sm text-destructive mt-1.5">{profileNameError}</p>
-                  )}
-                </div>
+          {/* Email step */}
+          {step === "email" && (
+            <div className="space-y-3">
+              <Input
+                type="email"
+                placeholder="yourname@email.com"
+                value={email}
+                onChange={e => { setEmail(e.target.value); if (emailError) validateEmail(e.target.value); }}
+                onKeyDown={e => e.key === "Enter" && validateEmail(email) && sendOtpMutation.mutate({ email: email.trim() })}
+                className="h-11 bg-[#2a2a2a] border-white/10 text-white placeholder:text-white/30"
+                autoFocus
+                disabled={sendOtpMutation.isPending}
+              />
+              {emailError && <p className="text-[12px] text-red-400">{emailError}</p>}
+              <button
+                onClick={() => { if (validateEmail(email)) sendOtpMutation.mutate({ email: email.trim() }); }}
+                disabled={sendOtpMutation.isPending || !email.trim()}
+                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {sendOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {sendOtpMutation.isPending ? "Sending…" : "Send Code"}
+              </button>
+            </div>
+          )}
 
-                <div>
-                  <label className="text-sm font-medium text-navy">Phone Number <span className="text-muted-foreground font-normal">(optional)</span></label>
-                  <Input
-                    type="tel"
-                    placeholder="e.g. 91234567"
-                    value={profilePhone}
-                    onChange={(e) => setProfilePhone(e.target.value)}
-                    className="h-12 text-base mt-1"
-                    disabled={completeProfileMutation.isPending}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-navy">Date of Birth <span className="text-muted-foreground font-normal">(optional)</span></label>
-                  <Input
-                    type="date"
-                    value={profileDob}
-                    onChange={(e) => setProfileDob(e.target.value)}
-                    className="h-12 text-base mt-1"
-                    disabled={completeProfileMutation.isPending}
-                  />
-                </div>
-
-                <Button
-                  onClick={handleCompleteProfile}
-                  disabled={completeProfileMutation.isPending || !profileName.trim()}
-                  className="w-full h-12 text-base font-semibold bg-gold hover:bg-gold-dark text-navy"
+          {/* OTP step */}
+          {step === "otp" && (
+            <div className="space-y-5">
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={otpValue}
+                  onChange={val => {
+                    setOtpValue(val);
+                    if (val.length === 6 && !verifyOtpMutation.isPending) {
+                      verifyOtpMutation.mutate({ email: email.trim(), code: val });
+                    }
+                  }}
+                  disabled={verifyOtpMutation.isPending}
+                  inputMode="numeric"
                 >
-                  {completeProfileMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Complete Sign Up"
-                  )}
-                </Button>
+                  <InputOTPGroup>
+                    {[0,1,2,3,4,5].map(i => <InputOTPSlot key={i} index={i} />)}
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
-            ) : step === "email" ? (
-              <div className="space-y-4">
+              <button
+                onClick={() => verifyOtpMutation.mutate({ email: email.trim(), code: otpValue })}
+                disabled={verifyOtpMutation.isPending || otpValue.length !== 6}
+                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {verifyOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {verifyOtpMutation.isPending ? "Verifying…" : "Verify Code"}
+              </button>
+              <div className="text-center space-y-1.5">
+                <button
+                  onClick={() => { setOtpValue(""); sendOtpMutation.mutate({ email: email.trim() }); }}
+                  disabled={sendOtpMutation.isPending || resendSeconds > 0}
+                  className="text-[13px] text-[#4DA6FF] disabled:opacity-40"
+                >
+                  {resendSeconds > 0 ? `Resend code (${resendSeconds}s)` : "Resend code"}
+                </button>
                 <div>
-                  <Input
-                    type="email"
-                    placeholder="yourname@email.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (emailError) validateEmail(e.target.value);
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendCode()}
-                    className={`h-12 text-base ${emailError ? "border-destructive" : ""}`}
-                    autoFocus
-                    disabled={sendOtpMutation.isPending}
-                  />
-                  {emailError && (
-                    <p className="text-sm text-destructive mt-1.5">{emailError}</p>
-                  )}
-                </div>
-
-                <Button
-                  onClick={handleSendCode}
-                  disabled={sendOtpMutation.isPending || !email.trim()}
-                  className="w-full h-12 text-base font-semibold bg-gold hover:bg-gold-dark text-navy"
-                >
-                  {sendOtpMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    "Send Code"
-                  )}
-                </Button>
-              </div>
-            ) : step === "otp" ? (
-              <div className="space-y-6">
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={otpValue}
-                    onChange={(val) => {
-                      setOtpValue(val);
-                      if (val.length === 6 && !verifyOtpMutation.isPending) {
-                        verifyOtpMutation.mutate({ email: email.trim(), code: val });
-                      }
-                    }}
-                    disabled={verifyOtpMutation.isPending}
-                    inputMode="numeric"
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-
-                <Button
-                  onClick={handleVerifyCode}
-                  disabled={verifyOtpMutation.isPending || otpValue.length !== 6}
-                  className="w-full h-12 text-base font-semibold bg-gold hover:bg-gold-dark text-navy"
-                >
-                  {verifyOtpMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    "Verify Code"
-                  )}
-                </Button>
-
-                <div className="text-center space-y-2">
-                  <button
-                    onClick={handleResend}
-                    disabled={sendOtpMutation.isPending || resendSeconds > 0}
-                    className="text-sm text-navy font-medium hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {sendOtpMutation.isPending
-                      ? "Sending..."
-                      : resendSeconds > 0
-                      ? `Resend code (${resendSeconds}s)`
-                      : "Resend code"}
+                  <button onClick={() => { setStep("email"); setOtpValue(""); }} className="text-[13px] text-white/35">
+                    Use a different email
                   </button>
-                  <div>
-                    <button
-                      onClick={() => { setStep("email"); setOtpValue(""); }}
-                      className="text-sm text-muted-foreground hover:underline"
-                    >
-                      Use a different email
-                    </button>
-                  </div>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
+            </div>
+          )}
 
-        <p className="text-center text-white/50 text-xs mt-6">
-          FATUWR Training Portal
-        </p>
+          {/* Profile step */}
+          {step === "profile" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-white/35 block mb-1.5">Full Name *</label>
+                <Input
+                  type="text" placeholder="e.g. Jane Tan" value={profileName}
+                  onChange={e => { setProfileName(e.target.value); if (profileNameError) setProfileNameError(""); }}
+                  onKeyDown={e => e.key === "Enter" && profileName.trim() && completeProfileMutation.mutate({ name: profileName.trim(), phone: profilePhone.trim() || undefined, dob: profileDob || undefined })}
+                  className={`h-11 bg-[#2a2a2a] border-white/10 text-white placeholder:text-white/30 ${profileNameError ? "border-red-500/60" : ""}`}
+                  autoFocus disabled={completeProfileMutation.isPending}
+                />
+                {profileNameError && <p className="text-[12px] text-red-400 mt-1">{profileNameError}</p>}
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-white/35 block mb-1.5">Phone <span className="normal-case font-normal">(optional)</span></label>
+                <Input type="tel" placeholder="e.g. 91234567" value={profilePhone}
+                  onChange={e => setProfilePhone(e.target.value)}
+                  className="h-11 bg-[#2a2a2a] border-white/10 text-white placeholder:text-white/30"
+                  disabled={completeProfileMutation.isPending} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-white/35 block mb-1.5">Date of Birth <span className="normal-case font-normal">(optional)</span></label>
+                <Input type="date" value={profileDob} onChange={e => setProfileDob(e.target.value)}
+                  className="h-11 bg-[#2a2a2a] border-white/10 text-white"
+                  disabled={completeProfileMutation.isPending} />
+              </div>
+              <button
+                onClick={() => {
+                  if (!profileName.trim()) { setProfileNameError("Name is required"); return; }
+                  completeProfileMutation.mutate({ name: profileName.trim(), phone: profilePhone.trim() || undefined, dob: profileDob || undefined });
+                }}
+                disabled={completeProfileMutation.isPending || !profileName.trim()}
+                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
+              >
+                {completeProfileMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {completeProfileMutation.isPending ? "Saving…" : "Complete Sign Up"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <p className="text-center text-white/25 text-[11px] mt-5">FATUWR Training Portal</p>
       </div>
     </div>
   );

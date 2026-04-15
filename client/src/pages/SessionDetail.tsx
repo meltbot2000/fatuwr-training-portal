@@ -111,7 +111,7 @@ export default function SessionDetail() {
               <p className="text-xs font-bold uppercase tracking-wider text-gold">{session.day}</p>
               {isClosed && <Badge variant="destructive">Closed</Badge>}
             </div>
-            <h1 className="text-2xl font-bold text-navy">{session.pool}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{session.pool}</h1>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ export default function SessionDetail() {
           {session.trainingObjective && (
             <Card>
               <CardContent className="p-3">
-                <p className="text-sm font-medium text-navy mb-1">Training Objective</p>
+                <p className="text-sm font-medium text-foreground mb-1">Training Objective</p>
                 <p className="text-sm text-muted-foreground">{session.trainingObjective}</p>
               </CardContent>
             </Card>
@@ -138,7 +138,7 @@ export default function SessionDetail() {
 
           {/* Notes */}
           {session.notes && (
-            <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+            <div className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               {session.notes}
             </div>
@@ -148,7 +148,7 @@ export default function SessionDetail() {
           <div className="space-y-2.5">
             {isAuthenticated && (
               <Link href={`/session/${rowId}/splits`}>
-                <Button variant="outline" size="sm" className="border-navy/30 text-navy">
+                <Button variant="outline" size="sm" className="border-white/15 text-foreground">
                   <Pencil className="w-3.5 h-3.5 mr-1.5" />
                   Splits
                 </Button>
@@ -156,7 +156,7 @@ export default function SessionDetail() {
             )}
 
             {!isClosed && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <div className="flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2.5 text-xs text-amber-300/90">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                 <p>
                   If the splits have already been sent, please inform the splits team if you're
@@ -179,7 +179,7 @@ export default function SessionDetail() {
             ) : mySignup ? (
               <Button
                 variant="outline"
-                className="w-full h-12 text-base rounded-xl border-navy/30 text-navy"
+                className="w-full h-12 text-base rounded-xl border-white/15 text-foreground"
                 onClick={() => { setEditingSignup(mySignup); setEditSheetOpen(true); }}
               >
                 <Pencil className="w-4 h-4 mr-2" />
@@ -285,7 +285,7 @@ export default function SessionDetail() {
             <div className="space-y-2 pt-2 border-t border-border/50">
               <Button
                 variant="outline"
-                className="w-full h-10 text-sm border-navy/30 text-navy hover:bg-navy/5"
+                className="w-full h-10 text-sm border-white/15 text-foreground hover:bg-navy/5"
                 onClick={() => setEditSessionOpen(true)}
               >
                 <Pencil className="w-4 h-4 mr-2" />

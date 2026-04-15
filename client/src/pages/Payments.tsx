@@ -35,7 +35,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     <button
       onClick={handleCopy}
       aria-label={`Copy ${label}`}
-      className="ml-1.5 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
+      className="ml-1.5 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-navy/5 transition-colors"
     >
       <Copy className="w-3.5 h-3.5" />
     </button>
@@ -62,7 +62,7 @@ function CollapsibleSection({
         className="w-full flex items-center justify-between p-4 text-left"
       >
         <div>
-          <p className="font-semibold text-navy text-sm">{title}</p>
+          <p className="font-semibold text-foreground text-sm">{title}</p>
           <p className="text-xs text-muted-foreground">{count} record{count !== 1 ? "s" : ""} · Total: {total}</p>
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -93,7 +93,7 @@ export default function Payments() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-navy transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
             {isFetching ? "Refreshing…" : "Refresh"}
@@ -123,7 +123,7 @@ export default function Payments() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Club UEN (PayNow)</p>
-                    <p className="font-semibold text-navy text-sm">{CLUB_UEN}</p>
+                    <p className="font-semibold text-foreground text-sm">{CLUB_UEN}</p>
                   </div>
                   <CopyButton value={CLUB_UEN} label="Club UEN" />
                 </div>
@@ -131,7 +131,7 @@ export default function Payments() {
                 <div className="border-t pt-3 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Your Payment ID</p>
-                    <p className="font-semibold text-navy text-sm">{data.paymentId || "—"}</p>
+                    <p className="font-semibold text-foreground text-sm">{data.paymentId || "—"}</p>
                   </div>
                   {data.paymentId && <CopyButton value={data.paymentId} label="Payment ID" />}
                 </div>
@@ -164,14 +164,14 @@ export default function Payments() {
               </div>
             )}
             {data.debt >= 26 && data.debt < 54 && (
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2.5 text-sm text-amber-300/90">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p>You have an outstanding balance of <span className="font-semibold">{formatFee(data.debt)}</span>.</p>
               </div>
             )}
 
             {/* PayNow instructions */}
-            <div className="mb-4 rounded-lg border border-navy/20 bg-navy/5 px-3 py-2.5 text-xs text-navy/80">
+            <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-foreground/80">
               <p className="font-semibold mb-0.5">How to pay via PayNow</p>
               <p>
                 Transfer to UEN <span className="font-mono font-semibold">{CLUB_UEN}</span>.{" "}
@@ -193,13 +193,13 @@ export default function Payments() {
                   {data.trainingFees.map((f, i) => (
                     <div key={i} className="flex items-center justify-between py-2">
                       <div>
-                        <p className="font-medium text-navy">{formatDate(f.trainingDate)}</p>
+                        <p className="font-medium text-foreground">{formatDate(f.trainingDate)}</p>
                         <p className="text-xs text-muted-foreground">{f.pool}{f.pool && f.activity ? " · " : ""}{f.activity}</p>
                       </div>
                       <p className="font-semibold tabular-nums">{formatFee(f.actualFee)}</p>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between py-2 font-semibold text-navy">
+                  <div className="flex items-center justify-between py-2 font-semibold text-foreground">
                     <p>Total</p>
                     <p>{formatFee(data.totalTrainingFees)}</p>
                   </div>
@@ -218,13 +218,13 @@ export default function Payments() {
                   {data.membershipFees.map((f, i) => (
                     <div key={i} className="flex items-center justify-between py-2">
                       <div>
-                        <p className="font-medium text-navy">{f.activity}</p>
+                        <p className="font-medium text-foreground">{f.activity}</p>
                         <p className="text-xs text-muted-foreground">{formatDate(f.date)}</p>
                       </div>
                       <p className="font-semibold tabular-nums">{formatFee(f.actualFee)}</p>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between py-2 font-semibold text-navy">
+                  <div className="flex items-center justify-between py-2 font-semibold text-foreground">
                     <p>Total</p>
                     <p>{formatFee(data.totalMembershipFees)}</p>
                   </div>
@@ -250,7 +250,7 @@ export default function Payments() {
                       <p className="font-semibold tabular-nums text-green-700">{formatFee(p.amount)}</p>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between py-2 font-semibold text-navy">
+                  <div className="flex items-center justify-between py-2 font-semibold text-foreground">
                     <p>Total</p>
                     <p className="text-green-700">{formatFee(data.totalPaid)}</p>
                   </div>

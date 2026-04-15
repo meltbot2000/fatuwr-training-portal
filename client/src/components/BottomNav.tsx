@@ -41,12 +41,12 @@ export default function BottomNav() {
               aria-current={isActive ? "page" : undefined}
             >
               {isActive && (
-                <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-navy" />
+                <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#4DA6FF]" />
               )}
               <span className="text-xl leading-none">{tab.icon}</span>
               <span
                 className={`text-[10px] font-medium leading-none ${
-                  isActive ? "text-navy" : "text-muted-foreground"
+                  isActive ? "text-[#4DA6FF]" : "text-muted-foreground"
                 }`}
               >
                 {tab.label}
