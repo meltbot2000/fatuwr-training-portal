@@ -27,6 +27,13 @@ import {
 
 export type SyncTab = "sessions" | "payments" | "signups" | "users";
 
+/**
+ * Tabs that are now DB-primary: the server writes directly to these DB tables.
+ * Syncing from Sheets would overwrite those writes, so we skip it.
+ * Add a tab here after migrating its write path away from GAS.
+ */
+export const DB_PRIMARY_TABS = new Set<SyncTab>(["signups"]);
+
 const syncStatus: Record<SyncTab, { lastSync: number; error: string | null }> = {
   sessions: { lastSync: 0, error: null },
   payments:  { lastSync: 0, error: null },
@@ -35,6 +42,10 @@ const syncStatus: Record<SyncTab, { lastSync: number; error: string | null }> = 
 };
 
 export async function syncTab(tab: SyncTab): Promise<void> {
+  if (DB_PRIMARY_TABS.has(tab)) {
+    console.log(`[Sync] ${tab} is DB-primary — skipping Sheet→DB sync`);
+    return;
+  }
   const db = await getDb();
   if (!db) {
     console.warn(`[Sync] DB not available — skipping ${tab} sync`);

@@ -21,6 +21,8 @@ import {
 import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
+import { eq, and } from "drizzle-orm";
+import { sheetSignups } from "../drizzle/schema";
 
 
 /**
@@ -389,19 +391,23 @@ export const appRouter = router({
           throw new TRPCError({ code: "CONFLICT", message: "You are already signed up for this session." });
         }
 
-        await appsScript.submitSignUp({
+        const signupDb = await db.getDb();
+        if (!signupDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await signupDb.insert(sheetSignups).values({
           name: input.name,
-          email: user.email ?? "",
-          trainingDate: input.sessionDate,
+          email: (user.email ?? "").toLowerCase().trim(),
+          paymentId: (user.paymentId ?? "").toLowerCase().trim(),
+          dateTimeOfSignUp: new Date().toISOString(),
           pool: input.sessionPool,
+          dateOfTraining: input.sessionDate,
           activity: input.activity,
+          activityValue: "",
           baseFee: input.fee,
-          actualFee: input.fee,
+          actualFees: input.fee,
           memberOnTrainingDate: input.memberOnTrainingDate,
         });
 
         clearSessionsCache();
-        syncTab("signups").catch(e => console.error("[Sync] signups post-submit:", e));
         return {
           success: true,
           message: `You're signed up! See you at ${input.sessionPool} on ${input.sessionDate}.`,
@@ -418,16 +424,16 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
-        await appsScript.editSignup({
-          email: user.email ?? "",
-          trainingDate: input.sessionDate,
-          pool: input.sessionPool,
-          activity: input.activity,
-          baseFee: input.baseFee,
-          actualFee: input.actualFee,
-        });
+        const editDb = await db.getDb();
+        if (!editDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await editDb.update(sheetSignups)
+          .set({ activity: input.activity, baseFee: input.baseFee, actualFees: input.actualFee })
+          .where(and(
+            eq(sheetSignups.email, (user.email ?? "").toLowerCase().trim()),
+            eq(sheetSignups.dateOfTraining, input.sessionDate),
+            eq(sheetSignups.pool, input.sessionPool),
+          ));
         clearSessionsCache();
-        syncTab("signups").catch(e => console.error("[Sync] signups post-edit:", e));
         return { success: true };
       }),
 
@@ -438,13 +444,14 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
-        await appsScript.deleteSignup({
-          email: user.email ?? "",
-          trainingDate: input.sessionDate,
-          pool: input.sessionPool,
-        });
+        const deleteDb = await db.getDb();
+        if (!deleteDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await deleteDb.delete(sheetSignups).where(and(
+          eq(sheetSignups.email, (user.email ?? "").toLowerCase().trim()),
+          eq(sheetSignups.dateOfTraining, input.sessionDate),
+          eq(sheetSignups.pool, input.sessionPool),
+        ));
         clearSessionsCache();
-        syncTab("signups").catch(e => console.error("[Sync] signups post-delete:", e));
         return { success: true };
       }),
 
@@ -573,15 +580,24 @@ export const appRouter = router({
       }
       // Update User tab membership status + trial dates
       await appsScript.updateTrialSignup(user.email ?? "");
-      // Record the trial membership fee in Training Sign-ups (email-stamped, not manual)
-      await appsScript.addMembershipSignup({
-        email: user.email ?? "",
-        name: user.name ?? "",
-        activity: "Trial Membership",
-        actualFee: 10,
-      });
+      // Record the trial membership fee in Training Sign-ups — direct DB write
+      const trialDb = await db.getDb();
+      if (trialDb) {
+        await trialDb.insert(sheetSignups).values({
+          name: user.name ?? "",
+          email: (user.email ?? "").toLowerCase().trim(),
+          paymentId: (user.paymentId ?? "").toLowerCase().trim(),
+          dateTimeOfSignUp: new Date().toISOString(),
+          pool: "",
+          dateOfTraining: "",
+          activity: "Trial Membership",
+          activityValue: "",
+          baseFee: 10,
+          actualFees: 10,
+          memberOnTrainingDate: "",
+        });
+      }
       syncTab("users").catch(e => console.error("[Sync] users post-trial:", e));
-      syncTab("signups").catch(e => console.error("[Sync] signups post-trial:", e));
 
       const today = new Date();
       const trialEnd = new Date(today);
@@ -644,16 +660,25 @@ export const appRouter = router({
         await appsScript.updateUser({ email: input.email, memberStatus: input.memberStatus, clubRole: input.clubRole });
         syncTab("users").catch(e => console.error("[Sync] users post-updateUser:", e));
 
-        // When promoting to Member and a fee is provided, log it in Training Sign-ups
+        // When promoting to Member and a fee is provided, log it in Training Sign-ups — direct DB write
         if (input.memberStatus === "Member" && input.membershipFee && input.membershipFee > 0) {
           const targetUser = await findUserByEmail(input.email);
-          await appsScript.addMembershipSignup({
-            email: input.email,
-            name: targetUser?.name ?? "",
-            activity: "Membership Fee",
-            actualFee: input.membershipFee,
-          });
-          syncTab("signups").catch(e => console.error("[Sync] signups post-memberFee:", e));
+          const memberFeeDb = await db.getDb();
+          if (memberFeeDb) {
+            await memberFeeDb.insert(sheetSignups).values({
+              name: targetUser?.name ?? "",
+              email: input.email.toLowerCase().trim(),
+              paymentId: (targetUser?.paymentId ?? "").toLowerCase().trim(),
+              dateTimeOfSignUp: new Date().toISOString(),
+              pool: "",
+              dateOfTraining: "",
+              activity: "Membership Fee",
+              activityValue: "",
+              baseFee: input.membershipFee,
+              actualFees: input.membershipFee,
+              memberOnTrainingDate: "",
+            });
+          }
         }
 
         const dbUser = await db.getUserByEmail(input.email.toLowerCase().trim());
