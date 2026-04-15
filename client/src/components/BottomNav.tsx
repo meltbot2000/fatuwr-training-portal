@@ -36,16 +36,16 @@ export default function BottomNav() {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[48px] relative transition-colors"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 min-h-[64px] relative transition-colors"
               aria-label={tab.label}
               aria-current={isActive ? "page" : undefined}
             >
               {isActive && (
                 <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#4DA6FF]" />
               )}
-              <span className="text-xl leading-none">{tab.icon}</span>
+              <span className="text-[22px] leading-none">{tab.icon}</span>
               <span
-                className={`text-[10px] font-medium leading-none ${
+                className={`text-[11px] font-medium leading-none ${
                   isActive ? "text-[#4DA6FF]" : "text-muted-foreground"
                 }`}
               >

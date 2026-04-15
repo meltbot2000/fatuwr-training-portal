@@ -106,9 +106,9 @@ export default function SignUpForm() {
           {fee > 0 && (
             <p className="text-[15px] text-white/50 mb-8">{formatFee(fee)} to pay</p>
           )}
-          <Link href="/">
+          <Link href={`/session/${rowId}`}>
             <button className="h-12 px-8 rounded-xl bg-white text-[#111111] font-semibold text-[15px]">
-              Back to Sessions
+              View Session
             </button>
           </Link>
         </main>

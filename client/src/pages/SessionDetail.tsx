@@ -3,19 +3,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import EditSignupSheet from "@/components/EditSignupSheet";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Link, useParams } from "wouter";
-import { Clock, MapPin, Users, AlertTriangle, Pencil, ChevronRight, DollarSign } from "lucide-react";
+import { AlertTriangle, Pencil, ChevronRight } from "lucide-react";
 import { EditSessionSheet } from "@/components/EditSessionSheet";
 import { toast } from "sonner";
-
-function formatFee(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
 
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(p => p[0]?.toUpperCase() || "").slice(0, 2).join("");
@@ -30,7 +23,6 @@ export default function SessionDetail() {
     { enabled: !!rowId }
   );
 
-  const memberStatus = ((user as any)?.memberStatus || "Non-Member").toLowerCase();
   const userEmail = ((user as any)?.email || "").toLowerCase().trim();
   const isAdminUser = (user as any)?.clubRole === "Admin";
 
@@ -55,15 +47,12 @@ export default function SessionDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader title="Session Details" showBack />
-        <main className="mx-auto max-w-[480px] px-4 py-4">
-          <Skeleton className="h-48 w-full rounded-lg" />
-          <div className="mt-4 space-y-3">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-32 w-full" />
-          </div>
+      <div className="min-h-screen bg-[#111111]">
+        <AppHeader title="Session" showBack />
+        <main className="mx-auto max-w-[480px] space-y-3 px-4 py-4">
+          <Skeleton className="h-48 w-full rounded-none" style={{ background: "#1c1c1c" }} />
+          <Skeleton className="h-20 w-full rounded-xl" style={{ background: "#1c1c1c" }} />
+          <Skeleton className="h-12 w-full rounded-xl" style={{ background: "#1c1c1c" }} />
         </main>
       </div>
     );
@@ -71,13 +60,15 @@ export default function SessionDetail() {
 
   if (error || !session) {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader title="Session Details" showBack />
-        <main className="mx-auto max-w-[480px] px-4 py-12 text-center">
-          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-3" />
-          <p className="text-destructive font-medium">Session not found</p>
+      <div className="min-h-screen bg-[#111111]">
+        <AppHeader title="Session" showBack />
+        <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
+          <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
+          <p className="text-white/50">Session not found</p>
           <Link href="/">
-            <Button variant="outline" className="mt-4">Back to Sessions</Button>
+            <button className="mt-4 px-5 py-2 rounded-xl border border-white/10 text-white/60 text-[13px]">
+              Back to Sessions
+            </button>
           </Link>
         </main>
       </div>
@@ -86,110 +77,118 @@ export default function SessionDetail() {
 
   const isClosed = session.isClosed && session.isClosed.trim().length > 0;
   const mySignup = session.signups?.find(s => s.email.toLowerCase().trim() === userEmail);
+  const signupCount = session.signups?.length ?? 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader title="Session Details" showBack />
+    <div className="min-h-screen bg-[#111111]">
+      <AppHeader title="Session" showBack />
 
-      <main className="mx-auto max-w-[480px] pb-24">
-        {/* Hero image */}
-        {session.poolImageUrl && (
-          <div className="h-48 overflow-hidden bg-muted">
+      <main className="mx-auto max-w-[480px] pb-28">
+        {/* Hero image — same proportions as Home card */}
+        <div className="relative h-48 overflow-hidden">
+          {session.poolImageUrl ? (
             <img
               src={session.poolImageUrl}
               alt={`${session.pool} pool`}
               className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => {
+                const el = e.target as HTMLImageElement;
+                el.style.display = "none";
+                el.parentElement!.style.background = "linear-gradient(135deg, #1E3A5F, #1E73D2)";
+              }}
             />
-          </div>
-        )}
-
-        <div className="px-4 py-4 space-y-4">
-          {/* Header */}
-          <div>
-            <div className="flex items-center justify-between mb-0.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-gold">{session.day}</p>
-              {isClosed && <Badge variant="destructive">Closed</Badge>}
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">{session.pool}</h1>
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                {session.trainingDate}, {session.trainingTime}
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#1E3A5F] to-[#1E73D2]" />
+          )}
+          {isClosed && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-sm px-4 py-1.5 rounded-full tracking-wide">
+                Session Closed
               </span>
-              {session.signups && session.signups.length > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  {session.signups.length} signed up
-                </span>
-              )}
             </div>
-          </div>
+          )}
+        </div>
 
+        {/* Session info card — identical style to Home cards */}
+        <div className="bg-[#1c1c1c] px-4 pt-3 pb-3.5">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4DA6FF] mb-0.5">
+            {session.day}
+          </p>
+          <p className="text-[16px] font-normal text-white leading-tight mb-1">
+            {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
+          </p>
+          <p className="text-[13px] text-white/50">
+            {session.pool}
+            {" · "}
+            {isClosed ? `Attendance: ${signupCount}` : `${signupCount} signed up`}
+          </p>
+        </div>
+
+        <div className="px-4 pt-4 space-y-3">
           {/* Training objective */}
           {session.trainingObjective && (
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-sm font-medium text-foreground mb-1">Training Objective</p>
-                <p className="text-sm text-muted-foreground">{session.trainingObjective}</p>
-              </CardContent>
-            </Card>
+            <div className="bg-[#1c1c1c] rounded-xl px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
+                Training Objective
+              </p>
+              <p className="text-[13px] text-white/70 leading-relaxed">{session.trainingObjective}</p>
+            </div>
           )}
 
           {/* Notes */}
           {session.notes && (
-            <div className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              {session.notes}
+            <div className="flex items-start gap-2.5 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[13px] text-amber-300/90 leading-snug">{session.notes}</p>
             </div>
           )}
 
-          {/* Splits + CTA */}
-          <div className="space-y-2.5">
+          {/* Splits reminder — only when open */}
+          {!isClosed && (
+            <div className="flex items-start gap-2.5 bg-white/4 border border-white/8 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-white/30 shrink-0 mt-0.5" />
+              <p className="text-[13px] text-white/40 leading-snug">
+                If splits have been sent, let the splits team know if you sign up or drop out.
+              </p>
+            </div>
+          )}
+
+          {/* CTA row */}
+          <div className="flex items-center gap-2">
+            {/* Splits button */}
             {isAuthenticated && (
               <Link href={`/session/${rowId}/splits`}>
-                <Button variant="outline" size="sm" className="border-white/15 text-foreground">
-                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                <button className="h-11 px-4 rounded-xl border border-white/10 text-[13px] text-white/60 flex items-center gap-1.5 hover:bg-white/5 transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
                   Splits
-                </Button>
+                </button>
               </Link>
             )}
 
-            {!isClosed && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2.5 text-xs text-amber-300/90">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-                <p>
-                  If the splits have already been sent, please inform the splits team if you're
-                  signing up or dropping out so they can adjust the split.
-                </p>
-              </div>
-            )}
-
-            {/* Sign up CTA */}
+            {/* Sign-up / Edit / Closed */}
             {!isAuthenticated ? (
-              <Link href="/login">
-                <Button className="w-full h-12 bg-[#007AFF] hover:bg-[#0066DD] text-white font-semibold text-base rounded-xl">
+              <Link href="/login" className="flex-1">
+                <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
                   Sign In to Register
-                </Button>
+                </button>
               </Link>
             ) : isClosed ? (
-              <Button disabled className="w-full h-12 text-base rounded-xl">
+              <button disabled className="flex-1 h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
                 Sign-ups Closed
-              </Button>
+              </button>
             ) : mySignup ? (
-              <Button
-                variant="outline"
-                className="w-full h-12 text-base rounded-xl border-white/15 text-foreground"
+              <button
+                className="flex-1 h-11 rounded-xl border border-white/10 text-[14px] text-white/80 font-medium flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
                 onClick={() => { setEditingSignup(mySignup); setEditSheetOpen(true); }}
               >
-                <Pencil className="w-4 h-4 mr-2" />
+                <Pencil className="w-4 h-4" />
                 Edit My Sign-up
-              </Button>
+              </button>
             ) : (
-              <Link href={`/signup/${rowId}`}>
-                <Button className="w-full h-12 bg-[#007AFF] hover:bg-[#0066DD] text-white font-semibold text-base rounded-xl">
-                  Sign up
-                </Button>
+              <Link href={`/signup/${rowId}`} className="flex-1">
+                <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
+                  Sign Up
+                </button>
               </Link>
             )}
           </div>
@@ -197,34 +196,30 @@ export default function SessionDetail() {
           {/* Sign-ups list */}
           {session.signups && session.signups.length > 0 && (
             <div>
-              <h2 className="text-lg font-bold text-foreground mb-2">
-                Training Sign-ups
-              </h2>
-              <div className="divide-y divide-border rounded-xl border overflow-hidden bg-card">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2 mt-1">
+                Sign-ups
+              </p>
+              <div className="bg-[#1c1c1c] rounded-xl divide-y divide-white/6 overflow-hidden">
                 {session.signups.map((su, idx) => {
                   const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
                   const canEdit = isMe && !isClosed;
                   return (
                     <button
                       key={idx}
-                      onClick={() => {
-                        if (canEdit) { setEditingSignup(su); setEditSheetOpen(true); }
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted" : "cursor-default"}`}
+                      onClick={() => { if (canEdit) { setEditingSignup(su); setEditSheetOpen(true); } }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${canEdit ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
                     >
-                      {/* Avatar */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold ${isMe ? "bg-navy text-white" : "bg-muted text-muted-foreground"}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#4DA6FF] text-white" : "bg-white/8 text-white/50"}`}>
                         {getInitials(su.name) || "?"}
                       </div>
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground truncate">
+                        <p className="text-[13px] font-medium text-white/85 truncate">
                           {su.name}
-                          {isMe && <span className="ml-1.5 text-xs text-gold font-normal">(you)</span>}
+                          {isMe && <span className="ml-1.5 text-[11px] text-[#4DA6FF] font-normal">you</span>}
                         </p>
-                        <p className="text-xs text-muted-foreground">{su.activity}</p>
+                        <p className="text-[12px] text-white/40">{su.activity}</p>
                       </div>
-                      {canEdit && <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      {canEdit && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
                     </button>
                   );
                 })}
@@ -232,82 +227,32 @@ export default function SessionDetail() {
             </div>
           )}
 
-          {/* Fee table — shown below sign-ups */}
-          <details className="group">
-            <summary className="flex items-center gap-2 text-sm font-medium text-muted-foreground cursor-pointer list-none py-1">
-              <DollarSign className="w-4 h-4" />
-              Session Fees
-              <ChevronRight className="w-4 h-4 ml-auto transition-transform group-open:rotate-90" />
-            </summary>
-            <Card className="mt-2">
-              <CardContent className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground">Full Training</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground">Swim Only</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className={`border-b ${memberStatus === "member" || memberStatus === "student" ? "bg-gold/5" : ""}`}>
-                      <td className="p-3 font-medium">
-                        Member
-                        {memberStatus === "member" && <Badge variant="outline" className="ml-2 text-xs">You</Badge>}
-                      </td>
-                      <td className="text-right p-3">{formatFee(session.memberFee)}</td>
-                      <td className="text-right p-3">{formatFee(session.memberSwimFee)}</td>
-                    </tr>
-                    <tr className={`border-b ${memberStatus === "non-member" ? "bg-gold/5" : ""}`}>
-                      <td className="p-3 font-medium">
-                        Non-Member
-                        {memberStatus === "non-member" && <Badge variant="outline" className="ml-2 text-xs">You</Badge>}
-                      </td>
-                      <td className="text-right p-3">{formatFee(session.nonMemberFee)}</td>
-                      <td className="text-right p-3">{formatFee(session.nonMemberSwimFee)}</td>
-                    </tr>
-                    <tr className={memberStatus === "student" ? "bg-gold/5" : ""}>
-                      <td className="p-3 font-medium">
-                        Student
-                        {memberStatus === "student" && <Badge variant="outline" className="ml-2 text-xs">You</Badge>}
-                      </td>
-                      <td className="text-right p-3">{formatFee(session.studentFee)}</td>
-                      <td className="text-right p-3">{formatFee(session.studentSwimFee)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </details>
-
           {/* Admin controls */}
           {isAdminUser && (
-            <div className="space-y-2 pt-2 border-t border-border/50">
-              <Button
-                variant="outline"
-                className="w-full h-10 text-sm border-white/15 text-foreground hover:bg-navy/5"
+            <div className="space-y-2 pt-1 border-t border-white/8">
+              <button
+                className="w-full h-10 rounded-xl border border-white/10 text-[13px] text-white/60 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
                 onClick={() => setEditSessionOpen(true)}
               >
-                <Pencil className="w-4 h-4 mr-2" />
+                <Pencil className="w-3.5 h-3.5" />
                 Admin: Edit Session
-              </Button>
+              </button>
 
               {!isClosed && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full h-10 border-destructive/40 text-destructive text-sm hover:bg-destructive/10"
+                    <button
+                      className="w-full h-10 rounded-xl border border-red-500/25 text-[13px] text-red-400 flex items-center justify-center hover:bg-red-400/8 transition-colors"
                       disabled={closeSessionMutation.isPending}
                     >
                       Admin: Close Sign-ups
-                    </Button>
+                    </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Close sign-ups?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        No new sign-ups will be accepted for {session.trainingDate} at {session.pool}. This cannot be undone here.
+                        No new sign-ups for {session.trainingDate} at {session.pool}. This cannot be undone here.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -328,11 +273,7 @@ export default function SessionDetail() {
       </main>
 
       {isAdminUser && session && (
-        <EditSessionSheet
-          open={editSessionOpen}
-          onOpenChange={setEditSessionOpen}
-          session={session}
-        />
+        <EditSessionSheet open={editSessionOpen} onOpenChange={setEditSessionOpen} session={session} />
       )}
 
       {editingSignup && (
