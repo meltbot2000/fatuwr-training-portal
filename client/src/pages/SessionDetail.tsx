@@ -14,6 +14,24 @@ function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(p => p[0]?.toUpperCase() || "").slice(0, 2).join("");
 }
 
+/** Returns true if the session start datetime has passed. */
+function hasSessionStarted(trainingDate: string, trainingTime?: string): boolean {
+  const date = new Date(trainingDate);
+  if (isNaN(date.getTime())) return false;
+  if (trainingTime) {
+    const m = trainingTime.match(/(\d+):?(\d*)\s*(am|pm)?/i);
+    if (m) {
+      let h = parseInt(m[1]);
+      const mins = parseInt(m[2] || "0");
+      const ampm = m[3]?.toLowerCase();
+      if (ampm === "pm" && h < 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+      date.setHours(h, mins, 0, 0);
+    }
+  }
+  return new Date() >= date;
+}
+
 export default function SessionDetail() {
   const { rowId } = useParams<{ rowId: string }>();
   const { user, isAuthenticated } = useAuth();
@@ -77,15 +95,19 @@ export default function SessionDetail() {
   }
 
   const isClosed = session.isClosed && session.isClosed.trim().length > 0;
+  const sessionStarted = hasSessionStarted(session.trainingDate, session.trainingTime ?? "");
   const mySignup = session.signups?.find(s => s.email.toLowerCase().trim() === userEmail);
   const signupCount = session.signups?.length ?? 0;
+
+  // Non-admins cannot edit/delete once session has started
+  const userCanEdit = !!mySignup && !isClosed && !sessionStarted;
 
   return (
     <div className="min-h-screen bg-[#111111]">
       <AppHeader title="Session" showBack />
 
       <main className="mx-auto max-w-[480px] pb-28">
-        {/* Hero image — same proportions as Home card */}
+        {/* Hero image */}
         <div className="relative h-48 overflow-hidden">
           {session.poolImageUrl ? (
             <img
@@ -110,7 +132,7 @@ export default function SessionDetail() {
           )}
         </div>
 
-        {/* Session info card — identical style to Home cards */}
+        {/* Session info card */}
         <div className="bg-[#1c1c1c] px-4 pt-3 pb-3.5">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4DA6FF] mb-0.5">
             {session.day}
@@ -154,45 +176,41 @@ export default function SessionDetail() {
             </div>
           )}
 
-          {/* CTA row */}
-          <div className="flex items-center gap-2">
-            {/* Splits button */}
-            {isAuthenticated && (
-              <Link href={`/session/${rowId}/splits`}>
-                <button className="h-11 px-4 rounded-xl border border-white/10 text-[13px] text-white/60 flex items-center gap-1.5 hover:bg-white/5 transition-colors">
-                  <Pencil className="w-3.5 h-3.5" />
-                  Splits
-                </button>
-              </Link>
-            )}
-
-            {/* Sign-up / Edit / Closed */}
-            {!isAuthenticated ? (
-              <Link href="/login" className="flex-1">
-                <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
-                  Sign In to Register
-                </button>
-              </Link>
-            ) : isClosed ? (
-              <button disabled className="flex-1 h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
-                Sign-ups Closed
+          {/* ── Primary CTA (full width) ── */}
+          {!isAuthenticated ? (
+            <Link href="/login">
+              <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
+                Sign In to Register
               </button>
-            ) : mySignup ? (
-              <button
-                className="flex-1 h-11 rounded-xl border border-white/10 text-[14px] text-white/80 font-medium flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
-                onClick={() => { setEditingSignup(mySignup!); setEditSheetOpen(true); }}
-              >
-                <Pencil className="w-4 h-4" />
-                Edit My Sign-up
+            </Link>
+          ) : isClosed ? (
+            <button disabled className="w-full h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
+              Sign-ups Closed
+            </button>
+          ) : sessionStarted && !mySignup ? (
+            <button disabled className="w-full h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
+              Session In Progress
+            </button>
+          ) : mySignup ? (
+            <button
+              disabled={!userCanEdit}
+              className={`w-full h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${
+                userCanEdit
+                  ? "border-white/15 text-white hover:bg-white/5"
+                  : "border-white/6 text-white/25 cursor-default"
+              }`}
+              onClick={() => { if (userCanEdit) { setEditingSignup(mySignup!); setEditSheetOpen(true); } }}
+            >
+              <Pencil className="w-4 h-4" />
+              {sessionStarted ? "Session In Progress" : "Edit My Sign-up"}
+            </button>
+          ) : (
+            <Link href={`/signup/${rowId}`}>
+              <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
+                Sign Up
               </button>
-            ) : (
-              <Link href={`/signup/${rowId}`} className="flex-1">
-                <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
-                  Sign Up
-                </button>
-              </Link>
-            )}
-          </div>
+            </Link>
+          )}
 
           {/* Sign-ups list */}
           {session.signups && session.signups.length > 0 && (
@@ -203,12 +221,12 @@ export default function SessionDetail() {
               <div className="bg-[#1c1c1c] rounded-xl divide-y divide-white/6 overflow-hidden">
                 {session.signups.map((su, idx) => {
                   const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
-                  const canEdit = isMe && !isClosed;
+                  const tappable = isAdminUser || (isMe && userCanEdit);
                   return (
                     <button
                       key={idx}
-                      onClick={() => { if (canEdit || isAdminUser) { setEditingSignup(su); setEditSheetOpen(true); } }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${(canEdit || isAdminUser) ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
+                      onClick={() => { if (tappable) { setEditingSignup(su); setEditSheetOpen(true); } }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${tappable ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
                     >
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#4DA6FF] text-white" : "bg-white/8 text-white/50"}`}>
                         {getInitials(su.name) || "?"}
@@ -220,7 +238,7 @@ export default function SessionDetail() {
                         </p>
                         <p className="text-[12px] text-white/40">{su.activity}</p>
                       </div>
-                      {(canEdit || isAdminUser) && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
+                      {tappable && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
                     </button>
                   );
                 })}
@@ -228,11 +246,21 @@ export default function SessionDetail() {
             </div>
           )}
 
+          {/* Splits button — below sign-ups list, above admin */}
+          {isAuthenticated && (
+            <Link href={`/session/${rowId}/splits`}>
+              <button className="w-full h-11 rounded-xl border border-white/10 text-[14px] font-semibold text-white/70 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
+                <Pencil className="w-4 h-4" />
+                Splits
+              </button>
+            </Link>
+          )}
+
           {/* Admin controls */}
           {isAdminUser && (
             <div className="space-y-2 pt-1 border-t border-white/8">
               <button
-                className="w-full h-10 rounded-xl border border-white/10 text-[13px] text-white/60 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
+                className="w-full h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-[13px] text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/25 transition-colors"
                 onClick={() => setEditSessionOpen(true)}
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -243,7 +271,7 @@ export default function SessionDetail() {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
-                      className="w-full h-10 rounded-xl border border-red-500/25 text-[13px] text-red-400 flex items-center justify-center hover:bg-red-400/8 transition-colors"
+                      className="w-full h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-[13px] text-red-400 font-medium flex items-center justify-center hover:bg-red-500/25 transition-colors"
                       disabled={closeSessionMutation.isPending}
                     >
                       Admin: Close Sign-ups

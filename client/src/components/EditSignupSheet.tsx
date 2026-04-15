@@ -132,47 +132,47 @@ export default function EditSignupSheet({
           {/* ── Admin fields ───────────────────────── */}
           {isAdmin && (
             <div className="space-y-3">
-              <div className="bg-[#111111] rounded-xl divide-y divide-white/6">
+              <div className="bg-[#2a2a2a] rounded-xl divide-y divide-white/8">
                 {/* Name */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/40 w-28 shrink-0">Name</span>
+                  <span className="text-[12px] text-white/55 w-28 shrink-0">Name</span>
                   <Input
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
                   />
                 </div>
                 {/* Member status */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/40 w-28 shrink-0">Status</span>
+                  <span className="text-[12px] text-white/55 w-28 shrink-0">Status</span>
                   <Input
                     value={memberStatus}
                     onChange={e => setMemberStatus(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
                   />
                 </div>
                 {/* Payment ID */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/40 w-28 shrink-0">Payment ID</span>
+                  <span className="text-[12px] text-white/55 w-28 shrink-0">Payment ID</span>
                   <Input
                     value={paymentId}
                     onChange={e => setPaymentId(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 font-mono focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white font-mono focus-visible:ring-0"
                   />
                 </div>
                 {/* Actual fee */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/40 w-28 shrink-0">Actual Fee</span>
+                  <span className="text-[12px] text-white/55 w-28 shrink-0">Actual Fee</span>
                   <Input
                     type="number"
                     step="0.01"
                     value={actualFee}
                     onChange={e => setActualFee(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-white/25 px-1">
+              <p className="text-[11px] text-white/45 px-1">
                 Calculated fee for this activity: {formatFee(calculatedFee)}
               </p>
             </div>
@@ -180,7 +180,7 @@ export default function EditSignupSheet({
 
           {/* ── Activity picker (all users) ─────────── */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55 mb-2">
               Activity
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -210,9 +210,9 @@ export default function EditSignupSheet({
           </div>
 
           {/* ── Fee summary ─────────────────────────── */}
-          <div className="bg-[#111111] rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[13px] text-white/40">Fee</span>
-            <span className="text-[15px] font-semibold text-white/80">{formatFee(displayFee)}</span>
+          <div className="bg-[#2a2a2a] rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-[13px] text-white/60">Fee</span>
+            <span className="text-[15px] font-semibold text-white">{formatFee(displayFee)}</span>
           </div>
 
           {/* ── Actions ─────────────────────────────── */}
