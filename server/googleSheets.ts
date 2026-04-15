@@ -76,6 +76,8 @@ export interface UserRow {
 }
 
 export interface PaymentRow {
+  /** DB row id — present when served from DB, absent when served from Sheets fallback */
+  id?: number;
   /** The matched reference/name from the sheet (col F — "PaymentID Match"), or "" if unmatched */
   paymentId: string;
   /** Raw PayNow reference text the sender typed (col E — "OTHR Message") */
@@ -373,6 +375,7 @@ function dbSessionToSessionRow(r: any): SessionRow {
 
 function dbPaymentToPaymentRow(r: any): PaymentRow {
   return {
+    id: r.id,
     paymentId: r.paymentId ?? "",
     reference: r.reference ?? "",
     amount: r.amount ?? 0,

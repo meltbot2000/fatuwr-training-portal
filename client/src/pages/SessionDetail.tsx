@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Link, useParams } from "wouter";
-import { Clock, MapPin, Users, DollarSign, AlertTriangle } from "lucide-react";
+import { Clock, MapPin, Users, DollarSign, AlertTriangle, Pencil } from "lucide-react";
+import { EditSessionSheet } from "@/components/EditSessionSheet";
 import { toast } from "sonner";
 
 function formatFee(amount: number): string {
@@ -39,6 +40,7 @@ export default function SessionDetail() {
     onError: (err) => toast.error(err.message || "Failed to close session."),
   });
 
+  const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editingSignup, setEditingSignup] = useState<{
     name: string;
@@ -273,6 +275,17 @@ export default function SessionDetail() {
               </div>
             )}
 
+            {isAdminUser && (
+              <Button
+                variant="outline"
+                className="w-full h-10 text-sm border-navy/30 text-navy hover:bg-navy/5"
+                onClick={() => setEditSessionOpen(true)}
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Admin: Edit Session
+              </Button>
+            )}
+
             {isAdminUser && !isClosed && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -306,6 +319,15 @@ export default function SessionDetail() {
           </div>
         </div>
       </main>
+
+      {/* Edit session sheet (admin) */}
+      {isAdminUser && session && (
+        <EditSessionSheet
+          open={editSessionOpen}
+          onOpenChange={setEditSessionOpen}
+          session={session}
+        />
+      )}
 
       {/* Edit sheet */}
       {editingSignup && (

@@ -22,7 +22,7 @@ import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
 import { eq, and, sql } from "drizzle-orm";
-import { sheetSignups, sheetSessions, sheetUsers } from "../drizzle/schema";
+import { sheetSignups, sheetSessions, sheetUsers, sheetPayments } from "../drizzle/schema";
 
 
 /**
@@ -675,6 +675,8 @@ export const appRouter = router({
     updateUserStatus: protectedProcedure
       .input(z.object({
         email: z.string().email(),
+        name: z.string().optional(),
+        paymentId: z.string().optional(),
         memberStatus: z.string().optional(),
         clubRole: z.string().optional(),
         trialStartDate: z.string().optional(),
@@ -690,6 +692,8 @@ export const appRouter = router({
         const adminUsersDb = await db.getDb();
         if (adminUsersDb) {
           const userFields: Record<string, string> = {};
+          if (input.name !== undefined) userFields.name = input.name;
+          if (input.paymentId !== undefined) { userFields.paymentId = input.paymentId; userFields.sheetId = input.paymentId; }
           if (input.memberStatus !== undefined) userFields.memberStatus = input.memberStatus;
           if (input.clubRole !== undefined) userFields.clubRole = input.clubRole;
           if (input.trialStartDate !== undefined) userFields.trialStartDate = input.trialStartDate;
@@ -726,6 +730,8 @@ export const appRouter = router({
         if (dbUser) {
           await db.upsertUser({
             openId: dbUser.openId,
+            ...(input.name !== undefined && { name: input.name }),
+            ...(input.paymentId !== undefined && { paymentId: input.paymentId }),
             ...(input.memberStatus !== undefined && { memberStatus: input.memberStatus }),
             ...(input.clubRole !== undefined && { clubRole: input.clubRole }),
             ...(input.trialStartDate !== undefined && { trialStartDate: input.trialStartDate }),
@@ -823,6 +829,33 @@ export const appRouter = router({
           .set({ isClosed: "Closed" })
           .where(eq(sheetSessions.rowId, input.rowId));
         clearSessionsCache();
+        return { success: true };
+      }),
+
+    editPayment: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        paymentId: z.string().optional(),
+        reference: z.string().optional(),
+        amount: z.number().optional(),
+        date: z.string().optional(),
+        email: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const payDb = await db.getDb();
+        if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { id, ...fields } = input;
+        const updates: Record<string, unknown> = {};
+        if (fields.paymentId !== undefined) updates.paymentId = fields.paymentId;
+        if (fields.reference !== undefined) updates.reference = fields.reference;
+        if (fields.amount !== undefined) updates.amount = fields.amount;
+        if (fields.date !== undefined) updates.date = fields.date;
+        if (fields.email !== undefined) updates.email = fields.email;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
         return { success: true };
       }),
 

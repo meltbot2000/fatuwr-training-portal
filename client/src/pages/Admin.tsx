@@ -12,9 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, Plus, Lock, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
 
 const STATUS_COLORS: Record<string, string> = {
   "Member": "bg-green-500 text-white",
@@ -51,12 +52,14 @@ function formatPaymentDate(dateStr: string): string {
 interface EditUserSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { name: string; email: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string };
+  user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string };
   onDone: () => void;
 }
 
 function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps) {
   const utils = trpc.useUtils();
+  const [name, setName] = useState(user.name || "");
+  const [paymentId, setPaymentId] = useState(user.paymentId || "");
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
   const [clubRole, setClubRole] = useState(user.clubRole || "");
   const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
@@ -64,6 +67,8 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const [membershipFee, setMembershipFee] = useState("");
 
   useEffect(() => {
+    setName(user.name || "");
+    setPaymentId(user.paymentId || "");
     setMemberStatus(user.memberStatus || "Non-Member");
     setClubRole(user.clubRole || "");
     setTrialStartDate(user.trialStartDate || "");
@@ -92,11 +97,30 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
         </SheetHeader>
 
         <div className="space-y-1 mb-5">
-          <p className="font-semibold text-navy text-sm">{user.name || "(no name)"}</p>
           <p className="text-xs text-muted-foreground">{user.email}</p>
         </div>
 
         <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Name</Label>
+            <Input
+              placeholder="Full name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Payment ID</Label>
+            <Input
+              placeholder="e.g. jtan"
+              value={paymentId}
+              onChange={e => setPaymentId(e.target.value)}
+              className="h-10 font-mono"
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Membership Status</Label>
             <Select value={memberStatus} onValueChange={setMemberStatus}>
@@ -175,10 +199,126 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
           <Button
             onClick={() => mutation.mutate({
               email: user.email,
+              name: name.trim() || undefined,
+              paymentId: paymentId.trim() || undefined,
               memberStatus,
               clubRole,
               ...(showTrialDates ? { trialStartDate, trialEndDate } : {}),
               ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
+            })}
+            disabled={mutation.isPending}
+            className="w-full bg-navy text-white hover:bg-navy/90"
+          >
+            {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Save Changes
+          </Button>
+          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ─── EditPaymentSheet ─────────────────────────────────────────────────────────
+
+interface EditPaymentSheetProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  payment: { id: number; paymentId: string; reference: string; amount: number; date: string; email: string };
+  onDone: () => void;
+}
+
+function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSheetProps) {
+  const utils = trpc.useUtils();
+  const [paymentId, setPaymentId] = useState(payment.paymentId);
+  const [amount, setAmount] = useState(String(payment.amount));
+  const [email, setEmail] = useState(payment.email);
+  const [date, setDate] = useState(payment.date);
+
+  useEffect(() => {
+    setPaymentId(payment.paymentId);
+    setAmount(String(payment.amount));
+    setEmail(payment.email);
+    setDate(payment.date);
+  }, [payment]);
+
+  const mutation = trpc.admin.editPayment.useMutation({
+    onSuccess: async () => {
+      toast.success("Payment updated.");
+      await utils.admin.allPayments.invalidate();
+      onOpenChange(false);
+      onDone();
+    },
+    onError: (err) => toast.error(err.message || "Failed to update payment."),
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="text-navy">Edit Payment</SheetTitle>
+        </SheetHeader>
+
+        <div className="space-y-1 mb-5">
+          <p className="text-xs text-muted-foreground font-mono truncate">{payment.reference || "(no reference)"}</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Payment ID Match</Label>
+            <Input
+              placeholder="e.g. jtan"
+              value={paymentId}
+              onChange={e => setPaymentId(e.target.value)}
+              className="h-10 font-mono"
+            />
+            <p className="text-xs text-muted-foreground">The user's payment ID this payment is matched to.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Email</Label>
+            <Input
+              type="email"
+              placeholder="user@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Amount ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Date</Label>
+              <Input
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-2">
+          <Button
+            onClick={() => mutation.mutate({
+              id: payment.id,
+              paymentId: paymentId.trim(),
+              email: email.trim(),
+              amount: parseFloat(amount) || 0,
+              date: date.trim(),
             })}
             disabled={mutation.isPending}
             className="w-full bg-navy text-white hover:bg-navy/90"
@@ -372,7 +512,9 @@ export default function Admin() {
   const [sessionPoolFilter, setSessionPoolFilter] = useState("All");
   const [sessionDayFilter, setSessionDayFilter] = useState("All");
   const [sessionStatusFilter, setSessionStatusFilter] = useState("All");
-  const [editingUser, setEditingUser] = useState<{ name: string; email: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string } | null>(null);
+  const [editingSession, setEditingSession] = useState<SessionForEdit | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
   const utils = trpc.useUtils();
@@ -539,7 +681,7 @@ export default function Admin() {
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, memberStatus: u.memberStatus, clubRole: u.clubRole, trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus, clubRole: u.clubRole, trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -602,24 +744,31 @@ export default function Admin() {
                   <span className="text-right">Amount · Date</span>
                 </div>
                 <div className="divide-y">
-                  {filteredPayments.map((p, i) => (
-                    <div key={i} className="px-4 py-2.5 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm text-navy truncate">{(p as any).reference || p.paymentId || "—"}</p>
-                        {p.paymentId ? (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            ID: <span className="font-mono">{p.paymentId}</span>
-                          </p>
-                        ) : (
-                          <p className="text-xs text-amber-600 mt-0.5">Unmatched</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold text-green-700 tabular-nums">{`$${p.amount.toFixed(2)}`}</p>
-                        <p className="text-xs text-muted-foreground">{formatPaymentDate(p.date)}</p>
-                      </div>
-                    </div>
-                  ))}
+                  {filteredPayments.map((p, i) => {
+                    const canEditPayment = isAdmin && (p as any).id != null;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => canEditPayment ? setEditingPayment({ id: (p as any).id, paymentId: p.paymentId, reference: (p as any).reference || "", amount: p.amount, date: p.date, email: p.email }) : undefined}
+                        className={`w-full text-left px-4 py-2.5 flex items-start justify-between gap-3 ${canEditPayment ? "hover:bg-muted/50 transition-colors" : ""}`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm text-navy truncate">{(p as any).reference || p.paymentId || "—"}</p>
+                          {p.paymentId ? (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              ID: <span className="font-mono">{p.paymentId}</span>
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-600 mt-0.5">Unmatched</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold text-green-700 tabular-nums">{`$${p.amount.toFixed(2)}`}</p>
+                          <p className="text-xs text-muted-foreground">{formatPaymentDate(p.date)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -716,7 +865,16 @@ export default function Admin() {
                         </p>
                         <p className="text-xs text-muted-foreground">{s.pool} · {s.trainingTime}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setEditingSession(s)}
+                        >
+                          <Pencil className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
                         {isClosed ? (
                           <Badge variant="destructive" className="text-xs">Closed</Badge>
                         ) : (
@@ -777,6 +935,24 @@ export default function Admin() {
         onOpenChange={setAddSessionOpen}
         onDone={() => {}}
       />
+
+      {editingSession && (
+        <EditSessionSheet
+          open={!!editingSession}
+          onOpenChange={(v) => { if (!v) setEditingSession(null); }}
+          session={editingSession}
+          onDone={() => setEditingSession(null)}
+        />
+      )}
+
+      {editingPayment && (
+        <EditPaymentSheet
+          open={!!editingPayment}
+          onOpenChange={(v) => { if (!v) setEditingPayment(null); }}
+          payment={editingPayment}
+          onDone={() => setEditingPayment(null)}
+        />
+      )}
     </div>
   );
 }
