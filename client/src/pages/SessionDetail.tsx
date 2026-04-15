@@ -194,10 +194,10 @@ export default function SessionDetail() {
           ) : mySignup ? (
             <button
               disabled={!userCanEdit}
-              className={`w-full h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full h-11 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${
                 userCanEdit
-                  ? "border-white/15 text-white hover:bg-white/5"
-                  : "border-white/6 text-white/25 cursor-default"
+                  ? "bg-[#4DA6FF] text-white"
+                  : "bg-white/6 text-white/25 cursor-default"
               }`}
               onClick={() => { if (userCanEdit) { setEditingSignup(mySignup!); setEditSheetOpen(true); } }}
             >
@@ -249,7 +249,7 @@ export default function SessionDetail() {
           {/* Splits button — below sign-ups list, above admin */}
           {isAuthenticated && (
             <Link href={`/session/${rowId}/splits`}>
-              <button className="w-full h-11 rounded-xl border border-white/10 text-[14px] font-semibold text-white/70 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
+              <button className="w-full h-11 rounded-xl border border-white/12 text-[14px] font-semibold text-white/60 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
                 <Pencil className="w-4 h-4" />
                 Splits
               </button>

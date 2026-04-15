@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getMembershipOnTrainingDate, calculateFee } from "@/lib/feeUtils";
 import AppHeader from "@/components/AppHeader";
-import { useParams, Link } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ export default function SignUpForm() {
 
   const [activity, setActivity] = useState<Activity>("Regular Training");
   const [submitted, setSubmitted] = useState(false);
+  const [, navigate] = useLocation();
 
   const currentStatus: string = (user as any)?.memberStatus || "Non-Member";
   const trialEndDate: string = (user as any)?.trialEndDate || "";
@@ -46,6 +47,13 @@ export default function SignUpForm() {
     if (!session || isFreeActivity) return 0;
     return calculateFee(session, membershipOnDate, activity);
   }, [session, membershipOnDate, activity, isFreeActivity]);
+
+  useEffect(() => {
+    if (submitted) {
+      const t = setTimeout(() => navigate(`/session/${rowId}`), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [submitted, rowId, navigate]);
 
   const submitMutation = trpc.signups.submit.useMutation({
     onSuccess: (data) => { setSubmitted(true); toast.success(data.message); },
@@ -104,13 +112,8 @@ export default function SignUpForm() {
             {session.pool} · {session.trainingDate}
           </p>
           {fee > 0 && (
-            <p className="text-[15px] text-white/50 mb-8">{formatFee(fee)} to pay</p>
+            <p className="text-[15px] text-white/50">{formatFee(fee)} to pay</p>
           )}
-          <Link href={`/session/${rowId}`}>
-            <button className="h-12 px-8 rounded-xl bg-white text-[#111111] font-semibold text-[15px]">
-              View Session
-            </button>
-          </Link>
         </main>
       </div>
     );
@@ -208,12 +211,12 @@ export default function SignUpForm() {
         </div>
 
         {/* Fee summary */}
-        <div className="bg-[#1c1c1c] rounded-xl px-4 py-3.5 flex items-center justify-between">
+        <div className="bg-[#1c1c1c] rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-0.5">Total</p>
-            <p className="text-[26px] font-bold text-white leading-none">{formatFee(fee)}</p>
+            <p className="text-[16px] font-normal text-white leading-tight">{formatFee(fee)}</p>
           </div>
-          <p className="text-[13px] text-white/40">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35">
             {isFreeActivity ? "Complimentary" : `${membershipOnDate} rate`}
           </p>
         </div>
@@ -222,7 +225,7 @@ export default function SignUpForm() {
         <button
           onClick={handleSubmit}
           disabled={submitMutation.isPending || debtBlocking}
-          className="w-full h-12 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[15px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
+          className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
         >
           {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitMutation.isPending ? "Submitting…" : "Confirm Sign Up"}
