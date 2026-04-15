@@ -61,7 +61,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const [name, setName] = useState(user.name || "");
   const [paymentId, setPaymentId] = useState(user.paymentId || "");
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
-  const [clubRole, setClubRole] = useState(user.clubRole || "");
+  const [clubRole, setClubRole] = useState(user.clubRole || "none");
   const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
   const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
@@ -70,7 +70,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
     setName(user.name || "");
     setPaymentId(user.paymentId || "");
     setMemberStatus(user.memberStatus || "Non-Member");
-    setClubRole(user.clubRole || "");
+    setClubRole(user.clubRole || "none");
     setTrialStartDate(user.trialStartDate || "");
     setTrialEndDate(user.trialEndDate || "");
     setMembershipFee("");
@@ -187,7 +187,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 <SelectItem value="Helper">Helper</SelectItem>
                 <SelectItem value="Admin">Admin</SelectItem>
               </SelectContent>
@@ -202,7 +202,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
               name: name.trim() || undefined,
               paymentId: paymentId.trim() || undefined,
               memberStatus,
-              clubRole,
+              clubRole: clubRole === "none" ? "" : clubRole,
               ...(showTrialDates ? { trialStartDate, trialEndDate } : {}),
               ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
             })}
@@ -681,7 +681,7 @@ export default function Admin() {
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name, email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus, clubRole: u.clubRole, trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
