@@ -100,6 +100,7 @@ export const sheetUsers = mysqlTable("sheet_users", {
   clubRole: varchar("clubRole", { length: 64 }).default(""),
   trialStartDate: varchar("trialStartDate", { length: 64 }).default(""),
   trialEndDate: varchar("trialEndDate", { length: 64 }).default(""),
+  dob: varchar("dob", { length: 64 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
 });
 export type SheetUser = typeof sheetUsers.$inferSelect;

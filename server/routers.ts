@@ -681,6 +681,7 @@ export const appRouter = router({
         clubRole: z.string().optional(),
         trialStartDate: z.string().optional(),
         trialEndDate: z.string().optional(),
+        dob: z.string().optional(),
         /** When setting memberStatus to "Member", optionally record the membership fee in Training Sign-ups */
         membershipFee: z.number().optional(),
       }))
@@ -698,6 +699,7 @@ export const appRouter = router({
           if (input.clubRole !== undefined) userFields.clubRole = input.clubRole;
           if (input.trialStartDate !== undefined) userFields.trialStartDate = input.trialStartDate;
           if (input.trialEndDate !== undefined) userFields.trialEndDate = input.trialEndDate;
+          if (input.dob !== undefined) userFields.dob = input.dob;
           if (Object.keys(userFields).length > 0) {
             await adminUsersDb.update(sheetUsers)
               .set(userFields)
@@ -752,6 +754,42 @@ export const appRouter = router({
         (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0)
       );
     }),
+
+    getUserActivity: protectedProcedure
+      .input(z.object({ email: z.string(), paymentId: z.string().optional() }))
+      .query(async ({ input, ctx }) => {
+        const { clubRole } = ctx.user;
+        if (clubRole !== "Admin" && clubRole !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const actDb = await db.getDb();
+        if (!actDb) return { payments: [], signups: [] };
+        const emailNorm = input.email.toLowerCase().trim();
+        const pidNorm   = (input.paymentId || "").toLowerCase().trim();
+
+        // Payments: match by email (col G) or paymentId (col F)
+        let payments: typeof sheetPayments.$inferSelect[] = [];
+        if (pidNorm) {
+          const { or } = await import("drizzle-orm");
+          payments = await actDb.select().from(sheetPayments)
+            .where(or(eq(sheetPayments.email, emailNorm), eq(sheetPayments.paymentId, pidNorm)));
+        } else {
+          payments = await actDb.select().from(sheetPayments)
+            .where(eq(sheetPayments.email, emailNorm));
+        }
+        payments = [...payments].sort((a, b) =>
+          (new Date(b.date ?? "").getTime() || 0) - (new Date(a.date ?? "").getTime() || 0)
+        );
+
+        // Signups: match by email
+        const signups = await actDb.select().from(sheetSignups)
+          .where(eq(sheetSignups.email, emailNorm));
+        const signupsSorted = [...signups].sort((a, b) =>
+          (new Date(b.dateOfTraining ?? "").getTime() || 0) - (new Date(a.dateOfTraining ?? "").getTime() || 0)
+        );
+
+        return { payments, signups: signupsSorted };
+      }),
 
     allSessions: protectedProcedure.query(async ({ ctx }) => {
       const { clubRole } = ctx.user;

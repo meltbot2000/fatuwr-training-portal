@@ -52,7 +52,7 @@ function formatPaymentDate(dateStr: string): string {
 interface EditUserSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string };
+  user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string; dob: string };
   onDone: () => void;
 }
 
@@ -60,21 +60,29 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const utils = trpc.useUtils();
   const [name, setName] = useState(user.name || "");
   const [paymentId, setPaymentId] = useState(user.paymentId || "");
+  const [dob, setDob] = useState(user.dob || "");
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
   const [clubRole, setClubRole] = useState(user.clubRole || "none");
   const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
   const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
+  const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
 
   useEffect(() => {
     setName(user.name || "");
     setPaymentId(user.paymentId || "");
+    setDob(user.dob || "");
     setMemberStatus(user.memberStatus || "Non-Member");
     setClubRole(user.clubRole || "none");
     setTrialStartDate(user.trialStartDate || "");
     setTrialEndDate(user.trialEndDate || "");
     setMembershipFee("");
   }, [user]);
+
+  const activityQuery = trpc.admin.getUserActivity.useQuery(
+    { email: user.email, paymentId: user.paymentId || undefined },
+    { enabled: open }
+  );
 
   const mutation = trpc.admin.updateUserStatus.useMutation({
     onSuccess: async () => {
@@ -87,137 +95,212 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   });
 
   const isSettingMember = memberStatus === "Member" && user.memberStatus !== "Member";
-  const showTrialDates = memberStatus === "Trial";
+
+  const payments = activityQuery.data?.payments ?? [];
+  const signups  = activityQuery.data?.signups  ?? [];
+
+  // Balance summary
+  const totalPaid    = payments.reduce((s, p) => s + (p.amount ?? 0), 0);
+  const totalCharged = signups
+    .filter(s => !["Trial Membership", "Membership Fee"].includes(s.activity ?? ""))
+    .reduce((s, sg) => s + (sg.actualFees ?? 0), 0);
+  const balance = totalPaid - totalCharged; // positive = credit, negative = owes
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Edit User</SheetTitle>
-        </SheetHeader>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto">
+          <SheetHeader className="mb-2">
+            <SheetTitle className="text-navy">{user.name || user.email}</SheetTitle>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </SheetHeader>
 
-        <div className="space-y-1 mb-5">
-          <p className="text-xs text-muted-foreground">{user.email}</p>
-        </div>
+          <Tabs defaultValue="profile" className="mt-3">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="profile" className="flex-1">Profile</TabsTrigger>
+              <TabsTrigger value="payments" className="flex-1">
+                Payments {payments.length > 0 && <span className="ml-1 text-xs opacity-60">({payments.length})</span>}
+              </TabsTrigger>
+              <TabsTrigger value="signups" className="flex-1">
+                Sign-ups {signups.length > 0 && <span className="ml-1 text-xs opacity-60">({signups.length})</span>}
+              </TabsTrigger>
+            </TabsList>
 
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Name</Label>
-            <Input
-              placeholder="Full name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="h-10"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Payment ID</Label>
-            <Input
-              placeholder="e.g. jtan"
-              value={paymentId}
-              onChange={e => setPaymentId(e.target.value)}
-              className="h-10 font-mono"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Membership Status</Label>
-            <Select value={memberStatus} onValueChange={setMemberStatus}>
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["Non-Member", "Trial", "Member", "Student"].map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Membership fee — shown only when promoting to Member */}
-          {isSettingMember && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">
-                Membership Fee Paid <span className="text-muted-foreground/60">(optional)</span>
-              </Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.50"
-                placeholder="e.g. 80"
-                value={membershipFee}
-                onChange={e => setMembershipFee(e.target.value)}
-                className="h-10"
-              />
-              <p className="text-xs text-muted-foreground">
-                If entered, a Membership Fee entry will be recorded in Training Sign-ups.
-              </p>
-            </div>
-          )}
-
-          {/* Trial dates — shown when status is Trial */}
-          {showTrialDates && (
-            <>
+            {/* ── Profile tab ─────────────────────────────── */}
+            <TabsContent value="profile" className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Trial Start Date <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                <Input
-                  placeholder="e.g. 01/04/2026"
-                  value={trialStartDate}
-                  onChange={e => setTrialStartDate(e.target.value)}
-                  className="h-10"
-                />
+                <Label className="text-xs font-medium text-muted-foreground">Name</Label>
+                <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="h-10" />
               </div>
+
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Trial End Date <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                <Input
-                  placeholder="e.g. 01/05/2026"
-                  value={trialEndDate}
-                  onChange={e => setTrialEndDate(e.target.value)}
-                  className="h-10"
-                />
+                <Label className="text-xs font-medium text-muted-foreground">Payment ID</Label>
+                <Input placeholder="e.g. jtan" value={paymentId} onChange={e => setPaymentId(e.target.value)} className="h-10 font-mono" />
+                <p className="text-xs text-muted-foreground">Used as PayNow reference for payment matching.</p>
               </div>
-            </>
-          )}
 
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Club Role</Label>
-            <Select value={clubRole} onValueChange={setClubRole}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="Helper">Helper</SelectItem>
-                <SelectItem value="Admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Date of Birth <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                <Input placeholder="e.g. 01/01/1990" value={dob} onChange={e => setDob(e.target.value)} className="h-10" />
+              </div>
 
-        <div className="mt-6 space-y-2">
-          <Button
-            onClick={() => mutation.mutate({
-              email: user.email,
-              name: name.trim() || undefined,
-              paymentId: paymentId.trim() || undefined,
-              memberStatus,
-              clubRole: clubRole === "none" ? "" : clubRole,
-              ...(showTrialDates ? { trialStartDate, trialEndDate } : {}),
-              ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
-            })}
-            disabled={mutation.isPending}
-            className="w-full bg-navy text-white hover:bg-navy/90"
-          >
-            {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save Changes
-          </Button>
-          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Membership Status</Label>
+                <Select value={memberStatus} onValueChange={setMemberStatus}>
+                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["Non-Member", "Trial", "Member", "Student"].map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isSettingMember && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Membership Fee Paid <span className="text-muted-foreground/60">(optional)</span>
+                  </Label>
+                  <Input type="number" min="0" step="0.50" placeholder="e.g. 80" value={membershipFee} onChange={e => setMembershipFee(e.target.value)} className="h-10" />
+                  <p className="text-xs text-muted-foreground">Records a Membership Fee entry in Training Sign-ups.</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Trial Start <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                  <Input placeholder="e.g. 01/04/2026" value={trialStartDate} onChange={e => setTrialStartDate(e.target.value)} className="h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Trial End <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                  <Input placeholder="e.g. 01/07/2026" value={trialEndDate} onChange={e => setTrialEndDate(e.target.value)} className="h-10" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Club Role</Label>
+                <Select value={clubRole} onValueChange={setClubRole}>
+                  <SelectTrigger className="h-10"><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="Helper">Helper</SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <Button
+                  onClick={() => mutation.mutate({
+                    email: user.email,
+                    name: name.trim() || undefined,
+                    paymentId: paymentId.trim() || undefined,
+                    dob: dob.trim() || undefined,
+                    memberStatus,
+                    clubRole: clubRole === "none" ? "" : clubRole,
+                    trialStartDate: trialStartDate || undefined,
+                    trialEndDate: trialEndDate || undefined,
+                    ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
+                  })}
+                  disabled={mutation.isPending}
+                  className="w-full bg-navy text-white hover:bg-navy/90"
+                >
+                  {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Cancel</Button>
+              </div>
+            </TabsContent>
+
+            {/* ── Payments tab ─────────────────────────────── */}
+            <TabsContent value="payments" className="space-y-3">
+              {/* Balance summary */}
+              <div className="rounded-lg border bg-muted/40 px-4 py-3 grid grid-cols-3 gap-2 text-center text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Paid</p>
+                  <p className="font-semibold text-green-700">${totalPaid.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Charged</p>
+                  <p className="font-semibold text-navy">${totalCharged.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Balance</p>
+                  <p className={`font-semibold ${balance >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    {balance >= 0 ? `+$${balance.toFixed(2)}` : `-$${Math.abs(balance).toFixed(2)}`}
+                  </p>
+                </div>
+              </div>
+
+              {activityQuery.isLoading ? (
+                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
+              ) : payments.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No payments found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {payments.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setEditingPayment({ id: p.id, paymentId: p.paymentId ?? "", reference: p.reference ?? "", amount: p.amount, date: p.date ?? "", email: p.email ?? "" })}
+                      className="w-full text-left rounded-lg border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-green-700">${(p.amount ?? 0).toFixed(2)}</span>
+                        <span className="text-xs text-muted-foreground">{formatPaymentDate(p.date ?? "")}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-xs text-muted-foreground font-mono">{p.paymentId || p.reference || "—"}</span>
+                        <Pencil className="w-3 h-3 text-muted-foreground/50" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── Sign-ups tab ─────────────────────────────── */}
+            <TabsContent value="signups" className="space-y-3">
+              <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{signups.length} sign-up{signups.length !== 1 ? "s" : ""}</span>
+                <span className="font-semibold text-navy">Total charged: ${totalCharged.toFixed(2)}</span>
+              </div>
+
+              {activityQuery.isLoading ? (
+                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
+              ) : signups.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No sign-ups found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {signups.map((s, idx) => (
+                    <div key={idx} className="rounded-lg border bg-card px-3 py-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-navy">{s.dateOfTraining || "—"}</span>
+                        <span className="text-sm font-semibold">${(s.actualFees ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-xs text-muted-foreground">{s.activity || "—"}{s.pool ? ` · ${s.pool}` : ""}</span>
+                        {s.memberOnTrainingDate && (
+                          <span className="text-xs text-muted-foreground">{s.memberOnTrainingDate}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </SheetContent>
+      </Sheet>
+
+      {editingPayment && (
+        <EditPaymentSheet
+          open={!!editingPayment}
+          onOpenChange={(v) => { if (!v) setEditingPayment(null); }}
+          payment={editingPayment}
+          onDone={() => { setEditingPayment(null); activityQuery.refetch(); }}
+        />
+      )}
+    </>
   );
 }
 
@@ -512,7 +595,7 @@ export default function Admin() {
   const [sessionPoolFilter, setSessionPoolFilter] = useState("All");
   const [sessionDayFilter, setSessionDayFilter] = useState("All");
   const [sessionStatusFilter, setSessionStatusFilter] = useState("All");
-  const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string; dob: string } | null>(null);
   const [editingSession, setEditingSession] = useState<SessionForEdit | null>(null);
   const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
@@ -681,7 +764,7 @@ export default function Admin() {
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "" }) : undefined}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "", dob: (u as any).dob || "" }) : undefined}
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">

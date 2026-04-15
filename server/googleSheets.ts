@@ -73,6 +73,7 @@ export interface UserRow {
   clubRole: string;
   trialStartDate: string;
   trialEndDate: string;
+  dob: string;
 }
 
 export interface PaymentRow {
@@ -295,6 +296,7 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
       memberStatus: row[9] || "Non-Member",
       trialStartDate: row[10] || "",
       trialEndDate: row[11] || "",
+      dob: row[8] || "",        // col I = Date of Birth
     });
   }
   return users;
@@ -412,6 +414,7 @@ function dbUserToUserRow(r: any): UserRow {
     clubRole: r.clubRole ?? "",
     trialStartDate: r.trialStartDate ?? "",
     trialEndDate: r.trialEndDate ?? "",
+    dob: r.dob ?? "",
   };
 }
 

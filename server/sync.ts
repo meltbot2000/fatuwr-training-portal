@@ -94,7 +94,7 @@ export async function syncTab(tab: SyncTab): Promise<void> {
         if (rows.length) {
           await tx.insert(sheetUsers).values(
             rows.map(u => ({
-              sheetId: u.id,         // UserRow.id = sheet col A value
+              sheetId: u.id,
               name: u.name,
               userEmail: u.userEmail,
               email: u.email,
@@ -104,6 +104,7 @@ export async function syncTab(tab: SyncTab): Promise<void> {
               clubRole: u.clubRole,
               trialStartDate: u.trialStartDate,
               trialEndDate: u.trialEndDate,
+              dob: u.dob ?? "",
             }))
           );
         }

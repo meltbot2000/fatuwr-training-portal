@@ -196,7 +196,7 @@ async function startServer() {
             r.clubRole ?? "",      // [5]  Club Role (col F)
             "",                    // [6]  Annual Membership Start (col G — not in DB)
             "",                    // [7]  Phone Number (col H — not in DB)
-            "",                    // [8]  Birth Date (col I — not in DB)
+            r.dob ?? "",           // [8]  Birth Date (col I)
             r.memberStatus ?? "Non-Member", // [9]  Membership Status (col J)
             r.trialStartDate ?? "", // [10] Trial Start Date (col K)
             r.trialEndDate ?? "",  // [11] Trial End Date (col L)

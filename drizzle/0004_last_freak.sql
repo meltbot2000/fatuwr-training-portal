@@ -1,0 +1,1 @@
+ALTER TABLE `sheet_users` ADD `dob` varchar(64) DEFAULT '';

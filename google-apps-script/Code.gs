@@ -1015,11 +1015,11 @@ function syncAllTabsFromDb() {
       Logger.log("[syncAllTabsFromDb] Error for " + tabs[i] + ": " + e);
     }
   }
-  if (errors.length > 0) {
-    SpreadsheetApp.getUi().alert("Sync completed with errors:\n" + errors.join("\n"));
-  } else {
-    SpreadsheetApp.getUi().alert("All tabs synced from DB successfully.");
-  }
+  var msg = errors.length > 0
+    ? "Sync completed with errors:\n" + errors.join("\n")
+    : "All tabs synced from DB successfully.";
+  Logger.log("[syncAllTabsFromDb] " + msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (uiErr) { /* not in UI context */ }
 }
 
 /** Individual tab sync functions — usable from the menu or directly. */
@@ -1039,10 +1039,10 @@ function syncTabFromDb(tab) {
   var url    = props.getProperty("RAILWAY_URL");
   var secret = props.getProperty("APPS_SCRIPT_SECRET");
   if (!url || !secret) {
-    SpreadsheetApp.getUi().alert(
-      "RAILWAY_URL and APPS_SCRIPT_SECRET must be set in Script Properties.\n" +
-      "Go to: Apps Script editor → Project Settings → Script Properties."
-    );
+    var cfgMsg = "RAILWAY_URL and APPS_SCRIPT_SECRET must be set in Script Properties.\n" +
+      "Go to: Apps Script editor → Project Settings → Script Properties.";
+    Logger.log("[syncTabFromDb] " + cfgMsg);
+    try { SpreadsheetApp.getUi().alert(cfgMsg); } catch (uiErr) { /* not in UI context */ }
     return;
   }
 
