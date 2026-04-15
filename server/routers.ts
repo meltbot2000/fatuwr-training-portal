@@ -441,15 +441,36 @@ export const appRouter = router({
         activity: z.string(),
         baseFee: z.number(),
         actualFee: z.number(),
+        // Admin-only: edit another user's sign-up
+        targetEmail: z.string().optional(),
+        name: z.string().optional(),
+        memberOnTrainingDate: z.string().optional(),
+        paymentId: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
+        const isAdmin = (user as any).clubRole === "Admin";
+        // Only admins may target another user's row
+        if (input.targetEmail && !isAdmin) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const editDb = await db.getDb();
         if (!editDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const fields: Record<string, any> = {
+          activity: input.activity,
+          baseFee: input.baseFee,
+          actualFees: input.actualFee,
+        };
+        if (isAdmin) {
+          if (input.name !== undefined) fields.name = input.name;
+          if (input.memberOnTrainingDate !== undefined) fields.memberOnTrainingDate = input.memberOnTrainingDate;
+          if (input.paymentId !== undefined) fields.paymentId = input.paymentId;
+        }
         await editDb.update(sheetSignups)
-          .set({ activity: input.activity, baseFee: input.baseFee, actualFees: input.actualFee })
+          .set(fields)
           .where(and(
-            eq(sheetSignups.email, (user.email ?? "").toLowerCase().trim()),
+            eq(sheetSignups.email, targetEmail),
             eq(sheetSignups.dateOfTraining, input.sessionDate),
             eq(sheetSignups.pool, input.sessionPool),
           ));
@@ -461,13 +482,19 @@ export const appRouter = router({
       .input(z.object({
         sessionDate: z.string(),
         sessionPool: z.string(),
+        targetEmail: z.string().optional(), // admin only
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
+        const isAdmin = (user as any).clubRole === "Admin";
+        if (input.targetEmail && !isAdmin) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const deleteDb = await db.getDb();
         if (!deleteDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         await deleteDb.delete(sheetSignups).where(and(
-          eq(sheetSignups.email, (user.email ?? "").toLowerCase().trim()),
+          eq(sheetSignups.email, targetEmail),
           eq(sheetSignups.dateOfTraining, input.sessionDate),
           eq(sheetSignups.pool, input.sessionPool),
         ));

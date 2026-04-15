@@ -39,6 +39,7 @@ export default function SessionDetail() {
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editingSignup, setEditingSignup] = useState<{
     name: string;
+    email: string;
     activity: string;
     memberOnTrainingDate: string;
     paymentId: string;
@@ -179,7 +180,7 @@ export default function SessionDetail() {
             ) : mySignup ? (
               <button
                 className="flex-1 h-11 rounded-xl border border-white/10 text-[14px] text-white/80 font-medium flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
-                onClick={() => { setEditingSignup(mySignup); setEditSheetOpen(true); }}
+                onClick={() => { setEditingSignup(mySignup!); setEditSheetOpen(true); }}
               >
                 <Pencil className="w-4 h-4" />
                 Edit My Sign-up
@@ -206,8 +207,8 @@ export default function SessionDetail() {
                   return (
                     <button
                       key={idx}
-                      onClick={() => { if (canEdit) { setEditingSignup(su); setEditSheetOpen(true); } }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${canEdit ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
+                      onClick={() => { if (canEdit || isAdminUser) { setEditingSignup(su); setEditSheetOpen(true); } }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${(canEdit || isAdminUser) ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
                     >
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#4DA6FF] text-white" : "bg-white/8 text-white/50"}`}>
                         {getInitials(su.name) || "?"}
@@ -219,7 +220,7 @@ export default function SessionDetail() {
                         </p>
                         <p className="text-[12px] text-white/40">{su.activity}</p>
                       </div>
-                      {canEdit && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
+                      {(canEdit || isAdminUser) && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
                     </button>
                   );
                 })}

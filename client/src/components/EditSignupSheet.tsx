@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { calculateFee, type FeeSession } from "@/lib/feeUtils";
 import {
@@ -6,7 +7,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetFooter,
 } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -19,9 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +39,7 @@ type Props = {
   session: FeeSession;
   signup: {
     name: string;
+    email: string;
     activity: string;
     memberOnTrainingDate: string;
     paymentId: string;
@@ -59,41 +58,40 @@ export default function EditSignupSheet({
   signup,
   onDone,
 }: Props) {
+  const { user } = useAuth();
+  const isAdmin = (user as any)?.clubRole === "Admin";
+
   const [activity, setActivity] = useState<Activity>(
     (ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity
   );
+  // Admin-only editable fields
+  const [name, setName] = useState(signup.name);
+  const [memberStatus, setMemberStatus] = useState(signup.memberOnTrainingDate || "Non-Member");
+  const [paymentId, setPaymentId] = useState(signup.paymentId || "");
+  const [actualFee, setActualFee] = useState(signup.actualFees?.toString() ?? "");
 
   const utils = trpc.useUtils();
-
   const refreshMutation = trpc.sessions.refresh.useMutation();
 
+  const afterMutation = async () => {
+    await refreshMutation.mutateAsync();
+    await utils.sessions.detail.invalidate({ rowId: sessionRowId });
+    onOpenChange(false);
+    onDone();
+  };
+
   const editMutation = trpc.signups.edit.useMutation({
-    onSuccess: async () => {
-      toast.success("Sign-up updated.");
-      await refreshMutation.mutateAsync();
-      await utils.sessions.detail.invalidate({ rowId: sessionRowId });
-      onOpenChange(false);
-      onDone();
-    },
-    onError: (err) => {
-      toast.error(err.message || "Failed to update sign-up.");
-    },
+    onSuccess: async () => { toast.success("Sign-up updated."); await afterMutation(); },
+    onError: (err) => toast.error(err.message || "Failed to update sign-up."),
   });
 
   const deleteMutation = trpc.signups.delete.useMutation({
-    onSuccess: async () => {
-      toast.success("Sign-up deleted.");
-      await refreshMutation.mutateAsync();
-      await utils.sessions.detail.invalidate({ rowId: sessionRowId });
-      onOpenChange(false);
-      onDone();
-    },
-    onError: (err) => {
-      toast.error(err.message || "Failed to delete sign-up.");
-    },
+    onSuccess: async () => { toast.success("Sign-up deleted."); await afterMutation(); },
+    onError: (err) => toast.error(err.message || "Failed to delete sign-up."),
   });
 
-  const calculatedFee = calculateFee(session, signup.memberOnTrainingDate, activity);
+  const calculatedFee = calculateFee(session, memberStatus, activity);
+  const displayFee = isAdmin ? (parseFloat(actualFee) || 0) : calculatedFee;
   const isPending = editMutation.isPending || deleteMutation.isPending || refreshMutation.isPending;
 
   const handleSave = () => {
@@ -102,121 +100,162 @@ export default function EditSignupSheet({
       sessionPool,
       activity,
       baseFee: calculatedFee,
-      actualFee: calculatedFee,
+      actualFee: isAdmin ? (parseFloat(actualFee) || 0) : calculatedFee,
+      ...(isAdmin ? {
+        targetEmail: signup.email,
+        name: name.trim(),
+        memberOnTrainingDate: memberStatus.trim(),
+        paymentId: paymentId.trim(),
+      } : {}),
     });
   };
 
   const handleDelete = () => {
-    deleteMutation.mutate({ sessionDate, sessionPool });
+    deleteMutation.mutate({
+      sessionDate,
+      sessionPool,
+      ...(isAdmin ? { targetEmail: signup.email } : {}),
+    });
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-navy">Edit Sign-up</SheetTitle>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto bg-[#1c1c1c] border-t border-white/8">
+        <SheetHeader className="pb-3">
+          <SheetTitle className="text-white text-[16px]">
+            {isAdmin ? `Edit — ${signup.name}` : "Edit My Sign-up"}
+          </SheetTitle>
         </SheetHeader>
 
-        <div className="px-4 space-y-4">
-          {/* Read-only fields */}
-          <div>
-            <Label className="text-xs text-muted-foreground">Name</Label>
-            <Input value={signup.name} disabled className="bg-muted/50" />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Member on Training Date</Label>
-            <Input value={signup.memberOnTrainingDate || "Non-Member"} disabled className="bg-muted/50" />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Payment ID</Label>
-            <Input value={signup.paymentId || "—"} disabled className="bg-muted/50" />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Actual Fee</Label>
-            <Input value={formatFee(calculatedFee)} disabled className="bg-muted/50 font-semibold" />
-          </div>
+        <div className="space-y-4 pb-6">
 
-          {/* Activity selection */}
+          {/* ── Admin fields ───────────────────────── */}
+          {isAdmin && (
+            <div className="space-y-3">
+              <div className="bg-[#111111] rounded-xl divide-y divide-white/6">
+                {/* Name */}
+                <div className="px-4 py-2.5 flex items-center gap-3">
+                  <span className="text-[12px] text-white/40 w-28 shrink-0">Name</span>
+                  <Input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                  />
+                </div>
+                {/* Member status */}
+                <div className="px-4 py-2.5 flex items-center gap-3">
+                  <span className="text-[12px] text-white/40 w-28 shrink-0">Status</span>
+                  <Input
+                    value={memberStatus}
+                    onChange={e => setMemberStatus(e.target.value)}
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                  />
+                </div>
+                {/* Payment ID */}
+                <div className="px-4 py-2.5 flex items-center gap-3">
+                  <span className="text-[12px] text-white/40 w-28 shrink-0">Payment ID</span>
+                  <Input
+                    value={paymentId}
+                    onChange={e => setPaymentId(e.target.value)}
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 font-mono focus-visible:ring-0"
+                  />
+                </div>
+                {/* Actual fee */}
+                <div className="px-4 py-2.5 flex items-center gap-3">
+                  <span className="text-[12px] text-white/40 w-28 shrink-0">Actual Fee</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={actualFee}
+                    onChange={e => setActualFee(e.target.value)}
+                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white/80 focus-visible:ring-0"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-white/25 px-1">
+                Calculated fee for this activity: {formatFee(calculatedFee)}
+              </p>
+            </div>
+          )}
+
+          {/* ── Activity picker (all users) ─────────── */}
           <div>
-            <Label className="text-sm font-medium text-navy mb-2 block">Activity</Label>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">
+              Activity
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              {ACTIVITIES.map((a) => (
-                <button
-                  key={a}
-                  onClick={() => setActivity(a)}
-                  className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                    activity === a
-                      ? "border-gold bg-gold/10 text-navy"
-                      : "border-border bg-card text-muted-foreground hover:border-gold/50"
-                  }`}
-                >
-                  {a}
-                  <p className="text-xs mt-0.5 opacity-70">
-                    {formatFee(calculateFee(session, signup.memberOnTrainingDate, a))}
-                  </p>
-                </button>
-              ))}
+              {ACTIVITIES.map((a) => {
+                const fee = calculateFee(session, memberStatus, a);
+                return (
+                  <button
+                    key={a}
+                    onClick={() => {
+                      setActivity(a);
+                      if (!isAdmin) setActualFee(fee.toString());
+                    }}
+                    className={`rounded-xl px-3 py-3 text-left transition-all ${
+                      activity === a
+                        ? "bg-white text-[#111111]"
+                        : "bg-[#2a2a2a] text-white/70 hover:bg-[#333]"
+                    }`}
+                  >
+                    <p className="text-[14px] font-semibold leading-tight">{a}</p>
+                    <p className={`text-[12px] mt-0.5 ${activity === a ? "text-black/50" : "text-white/35"}`}>
+                      {formatFee(fee)}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
 
-        <SheetFooter className="px-4 pt-4 gap-2">
-          <Button
-            onClick={handleSave}
-            disabled={isPending}
-            className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
-          >
-            {editMutation.isPending ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
-            ) : (
-              "Save changes"
-            )}
-          </Button>
+          {/* ── Fee summary ─────────────────────────── */}
+          <div className="bg-[#111111] rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-[13px] text-white/40">Fee</span>
+            <span className="text-[15px] font-semibold text-white/80">{formatFee(displayFee)}</span>
+          </div>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={isPending}
-                className="w-full border-destructive/50 text-destructive hover:bg-destructive/5"
-              >
-                {deleteMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Deleting...</>
-                ) : (
-                  "Delete sign-up"
-                )}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete sign-up?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove your sign-up for{" "}
-                  <span className="font-medium">{sessionDate}</span> at{" "}
-                  <span className="font-medium">{sessionPool}</span>. This cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-destructive hover:bg-destructive/90"
+          {/* ── Actions ─────────────────────────────── */}
+          <div className="space-y-2">
+            <button
+              onClick={handleSave}
+              disabled={isPending}
+              className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {editMutation.isPending ? "Saving…" : "Save Changes"}
+            </button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  disabled={isPending}
+                  className="w-full h-11 rounded-xl border border-red-500/25 text-red-400 text-[14px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
-                  Yes, delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {deleteMutation.isPending ? "Deleting…" : "Delete Sign-up"}
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete sign-up?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove the sign-up for{" "}
+                    <span className="font-medium">{sessionDate}</span> at{" "}
+                    <span className="font-medium">{sessionPool}</span>. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                    Yes, delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
 
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            className="w-full"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-        </SheetFooter>
+        </div>
       </SheetContent>
     </Sheet>
   );

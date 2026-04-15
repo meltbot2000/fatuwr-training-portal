@@ -29,7 +29,11 @@ export function calculateFee(
   membershipOnDate: string,
   activity: string
 ): number {
-  const isSwim = activity.toLowerCase().includes("swim");
+  // Trainer and First-timer are always free
+  const actLower = activity.toLowerCase();
+  if (actLower === "trainer" || actLower === "first timer" || actLower === "first-timer") return 0;
+
+  const isSwim = actLower.includes("swim");
   const status = membershipOnDate.toLowerCase();
   if (status === "member" || status === "trial") {
     return isSwim ? session.memberSwimFee : session.memberFee;
