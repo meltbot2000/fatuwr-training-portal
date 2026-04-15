@@ -5,85 +5,33 @@ import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-// ── TODO: Set to the actual full-year annual membership fee ──────────────────
-const ANNUAL_FEE = 80; // e.g. 80 → $80 for January (full year)
+// ── Annual membership fee (full year) ────────────────────────────────────────
+const ANNUAL_FEE = 80;
 
 // Pro-rated by calendar year: member joining in month M pays for (12-M+1)/12 of the year.
-// Rounded to nearest dollar. Update ANNUAL_FEE above to change all values at once.
 const PRORATED_SCHEDULE = (function () {
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ];
   return months.map(function (month, i) {
-    return { month, fee: "$" + Math.round((ANNUAL_FEE * (12 - i)) / 12) };
+    return { month, fee: Math.round((ANNUAL_FEE * (12 - i)) / 12) };
   });
 })();
 
-function MembershipFeeCard() {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <h3 className="text-sm font-bold text-navy mb-1">Annual Membership Fee</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Fees are pro-rated based on the month you join, valid until end of the calendar year.
-        </p>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-          {PRORATED_SCHEDULE.map(({ month, fee }) => (
-            <div key={month} className="flex justify-between">
-              <span className="text-navy/80">{month}</span>
-              <span className="font-semibold tabular-nums">{fee}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TrainingFeeCard() {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <h3 className="text-sm font-bold text-navy mb-1">Training Fees (Reference)</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Fees vary by pool — check session details for exact pricing.
-        </p>
-        <div className="space-y-1 text-sm">
-          <div className="grid grid-cols-3 text-xs font-medium text-muted-foreground mb-1">
-            <span>Membership</span>
-            <span className="text-right">Full</span>
-            <span className="text-right">Swim</span>
-          </div>
-          <Separator />
-          {[
-            { label: "Member / Student / Trial", full: "$13", swim: "$7" },
-            { label: "Non-Member", full: "$20", swim: "$10" },
-          ].map(({ label, full, swim }) => (
-            <div key={label} className="grid grid-cols-3 py-1">
-              <span className="text-navy/80 text-xs">{label}</span>
-              <span className="text-right tabular-nums">{full}</span>
-              <span className="text-right tabular-nums">{swim}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
+function getCurrentMonthFee(): number {
+  return PRORATED_SCHEDULE[new Date().getMonth()].fee;
 }
 
 const CLUB_UEN = "T14SS0144D";
 
 function parseDDMMYYYY(str: string): Date | null {
   if (!str || str === "NA") return null;
-  // Try JS Date first — handles M/D/YYYY returned by the Sheets API (e.g. "1/16/2026")
   const d = new Date(str);
   if (!isNaN(d.getTime())) return d;
-  // Fallback: DD/MM/YYYY written by the app (e.g. "16/01/2026")
   const parts = str.split("/").map(Number);
   if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
     const [dd, mm, yy] = parts;
@@ -99,14 +47,42 @@ function formatDisplayDate(str: string): string {
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function PaymentInstructionsCard({ paymentId }: { paymentId: string }) {
+// ── Membership fee schedule card ─────────────────────────────────────────────
+
+function MembershipFeeCard() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="text-sm font-bold text-navy mb-1">Annual Membership Fee</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Fees are pro-rated based on the month you join, valid until end of the calendar year.
+        </p>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+          {PRORATED_SCHEDULE.map(({ month, fee }) => {
+            const isCurrent = month === PRORATED_SCHEDULE[new Date().getMonth()].month;
+            return (
+              <div key={month} className={`flex justify-between ${isCurrent ? "font-semibold text-navy" : ""}`}>
+                <span className={isCurrent ? "text-navy" : "text-navy/80"}>{month}</span>
+                <span className={`tabular-nums ${isCurrent ? "text-gold" : ""}`}>${fee}</span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Payment instructions ─────────────────────────────────────────────────────
+
+function PaymentInstructionsCard({ paymentId, fee, label }: { paymentId: string; fee: number; label: string }) {
   return (
     <Card className="border-navy/20">
       <CardContent className="p-4 text-sm text-navy/80 space-y-2">
-        <p className="font-semibold text-navy">How to become a Member</p>
+        <p className="font-semibold text-navy">{label}</p>
         <ol className="list-decimal list-inside space-y-1.5 text-sm">
           <li>
-            Transfer the annual fee via PayNow to UEN{" "}
+            Transfer <span className="font-semibold">${fee}</span> via PayNow to UEN{" "}
             <span className="font-mono font-semibold">{CLUB_UEN}</span>.
           </li>
           <li>
@@ -124,10 +100,45 @@ function PaymentInstructionsCard({ paymentId }: { paymentId: string }) {
   );
 }
 
+// ── Benefits info note ───────────────────────────────────────────────────────
+
+function BenefitsNote() {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-navy/15 bg-navy/5 px-3 py-3 text-sm text-navy/80">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-navy/50" />
+      <p>
+        Membership gives you discounted training fees — typically around{" "}
+        <span className="font-medium">$4 less per session</span> depending on pool and activity.
+        Student membership is available at <span className="font-medium">half the annual fee</span> and
+        offers additional discounts on each training session.
+      </p>
+    </div>
+  );
+}
+
+// ── Student membership note ──────────────────────────────────────────────────
+
+function StudentMembershipNote() {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-800">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+      <div className="space-y-1">
+        <p className="font-medium">Interested in Student Membership?</p>
+        <p className="text-blue-700">
+          Please sign up for regular annual membership first, then approach the committee
+          to have your student ID verified. The committee will amend the cost of membership
+          and update your membership status once your student ID has been verified.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Membership() {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
   const utils = trpc.useUtils();
   const [trialSuccess, setTrialSuccess] = useState(false);
+  const [memberSuccess, setMemberSuccess] = useState(false);
 
   const trialMutation = trpc.membership.signupTrial.useMutation({
     onSuccess: async () => {
@@ -137,6 +148,17 @@ export default function Membership() {
     },
     onError: (err) => {
       toast.error(err.message || "Failed to activate trial.");
+    },
+  });
+
+  const memberMutation = trpc.membership.signupMember.useMutation({
+    onSuccess: async () => {
+      setMemberSuccess(true);
+      toast.success("Membership activated!");
+      await utils.auth.me.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to activate membership.");
     },
   });
 
@@ -154,11 +176,12 @@ export default function Membership() {
   const paymentId: string = (user as any)?.paymentId || "";
 
   const hasTrialled = trialStartDate !== "" && trialStartDate !== "NA";
-
   const trialEndParsed = parseDDMMYYYY(trialEndDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const trialActive = trialEndParsed !== null && trialEndParsed >= today;
+
+  const currentFee = getCurrentMonthFee();
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -177,6 +200,7 @@ export default function Membership() {
               </div>
               <Badge className="ml-auto bg-green-500 text-white hover:bg-green-500">Member</Badge>
             </div>
+            <StudentMembershipNote />
           </>
         )}
 
@@ -198,7 +222,7 @@ export default function Membership() {
             <div className="flex items-center gap-3 rounded-lg bg-gold/10 border border-gold/30 px-4 py-3">
               <CheckCircle2 className="w-5 h-5 text-gold shrink-0" />
               <div>
-                <p className="font-semibold text-navy">You're on a free trial.</p>
+                <p className="font-semibold text-navy">You're on a 3-month trial.</p>
                 <p className="text-xs text-navy/70 mt-0.5">
                   Valid until <span className="font-medium">{formatDisplayDate(trialEndDate)}</span>.
                 </p>
@@ -208,8 +232,9 @@ export default function Membership() {
 
             <div>
               <p className="text-sm font-medium text-navy mb-2">Upgrade to Annual Member</p>
-              <PaymentInstructionsCard paymentId={paymentId} />
+              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
             </div>
+            <StudentMembershipNote />
           </>
         )}
 
@@ -227,32 +252,52 @@ export default function Membership() {
 
             <div>
               <p className="text-sm font-medium text-navy mb-2">Become an Annual Member</p>
-              <PaymentInstructionsCard paymentId={paymentId} />
+              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
             </div>
+            {memberSuccess ? (
+              <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                <CheckCircle2 className="w-4 h-4" />
+                Membership activated! Welcome as an Annual Member.
+              </div>
+            ) : (
+              <Button
+                onClick={() => memberMutation.mutate()}
+                disabled={memberMutation.isPending}
+                className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
+              >
+                {memberMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
+                ) : (
+                  "I've paid — Activate Membership"
+                )}
+              </Button>
+            )}
+            <StudentMembershipNote />
           </>
         )}
 
         {/* ── NON-MEMBER ───────────────────────────────────────── */}
         {memberStatus === "Non-Member" && (
           <>
-            <p className="text-sm text-muted-foreground">
-              {hasTrialled
-                ? "Your trial has ended. Sign up for annual membership to continue training."
-                : "You're currently a Non-Member."}
-            </p>
+            <BenefitsNote />
 
             {/* Trial card — only shown if never trialled */}
             {!hasTrialled && (
               <Card className="border-gold/40 bg-gold/5">
                 <CardContent className="p-4">
-                  <p className="font-semibold text-navy mb-0.5">30-Day Free Trial</p>
+                  <div className="flex items-start justify-between gap-2 mb-0.5">
+                    <p className="font-semibold text-navy">3-Month Trial — $10</p>
+                    <Badge className="bg-gold text-navy hover:bg-gold shrink-0">Trial</Badge>
+                  </div>
                   <p className="text-sm text-navy/70 mb-3">
-                    Try training with us — no payment required for 30 days.
+                    Try training with us at member rates for 3 months. Transfer $10 to UEN{" "}
+                    <span className="font-mono font-semibold">{CLUB_UEN}</span> with your Payment ID{" "}
+                    <span className="font-mono font-semibold">{paymentId || "—"}</span> as the reference.
                   </p>
                   {trialSuccess ? (
                     <div className="flex items-center gap-2 text-green-700 text-sm">
                       <CheckCircle2 className="w-4 h-4" />
-                      Trial activated! You have 30 days of member-rate training.
+                      Trial activated! You have 3 months of member-rate training.
                     </div>
                   ) : (
                     <Button
@@ -271,17 +316,43 @@ export default function Membership() {
               </Card>
             )}
 
-            {/* Member card */}
+            {hasTrialled && (
+              <p className="text-sm text-muted-foreground">
+                Your trial has ended. Sign up for annual membership to continue at member rates.
+              </p>
+            )}
+
+            {/* Annual membership */}
             <div>
-              <p className="text-sm font-medium text-navy mb-2">Become an Annual Member</p>
-              <PaymentInstructionsCard paymentId={paymentId} />
+              <p className="text-sm font-medium text-navy mb-2">Annual Membership — ${currentFee} (joining {PRORATED_SCHEDULE[new Date().getMonth()].month})</p>
+              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
             </div>
+
+            {memberSuccess ? (
+              <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                <CheckCircle2 className="w-4 h-4" />
+                Membership activated! Welcome as an Annual Member.
+              </div>
+            ) : (
+              <Button
+                onClick={() => memberMutation.mutate()}
+                disabled={memberMutation.isPending}
+                className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
+              >
+                {memberMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
+                ) : (
+                  "I've paid — Activate Membership"
+                )}
+              </Button>
+            )}
+
+            <StudentMembershipNote />
           </>
         )}
 
-        {/* Fee schedules — always visible */}
+        {/* Fee schedule — always visible */}
         <MembershipFeeCard />
-        <TrainingFeeCard />
 
       </main>
     </div>

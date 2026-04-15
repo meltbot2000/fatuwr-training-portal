@@ -617,7 +617,7 @@ export const appRouter = router({
       }
       const today = new Date();
       const trialEnd = new Date(today);
-      trialEnd.setDate(trialEnd.getDate() + 30);
+      trialEnd.setMonth(trialEnd.getMonth() + 3);
       const fmt = (d: Date) => {
         const dd = String(d.getDate()).padStart(2, "0");
         const mm = String(d.getMonth() + 1).padStart(2, "0");
