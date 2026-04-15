@@ -633,7 +633,7 @@ export default function Admin() {
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
-    let result = users;
+    let result = [...users].reverse(); // newest accounts first (reverse DB insertion order)
     if (statusFilter !== "All") {
       result = result.filter(u => (u.memberStatus || "Non-Member") === statusFilter);
     }
@@ -649,11 +649,16 @@ export default function Admin() {
   const filteredPayments = useMemo(() => {
     if (!payments) return [];
     const q = paymentSearch.toLowerCase().trim();
-    if (!q) return payments;
-    return payments.filter(p =>
-      p.paymentId.toLowerCase().includes(q) ||
-      ((p as any).reference || "").toLowerCase().includes(q) ||
-      p.email.toLowerCase().includes(q)
+    const result = q
+      ? payments.filter(p =>
+          p.paymentId.toLowerCase().includes(q) ||
+          ((p as any).reference || "").toLowerCase().includes(q) ||
+          p.email.toLowerCase().includes(q)
+        )
+      : payments;
+    // Ensure most-recent first after any filtering
+    return [...result].sort((a, b) =>
+      (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0)
     );
   }, [payments, paymentSearch]);
 
