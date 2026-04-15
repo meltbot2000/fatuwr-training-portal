@@ -1,0 +1,1 @@
+ALTER TABLE `sheet_users` ADD `membershipStartDate` varchar(64) DEFAULT '';

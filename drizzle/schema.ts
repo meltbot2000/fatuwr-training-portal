@@ -98,6 +98,7 @@ export const sheetUsers = mysqlTable("sheet_users", {
   paymentId: varchar("paymentId", { length: 128 }).default(""),
   memberStatus: varchar("memberStatus", { length: 64 }).default("Non-Member"),
   clubRole: varchar("clubRole", { length: 64 }).default(""),
+  membershipStartDate: varchar("membershipStartDate", { length: 64 }).default(""),
   trialStartDate: varchar("trialStartDate", { length: 64 }).default(""),
   trialEndDate: varchar("trialEndDate", { length: 64 }).default(""),
   dob: varchar("dob", { length: 64 }).default(""),

@@ -71,6 +71,7 @@ export interface UserRow {
   paymentId: string;
   memberStatus: string;
   clubRole: string;
+  membershipStartDate: string;
   trialStartDate: string;
   trialEndDate: string;
   dob: string;
@@ -293,6 +294,7 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
       image: row[4] || "",
       clubRole: row[5] || "",
       paymentId: row[0] || "",  // col A = PaymentID (same as id; col H is phone number)
+      membershipStartDate: row[6] || "", // col G = Annual Membership Start
       memberStatus: row[9] || "Non-Member",
       trialStartDate: row[10] || "",
       trialEndDate: row[11] || "",
@@ -412,6 +414,7 @@ function dbUserToUserRow(r: any): UserRow {
     paymentId: r.paymentId ?? "",
     memberStatus: r.memberStatus ?? "Non-Member",
     clubRole: r.clubRole ?? "",
+    membershipStartDate: r.membershipStartDate ?? "",
     trialStartDate: r.trialStartDate ?? "",
     trialEndDate: r.trialEndDate ?? "",
     dob: r.dob ?? "",

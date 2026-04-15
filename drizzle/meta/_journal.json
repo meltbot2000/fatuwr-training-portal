@@ -36,6 +36,13 @@
       "when": 1776275174902,
       "tag": "0004_last_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1776277059051,
+      "tag": "0005_rare_deadpool",
+      "breakpoints": true
     }
   ]
 }

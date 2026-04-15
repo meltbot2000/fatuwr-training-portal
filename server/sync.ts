@@ -102,6 +102,7 @@ export async function syncTab(tab: SyncTab): Promise<void> {
               paymentId: u.paymentId,
               memberStatus: u.memberStatus,
               clubRole: u.clubRole,
+              membershipStartDate: u.membershipStartDate ?? "",
               trialStartDate: u.trialStartDate,
               trialEndDate: u.trialEndDate,
               dob: u.dob ?? "",

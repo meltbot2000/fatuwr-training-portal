@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle2, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const CLUB_UEN = "T14SS0144D";
@@ -79,7 +79,7 @@ function CollapsibleSection({
 export default function Payments() {
   useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
 
-  const { data, isLoading, error } = trpc.payments.myData.useQuery(undefined, {
+  const { data, isLoading, error, isFetching, refetch } = trpc.payments.myData.useQuery(undefined, {
     retry: false,
     refetchInterval: 60 * 1000,
   });
@@ -89,6 +89,17 @@ export default function Payments() {
       <AppHeader title="Payments" />
 
       <main className="mx-auto max-w-[480px] px-4 py-4">
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-navy transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+
         {isLoading && (
           <div className="space-y-3">
             <Skeleton className="h-28 w-full" />

@@ -679,6 +679,7 @@ export const appRouter = router({
         paymentId: z.string().optional(),
         memberStatus: z.string().optional(),
         clubRole: z.string().optional(),
+        membershipStartDate: z.string().optional(),
         trialStartDate: z.string().optional(),
         trialEndDate: z.string().optional(),
         dob: z.string().optional(),
@@ -697,6 +698,7 @@ export const appRouter = router({
           if (input.paymentId !== undefined) { userFields.paymentId = input.paymentId; userFields.sheetId = input.paymentId; }
           if (input.memberStatus !== undefined) userFields.memberStatus = input.memberStatus;
           if (input.clubRole !== undefined) userFields.clubRole = input.clubRole;
+          if (input.membershipStartDate !== undefined) userFields.membershipStartDate = input.membershipStartDate;
           if (input.trialStartDate !== undefined) userFields.trialStartDate = input.trialStartDate;
           if (input.trialEndDate !== undefined) userFields.trialEndDate = input.trialEndDate;
           if (input.dob !== undefined) userFields.dob = input.dob;

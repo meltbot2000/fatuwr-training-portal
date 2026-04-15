@@ -194,7 +194,7 @@ async function startServer() {
             r.email ?? "",         // [3]  Email (col D)
             r.image ?? "",         // [4]  Image (col E)
             r.clubRole ?? "",      // [5]  Club Role (col F)
-            "",                    // [6]  Annual Membership Start (col G — not in DB)
+            r.membershipStartDate ?? "", // [6]  Annual Membership Start (col G)
             "",                    // [7]  Phone Number (col H — not in DB)
             r.dob ?? "",           // [8]  Birth Date (col I)
             r.memberStatus ?? "Non-Member", // [9]  Membership Status (col J)

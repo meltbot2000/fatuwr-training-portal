@@ -52,7 +52,7 @@ function formatPaymentDate(dateStr: string): string {
 interface EditUserSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string; dob: string };
+  user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; membershipStartDate: string; trialStartDate: string; trialEndDate: string; dob: string };
   onDone: () => void;
 }
 
@@ -63,6 +63,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const [dob, setDob] = useState(user.dob || "");
   const [memberStatus, setMemberStatus] = useState(user.memberStatus || "Non-Member");
   const [clubRole, setClubRole] = useState(user.clubRole || "none");
+  const [membershipStartDate, setMembershipStartDate] = useState(user.membershipStartDate || "");
   const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
   const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
@@ -74,6 +75,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
     setDob(user.dob || "");
     setMemberStatus(user.memberStatus || "Non-Member");
     setClubRole(user.clubRole || "none");
+    setMembershipStartDate(user.membershipStartDate || "");
     setTrialStartDate(user.trialStartDate || "");
     setTrialEndDate(user.trialEndDate || "");
     setMembershipFee("");
@@ -166,6 +168,11 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                 </div>
               )}
 
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Annual Membership Start <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
+                <Input placeholder="e.g. 01/04/2026" value={membershipStartDate} onChange={e => setMembershipStartDate(e.target.value)} className="h-10" />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Trial Start <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
@@ -198,6 +205,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                     dob: dob.trim() || undefined,
                     memberStatus,
                     clubRole: clubRole === "none" ? "" : clubRole,
+                    membershipStartDate: membershipStartDate || undefined,
                     trialStartDate: trialStartDate || undefined,
                     trialEndDate: trialEndDate || undefined,
                     ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
@@ -595,7 +603,7 @@ export default function Admin() {
   const [sessionPoolFilter, setSessionPoolFilter] = useState("All");
   const [sessionDayFilter, setSessionDayFilter] = useState("All");
   const [sessionStatusFilter, setSessionStatusFilter] = useState("All");
-  const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; trialStartDate: string; trialEndDate: string; dob: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; membershipStartDate: string; trialStartDate: string; trialEndDate: string; dob: string } | null>(null);
   const [editingSession, setEditingSession] = useState<SessionForEdit | null>(null);
   const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
@@ -769,7 +777,7 @@ export default function Admin() {
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "", dob: (u as any).dob || "" }) : undefined}
+                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", membershipStartDate: (u as any).membershipStartDate || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "", dob: (u as any).dob || "" }) : undefined}
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
