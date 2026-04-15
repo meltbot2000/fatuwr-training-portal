@@ -5,28 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Calendar, AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
-import { getMembershipOnTrainingDate, calculateFee } from "@/lib/feeUtils";
 
 const MAX_SESSIONS = 6;
-
-function formatFee(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
-
-function getFeeForUser(
-  session: any,
-  memberStatus: string,
-  trialEndDate: string
-): { fee: number; label: string } {
-  const effectiveStatus = getMembershipOnTrainingDate(memberStatus, trialEndDate, session.trainingDate);
-  const fee = calculateFee(session, effectiveStatus, "Regular Training");
-  const statusLabel = effectiveStatus.toLowerCase();
-  const label =
-    statusLabel === "member" || statusLabel === "trial" ? "Member" :
-    statusLabel === "student" ? "Student" :
-    "Non-member";
-  return { fee, label };
-}
 
 function SessionCardSkeleton() {
   return (
@@ -44,9 +24,6 @@ function SessionCardSkeleton() {
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const { data: sessions, isLoading, error } = trpc.sessions.list.useQuery();
-
-  const memberStatus: string = (user as any)?.memberStatus || "Non-Member";
-  const trialEndDate: string = (user as any)?.trialEndDate || "";
 
   const visibleSessions = useMemo(() => {
     if (!sessions) return [];
@@ -96,7 +73,6 @@ export default function Home() {
           <div className="space-y-3">
             {visibleSessions.map((session) => {
               const isClosed = session.isClosed && session.isClosed.trim().length > 0;
-              const { fee, label } = getFeeForUser(session, memberStatus, trialEndDate);
               const liveSignups: number = (session as any).signups?.length ?? 0;
               const signupCount = isClosed ? (session.attendance ?? liveSignups) : liveSignups;
 
@@ -141,9 +117,9 @@ export default function Home() {
                       <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4DA6FF] mb-0.5">
                         {session.day}
                       </p>
-                      {/* Date */}
-                      <p className="text-[20px] font-bold text-white leading-tight mb-1">
-                        {session.trainingDate}
+                      {/* Date + time */}
+                      <p className="text-[16px] font-normal text-white leading-tight mb-1">
+                        {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
                       </p>
                       {/* Pool + count */}
                       <p className="text-[13px] text-white/50">
@@ -153,14 +129,6 @@ export default function Home() {
                           ? `Attendance: ${signupCount}`
                           : `${signupCount} signed up`}
                       </p>
-                      {/* Time + fee row */}
-                      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-white/8">
-                        <span className="text-[13px] text-white/50">{session.trainingTime}</span>
-                        <span className="text-[13px] font-semibold text-white/80">
-                          {formatFee(fee)}
-                          <span className="text-white/35 font-normal ml-1">{label}</span>
-                        </span>
-                      </div>
 
                       {/* Notes warning */}
                       {session.notes && !isClosed && (
