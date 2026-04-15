@@ -5,13 +5,23 @@ import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { AlertTriangle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ── Annual membership fee (full year) ────────────────────────────────────────
 const ANNUAL_FEE = 80;
 
-// Pro-rated by calendar year: member joining in month M pays for (12-M+1)/12 of the year.
 const PRORATED_SCHEDULE = (function () {
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -22,8 +32,8 @@ const PRORATED_SCHEDULE = (function () {
   });
 })();
 
-function getCurrentMonthFee(): number {
-  return PRORATED_SCHEDULE[new Date().getMonth()].fee;
+function getCurrentMonthEntry() {
+  return PRORATED_SCHEDULE[new Date().getMonth()];
 }
 
 const CLUB_UEN = "T14SS0144D";
@@ -47,9 +57,10 @@ function formatDisplayDate(str: string): string {
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "long", year: "numeric" });
 }
 
-// ── Membership fee schedule card ─────────────────────────────────────────────
+// ── Annual membership fee schedule ───────────────────────────────────────────
 
 function MembershipFeeCard() {
+  const currentMonth = getCurrentMonthEntry().month;
   return (
     <Card>
       <CardContent className="p-4">
@@ -59,42 +70,15 @@ function MembershipFeeCard() {
         </p>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
           {PRORATED_SCHEDULE.map(({ month, fee }) => {
-            const isCurrent = month === PRORATED_SCHEDULE[new Date().getMonth()].month;
+            const isCurrent = month === currentMonth;
             return (
-              <div key={month} className={`flex justify-between ${isCurrent ? "font-semibold text-navy" : ""}`}>
+              <div key={month} className={`flex justify-between ${isCurrent ? "font-semibold" : ""}`}>
                 <span className={isCurrent ? "text-navy" : "text-navy/80"}>{month}</span>
                 <span className={`tabular-nums ${isCurrent ? "text-gold" : ""}`}>${fee}</span>
               </div>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Payment instructions ─────────────────────────────────────────────────────
-
-function PaymentInstructionsCard({ paymentId, fee, label }: { paymentId: string; fee: number; label: string }) {
-  return (
-    <Card className="border-navy/20">
-      <CardContent className="p-4 text-sm text-navy/80 space-y-2">
-        <p className="font-semibold text-navy">{label}</p>
-        <ol className="list-decimal list-inside space-y-1.5 text-sm">
-          <li>
-            Transfer <span className="font-semibold">${fee}</span> via PayNow to UEN{" "}
-            <span className="font-mono font-semibold">{CLUB_UEN}</span>.
-          </li>
-          <li>
-            Use your Payment ID{" "}
-            <span className="font-mono font-semibold">{paymentId || "—"}</span>{" "}
-            as the <span className="font-semibold">only text</span> in the transfer notes/reference field.
-          </li>
-          <li>Send your receipt to the club admin.</li>
-        </ol>
-        <p className="text-xs text-muted-foreground pt-1">
-          Your membership will be activated within 24 hours of receipt confirmation.
-        </p>
       </CardContent>
     </Card>
   );
@@ -133,6 +117,97 @@ function StudentMembershipNote() {
     </div>
   );
 }
+
+// ── Annual membership sign-up block with confirm dialog ──────────────────────
+
+interface MembershipSignupBlockProps {
+  paymentId: string;
+  onConfirm: () => void;
+  isPending: boolean;
+  succeeded: boolean;
+  /** Optional heading override, e.g. "Upgrade to Annual Member" */
+  heading?: string;
+}
+
+function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, heading }: MembershipSignupBlockProps) {
+  const { month, fee } = getCurrentMonthEntry();
+
+  if (succeeded) {
+    return (
+      <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+        <CheckCircle2 className="w-4 h-4 shrink-0" />
+        Membership activated! Welcome as an Annual Member.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-navy">{heading ?? "Annual Membership"}</p>
+        <span className="text-sm font-semibold text-navy tabular-nums">${fee} <span className="text-xs font-normal text-muted-foreground">joining {month}</span></span>
+      </div>
+
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            disabled={isPending}
+            className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
+          >
+            {isPending ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
+            ) : (
+              "Sign Up for Annual Membership"
+            )}
+          </Button>
+        </AlertDialogTrigger>
+
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annual Membership — ${fee}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-foreground">
+                <p>
+                  You're signing up for annual membership (joining <strong>{month}</strong>).
+                  Your membership will be valid until the end of the calendar year.
+                </p>
+                <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                  <p className="font-medium text-navy text-xs uppercase tracking-wide">Payment Instructions</p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-sm text-navy/80">
+                    <li>
+                      Transfer <strong>${fee}</strong> via PayNow to UEN{" "}
+                      <span className="font-mono font-semibold">{CLUB_UEN}</span>.
+                    </li>
+                    <li>
+                      Use your Payment ID{" "}
+                      <span className="font-mono font-semibold">{paymentId || "—"}</span>{" "}
+                      as the <strong>only text</strong> in the transfer reference field.
+                    </li>
+                    <li>Send your receipt to the club admin.</li>
+                  </ol>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your membership will be activated within 24 hours of receipt confirmation.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-navy text-white hover:bg-navy/90"
+              onClick={onConfirm}
+            >
+              Confirm Sign Up
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Membership() {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
@@ -181,8 +256,6 @@ export default function Membership() {
   today.setHours(0, 0, 0, 0);
   const trialActive = trialEndParsed !== null && trialEndParsed >= today;
 
-  const currentFee = getCurrentMonthFee();
-
   return (
     <div className="min-h-screen bg-background pb-24">
       <AppHeader title="Membership" />
@@ -230,10 +303,13 @@ export default function Membership() {
               <Badge className="ml-auto bg-gold text-navy hover:bg-gold">Trial</Badge>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-navy mb-2">Upgrade to Annual Member</p>
-              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
-            </div>
+            <MembershipSignupBlock
+              paymentId={paymentId}
+              onConfirm={() => memberMutation.mutate()}
+              isPending={memberMutation.isPending}
+              succeeded={memberSuccess}
+              heading="Upgrade to Annual Member"
+            />
             <StudentMembershipNote />
           </>
         )}
@@ -250,28 +326,13 @@ export default function Membership() {
               </p>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-navy mb-2">Become an Annual Member</p>
-              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
-            </div>
-            {memberSuccess ? (
-              <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
-                <CheckCircle2 className="w-4 h-4" />
-                Membership activated! Welcome as an Annual Member.
-              </div>
-            ) : (
-              <Button
-                onClick={() => memberMutation.mutate()}
-                disabled={memberMutation.isPending}
-                className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
-              >
-                {memberMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
-                ) : (
-                  "I've paid — Activate Membership"
-                )}
-              </Button>
-            )}
+            <MembershipSignupBlock
+              paymentId={paymentId}
+              onConfirm={() => memberMutation.mutate()}
+              isPending={memberMutation.isPending}
+              succeeded={memberSuccess}
+              heading="Become an Annual Member"
+            />
             <StudentMembershipNote />
           </>
         )}
@@ -308,7 +369,7 @@ export default function Membership() {
                       {trialMutation.isPending ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
                       ) : (
-                        "Sign up for Trial"
+                        "Sign Up for Trial"
                       )}
                     </Button>
                   )}
@@ -322,30 +383,13 @@ export default function Membership() {
               </p>
             )}
 
-            {/* Annual membership */}
-            <div>
-              <p className="text-sm font-medium text-navy mb-2">Annual Membership — ${currentFee} (joining {PRORATED_SCHEDULE[new Date().getMonth()].month})</p>
-              <PaymentInstructionsCard paymentId={paymentId} fee={currentFee} label="How to become a Member" />
-            </div>
-
-            {memberSuccess ? (
-              <div className="flex items-center gap-2 text-green-700 text-sm rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
-                <CheckCircle2 className="w-4 h-4" />
-                Membership activated! Welcome as an Annual Member.
-              </div>
-            ) : (
-              <Button
-                onClick={() => memberMutation.mutate()}
-                disabled={memberMutation.isPending}
-                className="w-full bg-navy hover:bg-navy/90 text-white font-semibold"
-              >
-                {memberMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
-                ) : (
-                  "I've paid — Activate Membership"
-                )}
-              </Button>
-            )}
+            <MembershipSignupBlock
+              paymentId={paymentId}
+              onConfirm={() => memberMutation.mutate()}
+              isPending={memberMutation.isPending}
+              succeeded={memberSuccess}
+              heading="Annual Membership"
+            />
 
             <StudentMembershipNote />
           </>
