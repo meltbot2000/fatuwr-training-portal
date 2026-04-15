@@ -21,8 +21,8 @@ import {
 import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
-import { eq, and } from "drizzle-orm";
-import { sheetSignups } from "../drizzle/schema";
+import { eq, and, sql } from "drizzle-orm";
+import { sheetSignups, sheetSessions } from "../drizzle/schema";
 
 
 /**
@@ -739,9 +739,34 @@ export const appRouter = router({
         if (ctx.user.clubRole !== "Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
-        await appsScript.addSession(input);
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        // Derive next rowIndex: MAX(rowIndex) + 1 so new rows don't collide with
+        // existing rows that were synced from the sheet.
+        const [maxRow] = await sessDb.select({ m: sql<number>`MAX(${sheetSessions.rowIndex})` }).from(sheetSessions);
+        const nextRowIndex = (maxRow?.m ?? 0) + 1;
+        await sessDb.insert(sheetSessions).values({
+          rowIndex: nextRowIndex,
+          trainingDate: input.trainingDate,
+          day: input.day,
+          trainingTime: input.trainingTime,
+          pool: input.pool,
+          poolImageUrl: "",
+          memberFee: input.memberFee,
+          nonMemberFee: input.nonMemberFee,
+          memberSwimFee: input.memberSwimFee,
+          nonMemberSwimFee: input.nonMemberSwimFee,
+          studentFee: input.studentFee,
+          studentSwimFee: input.studentSwimFee,
+          trainerFee: input.trainerFee,
+          notes: input.notes,
+          rowId: nanoid(10),
+          attendance: 0,
+          isClosed: "",
+          trainingObjective: input.trainingObjective,
+          signUpCloseTime: "",
+        });
         clearSessionsCache();
-        syncTab("sessions").catch(e => console.error("[Sync] sessions post-addSession:", e));
         return { success: true };
       }),
 
@@ -751,9 +776,59 @@ export const appRouter = router({
         if (ctx.user.clubRole !== "Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
-        await appsScript.closeSession({ rowId: input.rowId });
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await sessDb.update(sheetSessions)
+          .set({ isClosed: "Closed" })
+          .where(eq(sheetSessions.rowId, input.rowId));
         clearSessionsCache();
-        syncTab("sessions").catch(e => console.error("[Sync] sessions post-closeSession:", e));
+        return { success: true };
+      }),
+
+    editSession: protectedProcedure
+      .input(z.object({
+        rowId: z.string(),
+        trainingDate: z.string().optional(),
+        day: z.string().optional(),
+        trainingTime: z.string().optional(),
+        pool: z.string().optional(),
+        memberFee: z.number().optional(),
+        nonMemberFee: z.number().optional(),
+        memberSwimFee: z.number().optional(),
+        nonMemberSwimFee: z.number().optional(),
+        studentFee: z.number().optional(),
+        studentSwimFee: z.number().optional(),
+        trainerFee: z.number().optional(),
+        notes: z.string().optional(),
+        trainingObjective: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { rowId, ...fields } = input;
+        // Only include fields that were actually provided
+        const updates: Record<string, unknown> = {};
+        if (fields.trainingDate !== undefined) updates.trainingDate = fields.trainingDate;
+        if (fields.day !== undefined) updates.day = fields.day;
+        if (fields.trainingTime !== undefined) updates.trainingTime = fields.trainingTime;
+        if (fields.pool !== undefined) updates.pool = fields.pool;
+        if (fields.memberFee !== undefined) updates.memberFee = fields.memberFee;
+        if (fields.nonMemberFee !== undefined) updates.nonMemberFee = fields.nonMemberFee;
+        if (fields.memberSwimFee !== undefined) updates.memberSwimFee = fields.memberSwimFee;
+        if (fields.nonMemberSwimFee !== undefined) updates.nonMemberSwimFee = fields.nonMemberSwimFee;
+        if (fields.studentFee !== undefined) updates.studentFee = fields.studentFee;
+        if (fields.studentSwimFee !== undefined) updates.studentSwimFee = fields.studentSwimFee;
+        if (fields.trainerFee !== undefined) updates.trainerFee = fields.trainerFee;
+        if (fields.notes !== undefined) updates.notes = fields.notes;
+        if (fields.trainingObjective !== undefined) updates.trainingObjective = fields.trainingObjective;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await sessDb.update(sheetSessions)
+          .set(updates)
+          .where(eq(sheetSessions.rowId, rowId));
+        clearSessionsCache();
         return { success: true };
       }),
   }),
