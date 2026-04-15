@@ -168,11 +168,13 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-foreground">
                 <p>
-                  You're signing up for annual membership (joining <strong>{month}</strong>).
-                  Your membership will be valid until the end of the calendar year.
+                  Click <strong>Confirm Sign Up</strong> to register for annual membership
+                  (joining <strong>{month}</strong>), valid until end of the calendar year.
                 </p>
                 <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
-                  <p className="font-medium text-navy text-xs uppercase tracking-wide">Payment Instructions</p>
+                  <p className="font-medium text-navy text-xs uppercase tracking-wide">
+                    Payment — if you haven't already
+                  </p>
                   <ol className="list-decimal list-inside space-y-1.5 text-sm text-navy/80">
                     <li>
                       Transfer <strong>${fee}</strong> via PayNow to UEN{" "}
@@ -181,14 +183,10 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
                     <li>
                       Use your Payment ID{" "}
                       <span className="font-mono font-semibold">{paymentId || "—"}</span>{" "}
-                      as the <strong>only text</strong> in the transfer reference field.
+                      as the <strong>only text</strong> in the reference field.
                     </li>
-                    <li>Send your receipt to the club admin.</li>
                   </ol>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Your membership will be activated within 24 hours of receipt confirmation.
-                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

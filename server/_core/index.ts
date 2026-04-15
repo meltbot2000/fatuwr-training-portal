@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
 import { getLatestOtp } from "../db";
-import { startBackgroundSync, syncTab, getSyncStatus } from "../sync";
+import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus } from "../sync";
 import { getDb } from "../db";
 import { sheetSessions, sheetSignups, sheetPayments, sheetUsers } from "../../drizzle/schema";
 import { ENV } from "./env";
@@ -76,19 +76,20 @@ async function startServer() {
   // POST /api/sync?tab=payments&token=APPS_SCRIPT_SECRET
   // Also accepts GET for manual testing: GET /api/sync/status
   app.post("/api/sync", async (req, res) => {
-    const { tab, token } = req.query as Record<string, string>;
+    const { tab, token, force } = req.query as Record<string, string>;
     if (!token || token !== ENV.appsScriptSecret) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
     const validTabs = ["sessions", "payments", "signups", "users"] as const;
-    if (!validTabs.includes(tab as any)) {
-      res.status(400).json({ error: `Invalid tab. Use one of: ${validTabs.join(", ")}` });
+    if (tab !== "all" && !validTabs.includes(tab as any)) {
+      res.status(400).json({ error: `Invalid tab. Use one of: ${validTabs.join(", ")} or "all"` });
       return;
     }
-    // Fire sync asynchronously — don't block GAS waiting for it
-    syncTab(tab as any).catch(e => console.error(`[Sync webhook] ${tab}:`, e));
-    res.json({ status: "sync queued", tab });
+    const tabs: readonly string[] = tab === "all" ? validTabs : [tab];
+    const fn = force === "true" ? forceSyncTab : syncTab;
+    tabs.forEach(t => (fn as any)(t).catch((e: any) => console.error(`[Sync webhook] ${t}:`, e)));
+    res.json({ status: force === "true" ? "force sync queued" : "sync queued", tabs });
   });
 
   app.get("/api/sync/status", (_req, res) => {

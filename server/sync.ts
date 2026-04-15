@@ -41,6 +41,23 @@ const syncStatus: Record<SyncTab, { lastSync: number; error: string | null }> = 
   users:     { lastSync: 0, error: null },
 };
 
+/**
+ * Force a Sheets → DB sync for a single tab, bypassing the DB_PRIMARY_TABS guard.
+ * Use this once after the initial DB_PRIMARY migration to seed the DB from existing
+ * Sheets data.  Triggered via POST /api/sync?tab=X&token=SECRET&force=true
+ */
+export async function forceSyncTab(tab: SyncTab): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const originalGuard = DB_PRIMARY_TABS.has(tab);
+  if (originalGuard) DB_PRIMARY_TABS.delete(tab);
+  try {
+    await syncTab(tab);
+  } finally {
+    if (originalGuard) DB_PRIMARY_TABS.add(tab);
+  }
+}
+
 export async function syncTab(tab: SyncTab): Promise<void> {
   if (DB_PRIMARY_TABS.has(tab)) {
     console.log(`[Sync] ${tab} is DB-primary — skipping Sheet→DB sync`);
