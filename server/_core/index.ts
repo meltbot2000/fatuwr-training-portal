@@ -10,6 +10,8 @@ import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
 import { getLatestOtp } from "../db";
 import { startBackgroundSync, syncTab, getSyncStatus } from "../sync";
+import { getDb } from "../db";
+import { sheetSessions, sheetSignups, sheetPayments, sheetUsers } from "../../drizzle/schema";
 import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -91,6 +93,124 @@ async function startServer() {
 
   app.get("/api/sync/status", (_req, res) => {
     res.json(getSyncStatus());
+  });
+
+  // DB → Sheet export endpoint (called by GAS "Sync from DB" menu)
+  // GET /api/export?tab=sessions&token=APPS_SCRIPT_SECRET
+  // Returns rows as arrays in exact sheet column order so GAS can write them directly.
+  app.get("/api/export", async (req, res) => {
+    const { tab, token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const exportDb = await getDb();
+    if (!exportDb) {
+      res.status(503).json({ error: "DB unavailable" });
+      return;
+    }
+    try {
+      if (tab === "sessions") {
+        const rows = await exportDb.select().from(sheetSessions).orderBy(sheetSessions.rowIndex);
+        res.json({
+          tab,
+          count: rows.length,
+          rows: rows.map(r => [
+            r.trainingDate,        // [0]  Training Date
+            r.day ?? "",           // [1]  Day
+            r.trainingTime ?? "",  // [2]  Training Time
+            r.pool ?? "",          // [3]  Pool
+            r.poolImageUrl ?? "",  // [4]  Pool Image URL
+            r.memberFee ?? 0,      // [5]  Member Fee
+            r.nonMemberFee ?? 0,   // [6]  Non-Member Fee
+            r.memberSwimFee ?? 0,  // [7]  Member Swim Fee
+            r.nonMemberSwimFee ?? 0, // [8] Non-Member Swim Fee
+            r.studentFee ?? 0,     // [9]  Student Fee
+            r.studentSwimFee ?? 0, // [10] Student Swim Fee
+            r.trainerFee ?? 0,     // [11] Trainer Fee
+            r.notes ?? "",         // [12] Notes
+            r.rowId ?? "",         // [13] Row ID
+            r.attendance ?? 0,     // [14] Attendance
+            r.isClosed ?? "",      // [15] Close?
+            r.trainingObjective ?? "", // [16] Training Objective
+            "",                    // [17] (unused)
+            "",                    // [18] (unused)
+            r.signUpCloseTime ?? "", // [19] Sign-Up Close Time
+          ]),
+        });
+        return;
+      }
+
+      if (tab === "signups") {
+        const rows = await exportDb.select().from(sheetSignups).orderBy(sheetSignups.id);
+        res.json({
+          tab,
+          count: rows.length,
+          rows: rows.map(r => [
+            r.name ?? "",              // [0]  Name
+            r.email ?? "",             // [1]  Email
+            r.paymentId ?? "",         // [2]  Payment ID
+            r.dateTimeOfSignUp ?? "",  // [3]  DateTime Signed Up
+            r.pool ?? "",              // [4]  Pool
+            r.dateOfTraining ?? "",    // [5]  Date of Training
+            r.activity ?? "",          // [6]  Activity
+            r.activityValue ?? "",     // [7]  Activity Value
+            r.baseFee ?? 0,            // [8]  Base Fee
+            r.actualFees ?? 0,         // [9]  Actual Fee
+            r.memberOnTrainingDate ?? "", // [10] Member on Training Date
+          ]),
+        });
+        return;
+      }
+
+      if (tab === "payments") {
+        const rows = await exportDb.select().from(sheetPayments).orderBy(sheetPayments.id);
+        res.json({
+          tab,
+          count: rows.length,
+          rows: rows.map(r => [
+            "",                // [0]  Maybank Payment Message (raw body — not stored in DB)
+            "",                // [1]  Subject (not stored in DB)
+            r.date ?? "",      // [2]  Date
+            r.amount ?? 0,     // [3]  Amount
+            r.reference ?? "", // [4]  OTHR Message
+            r.paymentId ?? "", // [5]  PaymentID Match
+            r.email ?? "",     // [6]  Email
+          ]),
+        });
+        return;
+      }
+
+      if (tab === "users") {
+        const rows = await exportDb.select().from(sheetUsers).orderBy(sheetUsers.id);
+        res.json({
+          tab,
+          count: rows.length,
+          rows: rows.map(r => [
+            r.paymentId ?? "",     // [0]  Payment ID (col A)
+            r.name ?? "",          // [1]  Name (col B)
+            r.userEmail ?? "",     // [2]  User Email (col C)
+            r.email ?? "",         // [3]  Email (col D)
+            r.image ?? "",         // [4]  Image (col E)
+            r.clubRole ?? "",      // [5]  Club Role (col F)
+            "",                    // [6]  Annual Membership Start (col G — not in DB)
+            "",                    // [7]  Phone Number (col H — not in DB)
+            "",                    // [8]  Birth Date (col I — not in DB)
+            r.memberStatus ?? "Non-Member", // [9]  Membership Status (col J)
+            r.trialStartDate ?? "", // [10] Trial Start Date (col K)
+            r.trialEndDate ?? "",  // [11] Trial End Date (col L)
+            "",                    // [12] Date Created (col M — not in DB)
+          ]),
+        });
+        return;
+      }
+
+      res.status(400).json({ error: "Unknown tab. Use one of: sessions, signups, payments, users" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Export] Error for tab=" + tab + ":", msg);
+      res.status(500).json({ error: msg });
+    }
   });
 
   // Email diagnostic endpoint — sends a real test email and returns the result
