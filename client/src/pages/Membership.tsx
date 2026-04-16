@@ -73,7 +73,7 @@ function MembershipFeeCard() {
             const isCurrent = month === currentMonth;
             return (
               <div key={month} className={`flex justify-between ${isCurrent ? "font-semibold" : ""}`}>
-                <span className={isCurrent ? "text-navy" : "text-foreground/70"}>{month}</span>
+                <span className={isCurrent ? "text-[#2196F3]" : "text-white"}>{month}</span>
                 <span className={`tabular-nums ${isCurrent ? "text-gold" : ""}`}>${fee}</span>
               </div>
             );

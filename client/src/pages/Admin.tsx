@@ -225,16 +225,16 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
               {/* Balance summary */}
               <div className="rounded-lg border bg-muted/40 px-4 py-3 grid grid-cols-3 gap-2 text-center text-sm">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Paid</p>
-                  <p className="font-semibold text-green-700">${totalPaid.toFixed(2)}</p>
+                  <p className="text-xs text-white/60 mb-0.5">Paid</p>
+                  <p className="font-semibold text-green-400">${totalPaid.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Charged</p>
-                  <p className="font-semibold text-navy">${totalCharged.toFixed(2)}</p>
+                  <p className="text-xs text-white/60 mb-0.5">Charged</p>
+                  <p className="font-semibold text-white">${totalCharged.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Balance</p>
-                  <p className={`font-semibold ${balance >= 0 ? "text-green-700" : "text-red-600"}`}>
+                  <p className="text-xs text-white/60 mb-0.5">Balance</p>
+                  <p className={`font-semibold ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
                     {balance >= 0 ? `+$${balance.toFixed(2)}` : `-$${Math.abs(balance).toFixed(2)}`}
                   </p>
                 </div>
@@ -243,7 +243,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
               {activityQuery.isLoading ? (
                 <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
               ) : payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No payments found.</p>
+                <p className="text-sm text-white/60 text-center py-6">No payments found.</p>
               ) : (
                 <div className="space-y-2">
                   {payments.map((p) => (
@@ -253,11 +253,11 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                       className="w-full text-left rounded-lg border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-green-700">${(p.amount ?? 0).toFixed(2)}</span>
-                        <span className="text-xs text-muted-foreground">{formatPaymentDate(p.date ?? "")}</span>
+                        <span className="text-sm font-medium text-green-400">${(p.amount ?? 0).toFixed(2)}</span>
+                        <span className="text-xs text-white/60">{formatPaymentDate(p.date ?? "")}</span>
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs text-muted-foreground font-mono">{p.paymentId || p.reference || "—"}</span>
+                        <span className="text-xs text-white/60 font-mono">{p.paymentId || p.reference || "—"}</span>
                         <Pencil className="w-3 h-3 text-muted-foreground/50" />
                       </div>
                     </button>
@@ -269,26 +269,26 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
             {/* ── Sign-ups tab ─────────────────────────────── */}
             <TabsContent value="signups" className="space-y-3">
               <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{signups.length} sign-up{signups.length !== 1 ? "s" : ""}</span>
-                <span className="font-semibold text-navy">Total charged: ${totalCharged.toFixed(2)}</span>
+                <span className="text-white/60">{signups.length} sign-up{signups.length !== 1 ? "s" : ""}</span>
+                <span className="font-semibold text-white">Total charged: ${totalCharged.toFixed(2)}</span>
               </div>
 
               {activityQuery.isLoading ? (
                 <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
               ) : signups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No sign-ups found.</p>
+                <p className="text-sm text-white/60 text-center py-6">No sign-ups found.</p>
               ) : (
                 <div className="space-y-2">
                   {signups.map((s, idx) => (
                     <div key={idx} className="rounded-lg border bg-card px-3 py-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-navy">{s.dateOfTraining || "—"}</span>
+                        <span className="text-sm font-medium text-white">{s.dateOfTraining || "—"}</span>
                         <span className="text-sm font-semibold">${(s.actualFees ?? 0).toFixed(2)}</span>
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs text-muted-foreground">{s.activity || "—"}{s.pool ? ` · ${s.pool}` : ""}</span>
+                        <span className="text-xs text-white/60">{s.activity || "—"}{s.pool ? ` · ${s.pool}` : ""}</span>
                         {s.memberOnTrainingDate && (
-                          <span className="text-xs text-muted-foreground">{s.memberOnTrainingDate}</span>
+                          <span className="text-xs text-white/60">{s.memberOnTrainingDate}</span>
                         )}
                       </div>
                     </div>
@@ -781,7 +781,7 @@ export default function Admin() {
                   className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm text-navy truncate">{u.name || "(no name)"}</span>
+                    <span className="font-medium text-sm text-white truncate">{u.name || "(no name)"}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {u.clubRole && (
                         <Badge className="text-xs bg-navy text-white hover:bg-navy">{u.clubRole}</Badge>
@@ -792,13 +792,13 @@ export default function Admin() {
                       {!canEdit && <Lock className="w-3 h-3 text-muted-foreground" />}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">{displayEmail || "(no email)"}</p>
+                  <p className="text-xs text-white/60">{displayEmail || "(no email)"}</p>
                 </button>
               );
             })}
 
             {!usersLoading && filteredUsers.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">No users found.</p>
+              <p className="text-center text-sm text-white/60 py-8">No users found.</p>
             )}
           </TabsContent>
 
@@ -830,12 +830,12 @@ export default function Admin() {
             )}
 
             {!paymentsLoading && filteredPayments.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">No payments found.</p>
+              <p className="text-center text-sm text-white/60 py-8">No payments found.</p>
             )}
 
             {filteredPayments.length > 0 && (
               <div className="rounded-lg border overflow-hidden">
-                <div className="bg-muted/50 grid grid-cols-[1fr_auto] px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+                <div className="bg-muted/50 grid grid-cols-[1fr_auto] px-4 py-2 text-xs font-medium text-white/70 border-b">
                   <span>Reference / Payment ID</span>
                   <span className="text-right">Amount · Date</span>
                 </div>
@@ -849,9 +849,9 @@ export default function Admin() {
                         className={`w-full text-left px-4 py-2.5 flex items-start justify-between gap-3 ${canEditPayment ? "hover:bg-muted/50 transition-colors" : ""}`}
                       >
                         <div className="min-w-0">
-                          <p className="text-sm text-navy truncate">{(p as any).reference || p.paymentId || "—"}</p>
+                          <p className="text-sm text-white truncate">{(p as any).reference || p.paymentId || "—"}</p>
                           {p.paymentId ? (
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="text-xs text-white/60 mt-0.5">
                               ID: <span className="font-mono">{p.paymentId}</span>
                             </p>
                           ) : (
@@ -859,8 +859,8 @@ export default function Admin() {
                           )}
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-sm font-semibold text-green-700 tabular-nums">{`$${p.amount.toFixed(2)}`}</p>
-                          <p className="text-xs text-muted-foreground">{formatPaymentDate(p.date)}</p>
+                          <p className="text-sm font-semibold text-green-400 tabular-nums">{`$${p.amount.toFixed(2)}`}</p>
+                          <p className="text-xs text-white/60">{formatPaymentDate(p.date)}</p>
                         </div>
                       </button>
                     );
@@ -947,7 +947,7 @@ export default function Admin() {
               )}
 
               {!sessionsLoading && filteredSessions && filteredSessions.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">No sessions found.</p>
+                <p className="text-center text-sm text-white/60 py-8">No sessions found.</p>
               )}
 
               {filteredSessions && filteredSessions.map((s) => {
@@ -956,10 +956,10 @@ export default function Admin() {
                   <div key={s.rowId} className="rounded-lg border bg-card px-4 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm text-navy truncate">
+                        <p className="font-medium text-sm text-white truncate">
                           {s.day} — {s.trainingDate}
                         </p>
-                        <p className="text-xs text-muted-foreground">{s.pool} · {s.trainingTime}</p>
+                        <p className="text-xs text-white/60">{s.pool} · {s.trainingTime}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Button
@@ -1007,7 +1007,7 @@ export default function Admin() {
                       </div>
                     </div>
                     {s.trainingObjective && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{s.trainingObjective}</p>
+                      <p className="text-xs text-white/60 mt-1 truncate">{s.trainingObjective}</p>
                     )}
                   </div>
                 );

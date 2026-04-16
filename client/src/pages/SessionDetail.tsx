@@ -137,7 +137,7 @@ export default function SessionDetail() {
           <p className="text-[11px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[22px] font-bold text-white leading-tight mb-1">
+          <p className="text-[19px] font-bold text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
           <p className="text-[13px] text-[#888888]">
@@ -246,14 +246,12 @@ export default function SessionDetail() {
 
           {/* Splits button — below sign-ups list, above admin */}
           {isAuthenticated && (
-            <div className="flex">
-              <Link href={`/session/${rowId}/splits`}>
-                <button className="bg-[#1E1E1E] rounded-xl text-white text-[14px] font-medium px-[14px] py-2 flex items-center gap-2 hover:bg-white/5 transition-colors">
-                  <Pencil className="w-4 h-4" />
-                  Splits
-                </button>
-              </Link>
-            </div>
+            <Link href={`/session/${rowId}/splits`}>
+              <button className="w-full h-[48px] rounded-full border border-white/20 text-white font-medium text-[17px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
+                <Pencil className="w-4 h-4" />
+                Splits
+              </button>
+            </Link>
           )}
 
           {/* Admin controls */}
