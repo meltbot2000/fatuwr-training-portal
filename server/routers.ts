@@ -89,10 +89,15 @@ async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typ
   const myRefs = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean));
   if (normUserPayId) myRefs.add(normUserPayId);
 
-  // Pass 2: carry-over rows (no email) whose col F ref is in the user's known refs
-  const byRef = payments.filter(p => !p.email && p.paymentId && myRefs.has(p.paymentId.toLowerCase().trim()));
+  // Pass 2: rows whose col F paymentId ref is in the user's known refs
+  // (includes carry-over rows with no email, and rows where GAS matched the ID but not the email)
+  const alreadyFound = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()));
+  const byRef = payments.filter(p => {
+    if (alreadyFound.has(p.paymentId.toLowerCase().trim())) return false; // avoid dups
+    return p.paymentId && myRefs.has(p.paymentId.toLowerCase().trim());
+  });
 
-  // Pass 3: GAS lookup failed (col F and G empty) — extract paymentId from col E reference text
+  // Pass 3: GAS lookup failed entirely (col F and G both empty) — extract paymentId from col E reference text
   const byRefText = normUserPayId
     ? payments.filter(p => {
         if (p.email || p.paymentId) return false;
