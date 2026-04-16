@@ -349,9 +349,22 @@ export const appRouter = router({
   sessions: router({
     list: publicProcedure.query(async () => {
       const sessions = await getUpcomingSessions();
+      // Attach live signup counts from DB
+      const sessionDb = await db.getDb();
+      let signupCounts: Record<string, number> = {};
+      if (sessionDb) {
+        const counts = await sessionDb
+          .select({ dateOfTraining: sheetSignups.dateOfTraining, pool: sheetSignups.pool, count: sql<number>`count(*)` })
+          .from(sheetSignups)
+          .groupBy(sheetSignups.dateOfTraining, sheetSignups.pool);
+        for (const row of counts) {
+          signupCounts[`${row.dateOfTraining}|${row.pool}`] = Number(row.count);
+        }
+      }
       return sessions.map(s => ({
         ...s,
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
+        signupCount: signupCounts[`${s.trainingDate}|${s.pool}`] ?? 0,
       }));
     }),
 

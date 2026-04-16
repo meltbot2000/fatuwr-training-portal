@@ -73,14 +73,12 @@ export default function Home() {
           <div className="space-y-3">
             {visibleSessions.map((session) => {
               const isClosed = session.isClosed && session.isClosed.trim().length > 0;
-              const liveSignups: number = (session as any).signups?.length ?? 0;
-              const signupCount = isClosed ? (session.attendance ?? liveSignups) : liveSignups;
+              const signupCount = (session as any).signupCount ?? 0;
 
               return (
                 <Link
                   key={session.rowId}
-                  href={isClosed ? "#" : `/session/${session.rowId}`}
-                  className={isClosed ? "pointer-events-none" : ""}
+                  href={`/session/${session.rowId}`}
                 >
                   <div className="rounded-2xl overflow-hidden active:scale-[0.99] transition-transform">
                     {/* Hero image */}

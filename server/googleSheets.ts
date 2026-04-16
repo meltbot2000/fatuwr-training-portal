@@ -437,17 +437,16 @@ export async function getSessions(): Promise<SessionRow[]> {
 
 export async function getUpcomingSessions(): Promise<SessionRow[]> {
   const sessions = await getSessions();
-  const now = new Date();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // compare date only so today's sessions always show
 
   return sessions.filter(session => {
-    if (session.isClosed && session.isClosed.trim().length > 0) return false;
     const sessionDate = parseSessionDate(session.trainingDate);
-    if (!sessionDate || sessionDate < now) return false;
-    if (session.signUpCloseTime) {
-      const closeTime = parseCloseTime(session.signUpCloseTime);
-      if (closeTime && closeTime < now) return false;
-    }
-    return true;
+    if (!sessionDate) return false;
+    const sessionDay = new Date(sessionDate);
+    sessionDay.setHours(0, 0, 0, 0);
+    // Include any session on or after today (closed or open)
+    return sessionDay >= today;
   }).sort((a, b) => {
     const dateA = parseSessionDate(a.trainingDate);
     const dateB = parseSessionDate(b.trainingDate);
