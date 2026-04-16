@@ -86,7 +86,7 @@ export default function SessionDetail() {
           <p className="text-white/50">Session not found</p>
           <Link href="/">
             <button className="mt-4 px-5 py-2 rounded-xl border border-white/10 text-white/60 text-[13px]">
-              Back to Sessions
+              Back to sessions
             </button>
           </Link>
         </main>
@@ -126,7 +126,7 @@ export default function SessionDetail() {
           {isClosed && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
               <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-sm px-4 py-1.5 rounded-full tracking-wide">
-                Session Closed
+                Session closed
               </span>
             </div>
           )}
@@ -152,7 +152,7 @@ export default function SessionDetail() {
           {session.trainingObjective && (
             <div className="bg-[#1E1E1E] rounded-xl px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
-                Training Objective
+                Training objective
               </p>
               <p className="text-[13px] text-white/70 leading-relaxed">{session.trainingObjective}</p>
             </div>
@@ -178,34 +178,25 @@ export default function SessionDetail() {
           {!isAuthenticated ? (
             <Link href="/login">
               <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px]">
-                Sign In to Register
+                Sign in to register
               </button>
             </Link>
           ) : isClosed ? (
             <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[13px] cursor-default">
-              Sign-ups Closed
+              Sign-ups closed
             </button>
           ) : sessionStarted && !mySignup ? (
             <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[13px] cursor-default">
-              Session In Progress
+              Session in progress
             </button>
           ) : mySignup ? (
-            <button
-              disabled={!userCanEdit}
-              className={`w-full h-[48px] rounded-full text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${
-                userCanEdit
-                  ? "bg-[#2196F3] text-white"
-                  : "bg-white/6 text-white/25 cursor-default"
-              }`}
-              onClick={() => { if (userCanEdit) { setEditingSignup(mySignup!); setEditSheetOpen(true); } }}
-            >
-              <Pencil className="w-4 h-4" />
-              {sessionStarted ? "Session In Progress" : "Edit My Sign-up"}
-            </button>
+            <div className="w-full h-[48px] rounded-full bg-white/5 text-white/30 cursor-default text-[13px] flex items-center justify-center">
+              You're signed up
+            </div>
           ) : (
             <Link href={`/signup/${rowId}`}>
               <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px]">
-                Sign Up
+                Sign up
               </button>
             </Link>
           )}
@@ -216,6 +207,7 @@ export default function SessionDetail() {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2 mt-1">
                 Sign-ups
               </p>
+
               <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C] overflow-hidden">
                 {session.signups.map((su, idx) => {
                   const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
@@ -262,7 +254,7 @@ export default function SessionDetail() {
                 onClick={() => setEditSessionOpen(true)}
               >
                 <Pencil className="w-3.5 h-3.5" />
-                Admin: Edit Session
+                Admin: edit session
               </button>
 
               {!isClosed && (
@@ -272,7 +264,7 @@ export default function SessionDetail() {
                       className="w-full h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-[13px] text-red-400 font-medium flex items-center justify-center hover:bg-red-500/25 transition-colors"
                       disabled={closeSessionMutation.isPending}
                     >
-                      Admin: Close Sign-ups
+                      Admin: close sign-ups
                     </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -288,7 +280,7 @@ export default function SessionDetail() {
                         className="bg-destructive text-white hover:bg-destructive/90"
                         onClick={() => closeSessionMutation.mutate({ rowId: rowId || "" })}
                       >
-                        Close Session
+                        Close session
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

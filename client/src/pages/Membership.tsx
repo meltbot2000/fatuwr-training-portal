@@ -64,7 +64,7 @@ function MembershipFeeCard() {
   return (
     <Card>
       <CardContent className="p-4">
-        <h3 className="text-sm font-bold text-foreground mb-1">Annual Membership Fee</h3>
+        <h3 className="text-sm font-bold text-foreground mb-1">Annual membership fee</h3>
         <p className="text-xs text-muted-foreground mb-3">
           Fees are pro-rated based on the month you join, valid until end of the calendar year.
         </p>
@@ -157,7 +157,7 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
             {isPending ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
             ) : (
-              "Sign Up for Annual Membership"
+              "Sign up for annual membership"
             )}
           </Button>
         </AlertDialogTrigger>
@@ -168,7 +168,7 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-foreground">
                 <p>
-                  Click <strong>Confirm Sign Up</strong> to register for annual membership
+                  Click <strong>Confirm sign up</strong> to register for annual membership
                   (joining <strong>{month}</strong>), valid until end of the calendar year.
                 </p>
                 <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
@@ -196,7 +196,7 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
               className="bg-navy text-white hover:bg-navy/90"
               onClick={onConfirm}
             >
-              Confirm Sign Up
+              Confirm sign up
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -367,7 +367,7 @@ export default function Membership() {
                       {trialMutation.isPending ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating...</>
                       ) : (
-                        "Sign Up for Trial"
+                        "Sign up for trial"
                       )}
                     </Button>
                   )}

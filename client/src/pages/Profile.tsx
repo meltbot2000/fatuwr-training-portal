@@ -85,7 +85,7 @@ export default function Profile() {
           className="w-full h-[52px] rounded-full border border-red-500/25 text-red-400 text-[13px] font-medium flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Sign Out
+          Sign out
         </button>
       </main>
     </div>

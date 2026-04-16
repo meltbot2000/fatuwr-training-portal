@@ -129,7 +129,7 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Edit Session</SheetTitle>
+          <SheetTitle className="text-navy">Edit session</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-3">
@@ -188,7 +188,7 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Training Objective</Label>
+            <Label className="text-xs font-medium text-muted-foreground">Training objective</Label>
             <Textarea placeholder="Optional" value={form.trainingObjective} onChange={set("trainingObjective")} className="resize-none" rows={2} />
           </div>
 
@@ -205,7 +205,7 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
             className="w-full bg-navy text-white hover:bg-navy/90"
           >
             {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save Changes
+            Save changes
           </Button>
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel

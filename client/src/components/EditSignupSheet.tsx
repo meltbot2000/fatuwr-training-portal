@@ -123,7 +123,7 @@ export default function EditSignupSheet({
       <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#1E1E1E] border-t border-white/8">
         <SheetHeader className="pb-3">
           <SheetTitle className="text-white text-[16px]">
-            {isAdmin ? `Edit — ${signup.name}` : "Edit My Sign-up"}
+            {isAdmin ? `Edit — ${signup.name}` : "Edit my sign-up"}
           </SheetTitle>
         </SheetHeader>
 
@@ -223,7 +223,7 @@ export default function EditSignupSheet({
               className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editMutation.isPending ? "Saving…" : "Save Changes"}
+              {editMutation.isPending ? "Saving…" : "Save changes"}
             </button>
 
             <AlertDialog>
@@ -233,7 +233,7 @@ export default function EditSignupSheet({
                   className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[13px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
                   {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {deleteMutation.isPending ? "Deleting…" : "Delete Sign-up"}
+                  {deleteMutation.isPending ? "Deleting…" : "Delete sign-up"}
                 </button>
               </AlertDialogTrigger>
               <AlertDialogContent>

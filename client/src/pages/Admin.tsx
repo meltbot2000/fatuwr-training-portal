@@ -214,7 +214,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                   className="w-full bg-navy text-white hover:bg-navy/90"
                 >
                   {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save Changes
+                  Save changes
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Cancel</Button>
               </div>
@@ -349,7 +349,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Edit Payment</SheetTitle>
+          <SheetTitle className="text-navy">Edit payment</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-1 mb-5">
@@ -415,7 +415,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
             className="w-full bg-navy text-white hover:bg-navy/90"
           >
             {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save Changes
+            Save changes
           </Button>
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel
@@ -494,7 +494,7 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Add Session</SheetTitle>
+          <SheetTitle className="text-navy">Add session</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-3">
@@ -553,7 +553,7 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Training Objective</Label>
+            <Label className="text-xs font-medium text-muted-foreground">Training objective</Label>
             <Textarea placeholder="Optional" value={form.trainingObjective} onChange={set("trainingObjective")} className="resize-none" rows={2} />
           </div>
 
@@ -570,7 +570,7 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
             className="w-full bg-navy text-white hover:bg-navy/90"
           >
             {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Add Session
+            Add session
           </Button>
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel
@@ -878,7 +878,7 @@ export default function Admin() {
                 className="w-full bg-navy text-white hover:bg-navy/90 h-10"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Session
+                Add session
               </Button>
 
               <Input
@@ -998,7 +998,7 @@ export default function Admin() {
                                   className="bg-destructive text-white hover:bg-destructive/90"
                                   onClick={() => closeSessionMutation.mutate({ rowId: s.rowId })}
                                 >
-                                  Close Session
+                                  Close session
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

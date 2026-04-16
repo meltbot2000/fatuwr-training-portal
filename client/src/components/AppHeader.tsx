@@ -40,7 +40,7 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
             </Link>
           ) : (
             <Link href="/login" className="text-white text-[14px] font-medium border border-white/40 rounded-full px-4 py-1.5">
-              Sign In
+              Sign in
             </Link>
           )}
         </div>

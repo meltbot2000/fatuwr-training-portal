@@ -182,7 +182,7 @@ export default function Payments() {
 
             {/* Training fees */}
             <CollapsibleSection
-              title="Training Fees"
+              title="Training fees"
               count={data.trainingFees.length}
               total={formatFee(data.totalTrainingFees)}
             >
@@ -210,7 +210,7 @@ export default function Payments() {
             {/* Membership fees — only shown if there are any */}
             {data.membershipFees.length > 0 && (
               <CollapsibleSection
-                title="Membership Fee"
+                title="Membership fee"
                 count={data.membershipFees.length}
                 total={formatFee(data.totalMembershipFees)}
               >
@@ -234,7 +234,7 @@ export default function Payments() {
 
             {/* Payments received */}
             <CollapsibleSection
-              title="Payments Received"
+              title="Payments received"
               count={data.payments.length}
               total={formatFee(data.totalPaid)}
             >

@@ -59,7 +59,7 @@ export default function Login() {
   };
 
   const STEP_ICONS = { email: Mail, otp: ShieldCheck, profile: UserCircle2 };
-  const STEP_TITLES = { email: "Sign In", otp: "Check Your Email", profile: "Complete Profile" };
+  const STEP_TITLES = { email: "Sign in", otp: "Check your email", profile: "Complete profile" };
   const StepIcon = STEP_ICONS[step];
 
   return (
@@ -110,7 +110,7 @@ export default function Login() {
                 className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {sendOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {sendOtpMutation.isPending ? "Sending…" : "Send Code"}
+                {sendOtpMutation.isPending ? "Sending…" : "Send code"}
               </button>
             </div>
           )}
@@ -142,7 +142,7 @@ export default function Login() {
                 className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {verifyOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {verifyOtpMutation.isPending ? "Verifying…" : "Verify Code"}
+                {verifyOtpMutation.isPending ? "Verifying…" : "Verify code"}
               </button>
               <div className="text-center space-y-1.5">
                 <button
@@ -197,7 +197,7 @@ export default function Login() {
                 className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
               >
                 {completeProfileMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {completeProfileMutation.isPending ? "Saving…" : "Complete Sign Up"}
+                {completeProfileMutation.isPending ? "Saving…" : "Complete sign up"}
               </button>
             </div>
           )}

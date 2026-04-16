@@ -78,7 +78,7 @@ export default function SignUpForm() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Sign Up" showBack backPath={`/session/${rowId}`} />
+        <AppHeader title="Sign up" showBack backPath={`/session/${rowId}`} />
         <main className="mx-auto max-w-[480px] px-4 py-6 space-y-3">
           {[80, 160, 120, 48].map((h, i) => (
             <div key={i} className={`h-[${h}px] rounded-xl bg-[#1E1E1E] animate-pulse`} style={{ height: h }} />
@@ -91,7 +91,7 @@ export default function SignUpForm() {
   if (!session) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Sign Up" showBack />
+        <AppHeader title="Sign up" showBack />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
           <p className="text-white/50">Session not found</p>
@@ -104,7 +104,7 @@ export default function SignUpForm() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Sign Up" showBack />
+        <AppHeader title="Sign up" showBack />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <CheckCircle2 className="w-14 h-14 text-green-400 mx-auto mb-4" />
           <p className="text-[22px] font-bold text-white mb-1">You're in!</p>
@@ -132,7 +132,7 @@ export default function SignUpForm() {
 
   return (
     <div className="min-h-screen bg-[#111111]">
-      <AppHeader title="Sign Up" showBack backPath={`/session/${rowId}`} />
+      <AppHeader title="Sign up" showBack backPath={`/session/${rowId}`} />
 
       <main className="mx-auto max-w-[480px] px-4 py-4 pb-10 space-y-3">
 
@@ -185,7 +185,7 @@ export default function SignUpForm() {
         {/* Session type */}
         <div className="bg-[#1E1E1E] rounded-xl px-4 pt-3.5 pb-3">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-3">
-            Session Type
+            Session type
           </p>
           <div className="flex flex-wrap gap-2">
             {ACTIVITY_OPTIONS.map(({ value, label, fee: optFee }) => (
@@ -225,7 +225,7 @@ export default function SignUpForm() {
           className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
         >
           {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          {submitMutation.isPending ? "Submitting…" : "Confirm Sign Up"}
+          {submitMutation.isPending ? "Submitting…" : "Confirm sign up"}
         </button>
 
       </main>

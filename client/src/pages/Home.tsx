@@ -103,7 +103,7 @@ export default function Home() {
                       {isClosed && (
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                           <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-sm px-4 py-1.5 rounded-full tracking-wide">
-                            Session Closed
+                            Session closed
                           </span>
                         </div>
                       )}
