@@ -141,8 +141,8 @@ export default function SignUpForm() {
           <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[24px] font-bold text-white leading-tight">{session.trainingDate}</p>
-          <p className="text-[14px] text-[#888888] mt-0.5">{session.trainingTime} · {session.pool}</p>
+          <p className="text-[18px] font-bold text-white leading-tight">{session.trainingDate}</p>
+          <p className="text-[13px] text-[#888888] mt-0.5">{session.trainingTime} · {session.pool}</p>
         </div>
 
         {/* Warnings */}
@@ -211,7 +211,7 @@ export default function SignUpForm() {
         <div className="bg-[#1E1E1E] rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-0.5">Total</p>
-            <p className="text-[16px] font-normal text-white leading-tight">{formatFee(fee)}</p>
+            <p className="text-[15px] font-normal text-white leading-tight">{formatFee(fee)}</p>
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35">
             {isFreeActivity ? "Complimentary" : `${membershipOnDate} rate`}

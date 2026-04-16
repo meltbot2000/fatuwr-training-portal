@@ -134,10 +134,10 @@ export default function SessionDetail() {
 
         {/* Session info card */}
         <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-          <p className="text-[11px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+          <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[20px] font-bold text-white leading-tight mb-1">
+          <p className="text-[18px] font-bold text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
           <p className="text-[13px] text-[#888888]">
