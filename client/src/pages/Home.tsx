@@ -12,7 +12,7 @@ function SessionCardSkeleton() {
   return (
     <div className="rounded-2xl overflow-hidden">
       <Skeleton className="h-48 w-full bg-[#2a2a2a]" />
-      <div className="bg-[#1c1c1c] px-4 py-3 space-y-2">
+      <div className="bg-[#1E1E1E] px-4 py-3 space-y-2">
         <Skeleton className="h-3 w-20 bg-[#2a2a2a]" />
         <Skeleton className="h-6 w-40 bg-[#2a2a2a]" />
         <Skeleton className="h-4 w-32 bg-[#2a2a2a]" />
@@ -37,9 +37,9 @@ export default function Home() {
       <main className="mx-auto max-w-[480px] px-4 py-4 pb-8">
         {/* Sign-in prompt */}
         {!isAuthenticated && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-[#1c1c1c] border border-white/10">
+          <div className="mb-4 px-4 py-3 rounded-xl bg-[#1E1E1E] border border-[#2C2C2C]">
             <p className="text-sm text-white/70">
-              <Link href="/login" className="font-semibold text-[#4DA6FF] underline">Sign in</Link>
+              <Link href="/login" className="font-semibold text-[#2196F3] underline">Sign in</Link>
               {" "}to register for sessions and view your fees.
             </p>
           </div>
@@ -112,17 +112,17 @@ export default function Home() {
                     </div>
 
                     {/* Card body — dark */}
-                    <div className="bg-[#1c1c1c] px-4 pt-3 pb-3.5">
+                    <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
                       {/* Day */}
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4DA6FF] mb-0.5">
+                      <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
                         {session.day}
                       </p>
                       {/* Date + time */}
-                      <p className="text-[16px] font-normal text-white leading-tight mb-1">
+                      <p className="text-[24px] font-bold text-white leading-tight mb-1">
                         {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
                       </p>
                       {/* Pool + count */}
-                      <p className="text-[13px] text-white/50">
+                      <p className="text-[14px] text-[#888888]">
                         {session.pool}
                         {" · "}
                         {isClosed
@@ -132,8 +132,7 @@ export default function Home() {
 
                       {/* Notes warning */}
                       {session.notes && !isClosed && (
-                        <div className="flex items-start gap-1.5 mt-2.5 text-[12px] text-amber-400/80 bg-amber-400/8 rounded-lg px-2.5 py-2">
-                          <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                        <div className="mt-2.5 bg-[#3D3500] rounded-xl px-2.5 py-2 text-[12px] text-[#F5C518]">
                           {session.notes}
                         </div>
                       )}

@@ -69,16 +69,16 @@ export default function Login() {
         {/* Step dots */}
         <div className="flex items-center justify-center gap-2 mb-4">
           {(["email", "otp", "profile"] as const).map(s => (
-            <div key={s} className={`h-1 w-10 rounded-full transition-colors ${step === s ? "bg-[#4DA6FF]" : "bg-white/15"}`} />
+            <div key={s} className={`h-1 w-10 rounded-full transition-colors ${step === s ? "bg-[#2196F3]" : "bg-white/15"}`} />
           ))}
         </div>
 
         {/* Card */}
-        <div className="bg-[#1c1c1c] rounded-2xl px-6 py-8 space-y-6">
+        <div className="bg-[#1E1E1E] rounded-2xl px-6 py-8 space-y-6">
           {/* Icon + title */}
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center">
-              <StepIcon className="w-6 h-6 text-[#4DA6FF]" />
+              <StepIcon className="w-6 h-6 text-[#2196F3]" />
             </div>
             <div>
               <p className="text-[20px] font-bold text-white">{STEP_TITLES[step]}</p>
@@ -107,7 +107,7 @@ export default function Login() {
               <button
                 onClick={() => { if (validateEmail(email)) sendOtpMutation.mutate({ email: email.trim() }); }}
                 disabled={sendOtpMutation.isPending || !email.trim()}
-                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {sendOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {sendOtpMutation.isPending ? "Sending…" : "Send Code"}
@@ -139,7 +139,7 @@ export default function Login() {
               <button
                 onClick={() => verifyOtpMutation.mutate({ email: email.trim(), code: otpValue })}
                 disabled={verifyOtpMutation.isPending || otpValue.length !== 6}
-                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {verifyOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {verifyOtpMutation.isPending ? "Verifying…" : "Verify Code"}
@@ -148,7 +148,7 @@ export default function Login() {
                 <button
                   onClick={() => { setOtpValue(""); sendOtpMutation.mutate({ email: email.trim() }); }}
                   disabled={sendOtpMutation.isPending || resendSeconds > 0}
-                  className="text-[13px] text-[#4DA6FF] disabled:opacity-40"
+                  className="text-[13px] text-[#2196F3] disabled:opacity-40"
                 >
                   {resendSeconds > 0 ? `Resend code (${resendSeconds}s)` : "Resend code"}
                 </button>
@@ -194,7 +194,7 @@ export default function Login() {
                   completeProfileMutation.mutate({ name: profileName.trim(), phone: profilePhone.trim() || undefined, dob: profileDob || undefined });
                 }}
                 disabled={completeProfileMutation.isPending || !profileName.trim()}
-                className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
               >
                 {completeProfileMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {completeProfileMutation.isPending ? "Saving…" : "Complete Sign Up"}

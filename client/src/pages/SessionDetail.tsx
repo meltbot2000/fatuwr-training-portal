@@ -69,9 +69,9 @@ export default function SessionDetail() {
       <div className="min-h-screen bg-[#111111]">
         <AppHeader title="Session" showBack />
         <main className="mx-auto max-w-[480px] space-y-3 px-4 py-4">
-          <Skeleton className="h-48 w-full rounded-none" style={{ background: "#1c1c1c" }} />
-          <Skeleton className="h-20 w-full rounded-xl" style={{ background: "#1c1c1c" }} />
-          <Skeleton className="h-12 w-full rounded-xl" style={{ background: "#1c1c1c" }} />
+          <Skeleton className="h-48 w-full rounded-none" style={{ background: "#1E1E1E" }} />
+          <Skeleton className="h-20 w-full rounded-xl" style={{ background: "#1E1E1E" }} />
+          <Skeleton className="h-12 w-full rounded-xl" style={{ background: "#1E1E1E" }} />
         </main>
       </div>
     );
@@ -133,14 +133,14 @@ export default function SessionDetail() {
         </div>
 
         {/* Session info card */}
-        <div className="bg-[#1c1c1c] px-4 pt-3 pb-3.5">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4DA6FF] mb-0.5">
+        <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
+          <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[16px] font-normal text-white leading-tight mb-1">
+          <p className="text-[24px] font-bold text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
-          <p className="text-[13px] text-white/50">
+          <p className="text-[14px] text-[#888888]">
             {session.pool}
             {" · "}
             {isClosed ? `Attendance: ${signupCount}` : `${signupCount} signed up`}
@@ -150,7 +150,7 @@ export default function SessionDetail() {
         <div className="px-4 pt-4 space-y-3">
           {/* Training objective */}
           {session.trainingObjective && (
-            <div className="bg-[#1c1c1c] rounded-xl px-4 py-3">
+            <div className="bg-[#1E1E1E] rounded-xl px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
                 Training Objective
               </p>
@@ -160,17 +160,15 @@ export default function SessionDetail() {
 
           {/* Notes */}
           {session.notes && (
-            <div className="flex items-start gap-2.5 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-[13px] text-amber-300/90 leading-snug">{session.notes}</p>
+            <div className="bg-[#3D3500] rounded-xl px-4 py-3">
+              <p className="text-[14px] text-[#F5C518] leading-snug">{session.notes}</p>
             </div>
           )}
 
           {/* Splits reminder — only when open */}
           {!isClosed && (
-            <div className="flex items-start gap-2.5 bg-white/4 border border-white/8 rounded-xl px-4 py-3">
-              <AlertTriangle className="w-4 h-4 text-white/30 shrink-0 mt-0.5" />
-              <p className="text-[13px] text-white/40 leading-snug">
+            <div className="bg-[#1E1E1E] rounded-xl px-4 py-3">
+              <p className="text-[13px] text-[#888888] leading-snug">
                 If splits have been sent, let the splits team know if you sign up or drop out.
               </p>
             </div>
@@ -179,24 +177,24 @@ export default function SessionDetail() {
           {/* ── Primary CTA (full width) ── */}
           {!isAuthenticated ? (
             <Link href="/login">
-              <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
+              <button className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px]">
                 Sign In to Register
               </button>
             </Link>
           ) : isClosed ? (
-            <button disabled className="w-full h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
+            <button disabled className="w-full h-[52px] rounded-full bg-white/6 text-white/25 text-[16px] cursor-default">
               Sign-ups Closed
             </button>
           ) : sessionStarted && !mySignup ? (
-            <button disabled className="w-full h-11 rounded-xl bg-white/6 text-white/30 text-[14px] font-medium cursor-default">
+            <button disabled className="w-full h-[52px] rounded-full bg-white/6 text-white/25 text-[16px] cursor-default">
               Session In Progress
             </button>
           ) : mySignup ? (
             <button
               disabled={!userCanEdit}
-              className={`w-full h-11 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full h-[52px] rounded-full text-[16px] font-bold flex items-center justify-center gap-2 transition-colors ${
                 userCanEdit
-                  ? "bg-[#4DA6FF] text-white"
+                  ? "bg-[#2196F3] text-white"
                   : "bg-white/6 text-white/25 cursor-default"
               }`}
               onClick={() => { if (userCanEdit) { setEditingSignup(mySignup!); setEditSheetOpen(true); } }}
@@ -206,7 +204,7 @@ export default function SessionDetail() {
             </button>
           ) : (
             <Link href={`/signup/${rowId}`}>
-              <button className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px]">
+              <button className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px]">
                 Sign Up
               </button>
             </Link>
@@ -218,7 +216,7 @@ export default function SessionDetail() {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2 mt-1">
                 Sign-ups
               </p>
-              <div className="bg-[#1c1c1c] rounded-xl divide-y divide-white/6 overflow-hidden">
+              <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C] overflow-hidden">
                 {session.signups.map((su, idx) => {
                   const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
                   const tappable = isAdminUser || (isMe && userCanEdit);
@@ -228,13 +226,13 @@ export default function SessionDetail() {
                       onClick={() => { if (tappable) { setEditingSignup(su); setEditSheetOpen(true); } }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-left ${tappable ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#4DA6FF] text-white" : "bg-white/8 text-white/50"}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#2196F3] text-white" : "bg-white/8 text-white/50"}`}>
                         {getInitials(su.name) || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium text-white/85 truncate">
                           {su.name}
-                          {isMe && <span className="ml-1.5 text-[11px] text-[#4DA6FF] font-normal">you</span>}
+                          {isMe && <span className="ml-1.5 text-[11px] text-[#2196F3] font-normal">you</span>}
                         </p>
                         <p className="text-[12px] text-white/40">{su.activity}</p>
                       </div>
@@ -248,12 +246,14 @@ export default function SessionDetail() {
 
           {/* Splits button — below sign-ups list, above admin */}
           {isAuthenticated && (
-            <Link href={`/session/${rowId}/splits`}>
-              <button className="w-full h-11 rounded-xl border border-white/12 text-[14px] font-semibold text-white/60 flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
-                <Pencil className="w-4 h-4" />
-                Splits
-              </button>
-            </Link>
+            <div className="flex">
+              <Link href={`/session/${rowId}/splits`}>
+                <button className="bg-[#1E1E1E] rounded-xl text-white text-[14px] font-medium px-[14px] py-2 flex items-center gap-2 hover:bg-white/5 transition-colors">
+                  <Pencil className="w-4 h-4" />
+                  Splits
+                </button>
+              </Link>
+            </div>
           )}
 
           {/* Admin controls */}

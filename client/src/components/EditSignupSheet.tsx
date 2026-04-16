@@ -120,7 +120,7 @@ export default function EditSignupSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto bg-[#1c1c1c] border-t border-white/8">
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#1E1E1E] border-t border-white/8">
         <SheetHeader className="pb-3">
           <SheetTitle className="text-white text-[16px]">
             {isAdmin ? `Edit — ${signup.name}` : "Edit My Sign-up"}
@@ -183,7 +183,7 @@ export default function EditSignupSheet({
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55 mb-2">
               Activity
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap gap-2">
               {ACTIVITIES.map((a) => {
                 const fee = calculateFee(session, memberStatus, a);
                 return (
@@ -193,16 +193,16 @@ export default function EditSignupSheet({
                       setActivity(a);
                       if (!isAdmin) setActualFee(fee.toString());
                     }}
-                    className={`rounded-xl px-3 py-3 text-left transition-all ${
+                    className={`rounded-full border-2 text-[16px] font-medium px-5 py-2.5 bg-transparent transition-all flex flex-col items-start ${
                       activity === a
-                        ? "bg-white text-[#111111]"
-                        : "bg-[#2a2a2a] text-white/70 hover:bg-[#333]"
+                        ? "border-[#2196F3] text-[#2196F3]"
+                        : "border-[#888888] text-white"
                     }`}
                   >
-                    <p className="text-[14px] font-semibold leading-tight">{a}</p>
-                    <p className={`text-[12px] mt-0.5 ${activity === a ? "text-black/50" : "text-white/35"}`}>
+                    <span className="leading-tight">{a}</span>
+                    <span className={`text-[12px] mt-0.5 ${activity === a ? "text-[#2196F3]" : "text-[#888888]"}`}>
                       {formatFee(fee)}
-                    </p>
+                    </span>
                   </button>
                 );
               })}
@@ -220,7 +220,7 @@ export default function EditSignupSheet({
             <button
               onClick={handleSave}
               disabled={isPending}
-              className="w-full h-11 rounded-xl bg-[#4DA6FF] text-white font-semibold text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {editMutation.isPending ? "Saving…" : "Save Changes"}
@@ -230,7 +230,7 @@ export default function EditSignupSheet({
               <AlertDialogTrigger asChild>
                 <button
                   disabled={isPending}
-                  className="w-full h-11 rounded-xl border border-red-500/25 text-red-400 text-[14px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
+                  className="w-full h-[52px] rounded-full border border-red-500/40 text-red-400 text-[16px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
                   {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {deleteMutation.isPending ? "Deleting…" : "Delete Sign-up"}
