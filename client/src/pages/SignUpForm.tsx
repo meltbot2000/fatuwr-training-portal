@@ -222,7 +222,7 @@ export default function SignUpForm() {
         <button
           onClick={handleSubmit}
           disabled={submitMutation.isPending || debtBlocking}
-          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
+          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
         >
           {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitMutation.isPending ? "Submitting…" : "Confirm Sign Up"}

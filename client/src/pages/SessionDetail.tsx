@@ -137,7 +137,7 @@ export default function SessionDetail() {
           <p className="text-[11px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[19px] font-bold text-white leading-tight mb-1">
+          <p className="text-[20px] font-bold text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
           <p className="text-[13px] text-[#888888]">
@@ -177,22 +177,22 @@ export default function SessionDetail() {
           {/* ── Primary CTA (full width) ── */}
           {!isAuthenticated ? (
             <Link href="/login">
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px]">
                 Sign In to Register
               </button>
             </Link>
           ) : isClosed ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[17px] cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[13px] cursor-default">
               Sign-ups Closed
             </button>
           ) : sessionStarted && !mySignup ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[17px] cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[13px] cursor-default">
               Session In Progress
             </button>
           ) : mySignup ? (
             <button
               disabled={!userCanEdit}
-              className={`w-full h-[48px] rounded-full text-[17px] font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full h-[48px] rounded-full text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${
                 userCanEdit
                   ? "bg-[#2196F3] text-white"
                   : "bg-white/6 text-white/25 cursor-default"
@@ -204,7 +204,7 @@ export default function SessionDetail() {
             </button>
           ) : (
             <Link href={`/signup/${rowId}`}>
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px]">
                 Sign Up
               </button>
             </Link>
@@ -247,7 +247,7 @@ export default function SessionDetail() {
           {/* Splits button — below sign-ups list, above admin */}
           {isAuthenticated && (
             <Link href={`/session/${rowId}/splits`}>
-              <button className="w-full h-[48px] rounded-full border border-white/20 text-white font-medium text-[17px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
+              <button className="w-full h-[48px] rounded-full border border-white/20 text-white font-medium text-[13px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
                 <Pencil className="w-4 h-4" />
                 Splits
               </button>

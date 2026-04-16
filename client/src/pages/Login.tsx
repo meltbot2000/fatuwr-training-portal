@@ -107,7 +107,7 @@ export default function Login() {
               <button
                 onClick={() => { if (validateEmail(email)) sendOtpMutation.mutate({ email: email.trim() }); }}
                 disabled={sendOtpMutation.isPending || !email.trim()}
-                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {sendOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {sendOtpMutation.isPending ? "Sending…" : "Send Code"}
@@ -139,7 +139,7 @@ export default function Login() {
               <button
                 onClick={() => verifyOtpMutation.mutate({ email: email.trim(), code: otpValue })}
                 disabled={verifyOtpMutation.isPending || otpValue.length !== 6}
-                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {verifyOtpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {verifyOtpMutation.isPending ? "Verifying…" : "Verify Code"}
@@ -194,7 +194,7 @@ export default function Login() {
                   completeProfileMutation.mutate({ name: profileName.trim(), phone: profilePhone.trim() || undefined, dob: profileDob || undefined });
                 }}
                 disabled={completeProfileMutation.isPending || !profileName.trim()}
-                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
+                className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[13px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
               >
                 {completeProfileMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 {completeProfileMutation.isPending ? "Saving…" : "Complete Sign Up"}

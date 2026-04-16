@@ -82,7 +82,7 @@ export default function Profile() {
         {/* Sign out */}
         <button
           onClick={handleLogout}
-          className="w-full h-[52px] rounded-full border border-red-500/25 text-red-400 text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
+          className="w-full h-[52px] rounded-full border border-red-500/25 text-red-400 text-[13px] font-medium flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
