@@ -192,7 +192,7 @@ export default function SignUpForm() {
               <button
                 key={value}
                 onClick={() => setActivity(value)}
-                className={`rounded-full border-2 text-[16px] font-medium px-5 py-2.5 bg-transparent transition-all flex flex-col items-start ${
+                className={`rounded-full border-2 text-[13px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
                   activity === value
                     ? "border-[#2196F3] text-[#2196F3]"
                     : "border-[#888888] text-white"
@@ -222,7 +222,7 @@ export default function SignUpForm() {
         <button
           onClick={handleSubmit}
           disabled={submitMutation.isPending || debtBlocking}
-          className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
+          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
         >
           {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitMutation.isPending ? "Submitting…" : "Confirm Sign Up"}

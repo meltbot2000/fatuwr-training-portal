@@ -134,13 +134,13 @@ export default function SessionDetail() {
 
         {/* Session info card */}
         <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-          <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+          <p className="text-[11px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[24px] font-bold text-white leading-tight mb-1">
+          <p className="text-[22px] font-bold text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
-          <p className="text-[14px] text-[#888888]">
+          <p className="text-[13px] text-[#888888]">
             {session.pool}
             {" · "}
             {isClosed ? `Attendance: ${signupCount}` : `${signupCount} signed up`}
@@ -177,22 +177,22 @@ export default function SessionDetail() {
           {/* ── Primary CTA (full width) ── */}
           {!isAuthenticated ? (
             <Link href="/login">
-              <button className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px]">
                 Sign In to Register
               </button>
             </Link>
           ) : isClosed ? (
-            <button disabled className="w-full h-[52px] rounded-full bg-white/6 text-white/25 text-[16px] cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[17px] cursor-default">
               Sign-ups Closed
             </button>
           ) : sessionStarted && !mySignup ? (
-            <button disabled className="w-full h-[52px] rounded-full bg-white/6 text-white/25 text-[16px] cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[17px] cursor-default">
               Session In Progress
             </button>
           ) : mySignup ? (
             <button
               disabled={!userCanEdit}
-              className={`w-full h-[52px] rounded-full text-[16px] font-bold flex items-center justify-center gap-2 transition-colors ${
+              className={`w-full h-[48px] rounded-full text-[17px] font-medium flex items-center justify-center gap-2 transition-colors ${
                 userCanEdit
                   ? "bg-[#2196F3] text-white"
                   : "bg-white/6 text-white/25 cursor-default"
@@ -204,7 +204,7 @@ export default function SessionDetail() {
             </button>
           ) : (
             <Link href={`/signup/${rowId}`}>
-              <button className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px]">
                 Sign Up
               </button>
             </Link>

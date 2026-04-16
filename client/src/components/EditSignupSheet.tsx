@@ -193,7 +193,7 @@ export default function EditSignupSheet({
                       setActivity(a);
                       if (!isAdmin) setActualFee(fee.toString());
                     }}
-                    className={`rounded-full border-2 text-[16px] font-medium px-5 py-2.5 bg-transparent transition-all flex flex-col items-start ${
+                    className={`rounded-full border-2 text-[13px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
                       activity === a
                         ? "border-[#2196F3] text-[#2196F3]"
                         : "border-[#888888] text-white"
@@ -220,7 +220,7 @@ export default function EditSignupSheet({
             <button
               onClick={handleSave}
               disabled={isPending}
-              className="w-full h-[52px] rounded-full bg-[#2196F3] text-white font-bold text-[16px] disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[17px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {editMutation.isPending ? "Saving…" : "Save Changes"}
@@ -230,7 +230,7 @@ export default function EditSignupSheet({
               <AlertDialogTrigger asChild>
                 <button
                   disabled={isPending}
-                  className="w-full h-[52px] rounded-full border border-red-500/40 text-red-400 text-[16px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
+                  className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[17px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
                   {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {deleteMutation.isPending ? "Deleting…" : "Delete Sign-up"}

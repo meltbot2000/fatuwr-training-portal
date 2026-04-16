@@ -114,15 +114,15 @@ export default function Home() {
                     {/* Card body — dark */}
                     <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
                       {/* Day */}
-                      <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+                      <p className="text-[11px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
                         {session.day}
                       </p>
                       {/* Date + time */}
-                      <p className="text-[24px] font-bold text-white leading-tight mb-1">
+                      <p className="text-[19px] font-bold text-white leading-tight mb-1">
                         {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
                       </p>
                       {/* Pool + count */}
-                      <p className="text-[14px] text-[#888888]">
+                      <p className="text-[13px] text-[#888888]">
                         {session.pool}
                         {" · "}
                         {isClosed
