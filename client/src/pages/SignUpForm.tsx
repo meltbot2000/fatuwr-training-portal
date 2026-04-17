@@ -94,7 +94,7 @@ export default function SignUpForm() {
         <AppHeader title="Sign up" showBack />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
-          <p className="text-white/50">Session not found</p>
+          <p className="text-[16px] text-white/50">Session not found</p>
         </main>
       </div>
     );
@@ -107,12 +107,12 @@ export default function SignUpForm() {
         <AppHeader title="Sign up" showBack />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <CheckCircle2 className="w-14 h-14 text-green-400 mx-auto mb-4" />
-          <p className="text-[22px] font-bold text-white mb-1">You're in!</p>
-          <p className="text-[15px] text-white/50 mb-1">
+          <p className="text-[18px] font-medium text-white mb-1">You're in!</p>
+          <p className="text-[16px] text-[#888888] mb-1">
             {session.pool} · {session.trainingDate}
           </p>
           {fee > 0 && (
-            <p className="text-[15px] text-white/50">{formatFee(fee)} to pay</p>
+            <p className="text-[16px] text-[#888888]">{formatFee(fee)} to pay</p>
           )}
         </main>
       </div>
@@ -138,46 +138,46 @@ export default function SignUpForm() {
 
         {/* Session summary */}
         <div className="bg-[#1E1E1E] rounded-xl px-4 py-3.5">
-          <p className="text-[12px] font-bold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+          <p className="text-[11px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[18px] font-bold text-white leading-tight">{session.trainingDate}</p>
-          <p className="text-[13px] text-[#888888] mt-0.5">{session.trainingTime} · {session.pool}</p>
+          <p className="text-[18px] font-medium text-white leading-tight">{session.trainingDate}</p>
+          <p className="text-[16px] text-[#888888] mt-0.5">{session.trainingTime} · {session.pool}</p>
         </div>
 
         {/* Warnings */}
         {trialExpiredWarning && (
-          <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[13px] text-[#F5C518] leading-snug">
+          <div className="bg-[#3D3500] rounded-xl px-4 py-4">
+            <p className="text-[16px] text-[#F5C518] leading-snug">
               Your trial will have expired by this date — you'll be charged the non-member rate.
             </p>
           </div>
         )}
         {debtBlocking && (
-          <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[13px] text-[#F5C518] leading-snug">
+          <div className="bg-[#3D3500] rounded-xl px-4 py-4">
+            <p className="text-[16px] text-[#F5C518] leading-snug">
               Outstanding balance of {formatFee(debt)} — please settle before signing up.
             </p>
           </div>
         )}
         {debtWarning && (
-          <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[13px] text-[#F5C518] leading-snug">
+          <div className="bg-[#3D3500] rounded-xl px-4 py-4">
+            <p className="text-[16px] text-[#F5C518] leading-snug">
               Reminder: outstanding balance of {formatFee(debt)}. Please pay soon.
             </p>
           </div>
         )}
 
         {/* User info */}
-        <div className="bg-[#1E1E1E] rounded-xl divide-y divide-white/6">
+        <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C]">
           {[
             { label: "Name",   value: user?.name  || "—" },
             { label: "Email",  value: user?.email || "—" },
             { label: "Status", value: trialExpiredWarning ? "Non-Member (trial expired)" : membershipOnDate },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between px-4 py-3">
-              <span className="text-[13px] text-white/40">{label}</span>
-              <span className="text-[13px] text-white/80">{value}</span>
+              <span className="text-[16px] text-[#888888]">{label}</span>
+              <span className="text-[16px] text-white">{value}</span>
             </div>
           ))}
         </div>
@@ -192,14 +192,14 @@ export default function SignUpForm() {
               <button
                 key={value}
                 onClick={() => setActivity(value)}
-                className={`rounded-full border-2 text-[13px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
+                className={`rounded-full border-[1.5px] text-[14px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
                   activity === value
                     ? "border-[#2196F3] text-[#2196F3]"
                     : "border-[#888888] text-white"
                 }`}
               >
                 <span className="leading-tight">{label}</span>
-                <span className={`text-[12px] mt-0.5 ${activity === value ? "text-[#2196F3]" : "text-[#888888]"}`}>
+                <span className={`text-[14px] mt-0.5 ${activity === value ? "text-[#2196F3]" : "text-[#888888]"}`}>
                   {optFee}
                 </span>
               </button>
@@ -211,9 +211,9 @@ export default function SignUpForm() {
         <div className="bg-[#1E1E1E] rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-0.5">Total</p>
-            <p className="text-[15px] font-normal text-white leading-tight">{formatFee(fee)}</p>
+            <p className="text-[18px] font-medium text-white leading-tight">{formatFee(fee)}</p>
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35">
+          <p className="text-[16px] text-[#888888]">
             {isFreeActivity ? "Complimentary" : `${membershipOnDate} rate`}
           </p>
         </div>
@@ -222,7 +222,7 @@ export default function SignUpForm() {
         <button
           onClick={handleSubmit}
           disabled={submitMutation.isPending || debtBlocking}
-          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
+          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[14px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
         >
           {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitMutation.isPending ? "Submitting…" : "Confirm sign up"}

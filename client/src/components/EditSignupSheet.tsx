@@ -120,9 +120,9 @@ export default function EditSignupSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#1E1E1E] border-t border-white/8">
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8">
         <SheetHeader className="pb-3">
-          <SheetTitle className="text-white text-[16px]">
+          <SheetTitle className="text-white text-[18px] font-medium">
             {isAdmin ? `Edit — ${signup.name}` : "Edit my sign-up"}
           </SheetTitle>
         </SheetHeader>
@@ -132,47 +132,47 @@ export default function EditSignupSheet({
           {/* ── Admin fields ───────────────────────── */}
           {isAdmin && (
             <div className="space-y-3">
-              <div className="bg-[#2a2a2a] rounded-xl divide-y divide-white/8">
+              <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C]">
                 {/* Name */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/55 w-28 shrink-0">Name</span>
+                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Name</span>
                   <Input
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[16px] text-white focus-visible:ring-0"
                   />
                 </div>
                 {/* Member status */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/55 w-28 shrink-0">Status</span>
+                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Status</span>
                   <Input
                     value={memberStatus}
                     onChange={e => setMemberStatus(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[16px] text-white focus-visible:ring-0"
                   />
                 </div>
                 {/* Payment ID */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/55 w-28 shrink-0">Payment ID</span>
+                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Payment ID</span>
                   <Input
                     value={paymentId}
                     onChange={e => setPaymentId(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white font-mono focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[16px] text-white font-mono focus-visible:ring-0"
                   />
                 </div>
                 {/* Actual fee */}
                 <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[12px] text-white/55 w-28 shrink-0">Actual Fee</span>
+                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Actual Fee</span>
                   <Input
                     type="number"
                     step="0.01"
                     value={actualFee}
                     onChange={e => setActualFee(e.target.value)}
-                    className="h-8 bg-transparent border-0 p-0 text-[13px] text-white focus-visible:ring-0"
+                    className="h-8 bg-transparent border-0 p-0 text-[16px] text-white focus-visible:ring-0"
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-white/45 px-1">
+              <p className="text-[16px] text-[#888888] px-1">
                 Calculated fee for this activity: {formatFee(calculatedFee)}
               </p>
             </div>
@@ -193,14 +193,14 @@ export default function EditSignupSheet({
                       setActivity(a);
                       if (!isAdmin) setActualFee(fee.toString());
                     }}
-                    className={`rounded-full border-2 text-[13px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
+                    className={`rounded-full border-[1.5px] text-[14px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
                       activity === a
                         ? "border-[#2196F3] text-[#2196F3]"
                         : "border-[#888888] text-white"
                     }`}
                   >
                     <span className="leading-tight">{a}</span>
-                    <span className={`text-[12px] mt-0.5 ${activity === a ? "text-[#2196F3]" : "text-[#888888]"}`}>
+                    <span className={`text-[14px] mt-0.5 ${activity === a ? "text-[#2196F3]" : "text-[#888888]"}`}>
                       {formatFee(fee)}
                     </span>
                   </button>
@@ -210,9 +210,9 @@ export default function EditSignupSheet({
           </div>
 
           {/* ── Fee summary ─────────────────────────── */}
-          <div className="bg-[#2a2a2a] rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[13px] text-white/60">Fee</span>
-            <span className="text-[15px] font-semibold text-white">{formatFee(displayFee)}</span>
+          <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 flex items-center justify-between">
+            <span className="text-[16px] text-[#888888]">Fee</span>
+            <span className="text-[18px] font-medium text-white">{formatFee(displayFee)}</span>
           </div>
 
           {/* ── Actions ─────────────────────────────── */}
@@ -220,7 +220,7 @@ export default function EditSignupSheet({
             <button
               onClick={handleSave}
               disabled={isPending}
-              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[13px] disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {editMutation.isPending ? "Saving…" : "Save changes"}
@@ -230,7 +230,7 @@ export default function EditSignupSheet({
               <AlertDialogTrigger asChild>
                 <button
                   disabled={isPending}
-                  className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[13px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
+                  className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[14px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
                   {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {deleteMutation.isPending ? "Deleting…" : "Delete sign-up"}
