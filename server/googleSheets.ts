@@ -269,6 +269,10 @@ export async function fetchSheetsSessions(): Promise<Omit<SessionRow, never>[]> 
       isClosed: row[15] || "",
       trainingObjective: row[16] || "",
       signUpCloseTime: row[19] || "",
+      // col V (21) = Venue/pool cost, col W (22) = Revenue (historical, sheet-stored)
+      venueCost: parseNumber(row[21] || "0"),
+      revenue: parseNumber(row[22] || "0"),
+      rainOff: "",  // no rainOff column in sheet; defaults to empty
     });
   }
   return sessions;
