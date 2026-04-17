@@ -83,9 +83,9 @@ export default function SessionDetail() {
         <AppHeader title="Session" showBack />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
-          <p className="text-[16px] text-white/50">Session not found</p>
+          <p className="text-[13px] text-white/50">Session not found</p>
           <Link href="/">
-            <button className="mt-4 px-5 py-2 rounded-xl border border-white/10 text-white/60 text-[14px]">
+            <button className="mt-4 px-5 py-2 rounded-xl border border-white/10 text-white/60 text-[15px] font-medium">
               Back to sessions
             </button>
           </Link>
@@ -125,7 +125,7 @@ export default function SessionDetail() {
           )}
           {isClosed && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[14px] px-4 py-1.5 rounded-full tracking-wide">
+              <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[15px] px-4 py-1.5 rounded-full tracking-wide">
                 Session closed
               </span>
             </div>
@@ -134,13 +134,16 @@ export default function SessionDetail() {
 
         {/* Session info card */}
         <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-          <p className="text-[11px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+          {/* Day badge — fs-meta special: 13px/600/uppercase */}
+          <p className="text-[13px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
             {session.day}
           </p>
-          <p className="text-[18px] font-medium text-white leading-tight mb-1">
+          {/* Date + time — fs-content: 14px/400 */}
+          <p className="text-[14px] text-white leading-tight mb-1">
             {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
           </p>
-          <p className="text-[16px] text-[#888888]">
+          {/* Pool + count — fs-meta: 13px/400 */}
+          <p className="text-[13px] text-[#888888]">
             {session.pool}
             {" · "}
             {isClosed ? `Attendance: ${signupCount}` : `${signupCount} signed up`}
@@ -154,49 +157,59 @@ export default function SessionDetail() {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
                 Training objective
               </p>
-              <p className="text-[16px] text-[#888888] leading-relaxed">{session.trainingObjective}</p>
+              <p className="text-[13px] text-[#888888] leading-relaxed">{session.trainingObjective}</p>
             </div>
           )}
 
-          {/* Notes */}
+          {/* Notes — warning banner: fs-meta 13px/400 */}
           {session.notes && (
             <div className="bg-[#3D3500] rounded-xl px-4 py-4">
-              <p className="text-[16px] text-[#F5C518] leading-snug">{session.notes}</p>
+              <p className="text-[13px] text-[#F5C518] leading-snug">{session.notes}</p>
             </div>
           )}
 
-          {/* Splits reminder — only when open */}
+          {/* Splits reminder */}
           {!isClosed && (
             <div className="bg-[#1E1E1E] rounded-xl px-4 py-4">
-              <p className="text-[16px] text-[#888888] leading-snug">
+              <p className="text-[13px] text-[#888888] leading-snug">
                 If splits have been sent, let the splits team know if you sign up or drop out.
               </p>
             </div>
           )}
 
-          {/* ── Primary CTA (full width) ── */}
+          {/* ── Primary CTA — fs-primary: 15px/500 ── */}
           {!isAuthenticated ? (
             <Link href="/login">
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[14px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
                 Sign in to register
               </button>
             </Link>
           ) : isClosed ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[14px] font-medium cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
               Sign-ups closed
             </button>
           ) : sessionStarted && !mySignup ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[14px] font-medium cursor-default">
+            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
               Session in progress
             </button>
           ) : mySignup ? (
-            <div className="w-full h-[48px] rounded-full bg-white/5 text-white/30 cursor-default text-[14px] flex items-center justify-center">
+            <div className="w-full h-[48px] rounded-full bg-white/5 text-white/30 cursor-default text-[15px] flex items-center justify-center">
               You're signed up
             </div>
           ) : (
             <Link href={`/signup/${rowId}`}>
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[14px]">
+              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
                 Sign up
+              </button>
+            </Link>
+          )}
+
+          {/* Splits button — secondary: 15px/500 */}
+          {isAuthenticated && (
+            <Link href={`/session/${rowId}/splits`}>
+              <button className="w-full h-[48px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[15px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
+                <Pencil className="w-4 h-4" />
+                Splits
               </button>
             </Link>
           )}
@@ -222,11 +235,13 @@ export default function SessionDetail() {
                         {getInitials(su.name) || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[16px] font-medium text-white truncate">
+                        {/* Name — fs-primary: 15px/500 */}
+                        <p className="text-[15px] font-medium text-white truncate">
                           {su.name}
                           {isMe && <span className="ml-1.5 text-[11px] text-[#2196F3] font-normal">you</span>}
                         </p>
-                        <p className="text-[16px] text-[#888888]">{su.activity}</p>
+                        {/* Activity — fs-meta: 13px/400 */}
+                        <p className="text-[13px] text-[#888888]">{su.activity}</p>
                       </div>
                       {tappable && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
                     </button>
@@ -236,24 +251,14 @@ export default function SessionDetail() {
             </div>
           )}
 
-          {/* Splits button — below sign-ups list, above admin */}
-          {isAuthenticated && (
-            <Link href={`/session/${rowId}/splits`}>
-              <button className="w-full h-[48px] rounded-full border border-white/20 text-white font-medium text-[14px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
-                <Pencil className="w-4 h-4" />
-                Splits
-              </button>
-            </Link>
-          )}
-
           {/* Admin controls */}
           {isAdminUser && (
             <div className="space-y-2 pt-1 border-t border-white/8">
               <button
-                className="w-full h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-[14px] text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/25 transition-colors"
+                className="w-full h-[48px] rounded-full bg-red-500/15 border border-red-500/30 text-[15px] text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/25 transition-colors"
                 onClick={() => setEditSessionOpen(true)}
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <Pencil className="w-4 h-4" />
                 Admin: edit session
               </button>
 
@@ -261,7 +266,7 @@ export default function SessionDetail() {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
-                      className="w-full h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-[14px] text-red-400 font-medium flex items-center justify-center hover:bg-red-500/25 transition-colors"
+                      className="w-full h-[48px] rounded-full bg-red-500/15 border border-red-500/30 text-[15px] text-red-400 font-medium flex items-center justify-center hover:bg-red-500/25 transition-colors"
                       disabled={closeSessionMutation.isPending}
                     >
                       Admin: close sign-ups

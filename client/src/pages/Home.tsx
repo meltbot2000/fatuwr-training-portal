@@ -14,7 +14,7 @@ function SessionCardSkeleton() {
       <Skeleton className="h-48 w-full bg-[#2a2a2a]" />
       <div className="bg-[#1E1E1E] px-4 py-3 space-y-2">
         <Skeleton className="h-3 w-20 bg-[#2a2a2a]" />
-        <Skeleton className="h-6 w-40 bg-[#2a2a2a]" />
+        <Skeleton className="h-5 w-40 bg-[#2a2a2a]" />
         <Skeleton className="h-4 w-32 bg-[#2a2a2a]" />
       </div>
     </div>
@@ -56,16 +56,16 @@ export default function Home() {
         {error && (
           <div className="text-center py-12">
             <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-            <p className="text-[16px] text-red-400 font-medium">Failed to load sessions</p>
-            <p className="text-[14px] text-white/40 mt-1">{error.message}</p>
+            <p className="text-[15px] font-medium text-red-400">Failed to load sessions</p>
+            <p className="text-[13px] text-white/40 mt-1">{error.message}</p>
           </div>
         )}
 
         {!isLoading && !error && sessions?.length === 0 && (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-[16px] font-medium text-white/60">No upcoming sessions</p>
-            <p className="text-[14px] text-white/30 mt-1">Check back later for new training sessions.</p>
+            <p className="text-[15px] font-medium text-white/60">No upcoming sessions</p>
+            <p className="text-[13px] text-white/30 mt-1">Check back later for new training sessions.</p>
           </div>
         )}
 
@@ -102,25 +102,25 @@ export default function Home() {
                       {/* Closed overlay */}
                       {isClosed && (
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[14px] px-4 py-1.5 rounded-full tracking-wide">
+                          <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[15px] px-4 py-1.5 rounded-full tracking-wide">
                             Session closed
                           </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Card body — dark */}
+                    {/* Card body */}
                     <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-                      {/* Day */}
-                      <p className="text-[11px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+                      {/* Day badge — fs-meta special: 13px/600/uppercase */}
+                      <p className="text-[13px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
                         {session.day}
                       </p>
-                      {/* Date + time */}
-                      <p className="text-[18px] font-medium text-white leading-tight mb-1">
+                      {/* Date + time — fs-content: 14px/400 */}
+                      <p className="text-[14px] text-white leading-tight mb-1">
                         {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
                       </p>
-                      {/* Pool + count */}
-                      <p className="text-[16px] text-[#888888]">
+                      {/* Pool + count — fs-meta: 13px/400 */}
+                      <p className="text-[13px] text-[#888888]">
                         {session.pool}
                         {" · "}
                         {isClosed
@@ -128,9 +128,9 @@ export default function Home() {
                           : `${signupCount} signed up`}
                       </p>
 
-                      {/* Notes warning */}
+                      {/* Notes warning — fs-meta: 13px/400 */}
                       {session.notes && !isClosed && (
-                        <div className="mt-2.5 bg-[#3D3500] rounded-xl px-4 py-4 text-[16px] text-[#F5C518]">
+                        <div className="mt-2.5 bg-[#3D3500] rounded-xl px-4 py-4 text-[13px] text-[#F5C518]">
                           {session.notes}
                         </div>
                       )}

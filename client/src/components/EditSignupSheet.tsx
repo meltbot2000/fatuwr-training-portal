@@ -64,7 +64,6 @@ export default function EditSignupSheet({
   const [activity, setActivity] = useState<Activity>(
     (ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity
   );
-  // Admin-only editable fields
   const [name, setName] = useState(signup.name);
   const [memberStatus, setMemberStatus] = useState(signup.memberOnTrainingDate || "Non-Member");
   const [paymentId, setPaymentId] = useState(signup.paymentId || "");
@@ -120,21 +119,22 @@ export default function EditSignupSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
+      {/* Bottom sheet — bg-modal: #2A2A2A */}
       <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8">
         <SheetHeader className="pb-3">
-          <SheetTitle className="text-white text-[18px] font-medium">
+          {/* Sheet title — fs-primary: 15px/500 */}
+          <SheetTitle className="text-white text-[15px] font-medium">
             {isAdmin ? `Edit — ${signup.name}` : "Edit my sign-up"}
           </SheetTitle>
         </SheetHeader>
 
         <div className="space-y-4 pb-6">
 
-          {/* ── Admin fields ───────────────────────── */}
+          {/* ── Admin fields — horizontal label/value rows: fs-body 16px/400 ── */}
           {isAdmin && (
             <div className="space-y-3">
               <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C]">
-                {/* Name */}
-                <div className="px-4 py-2.5 flex items-center gap-3">
+                <div className="px-4 py-2.5 flex items-center gap-3 min-h-[48px]">
                   <span className="text-[16px] text-[#888888] w-32 shrink-0">Name</span>
                   <Input
                     value={name}
@@ -142,8 +142,7 @@ export default function EditSignupSheet({
                     className="h-8 bg-transparent border-0 p-0 text-[16px] text-white focus-visible:ring-0"
                   />
                 </div>
-                {/* Member status */}
-                <div className="px-4 py-2.5 flex items-center gap-3">
+                <div className="px-4 py-2.5 flex items-center gap-3 min-h-[48px]">
                   <span className="text-[16px] text-[#888888] w-32 shrink-0">Status</span>
                   <Input
                     value={memberStatus}
@@ -151,8 +150,7 @@ export default function EditSignupSheet({
                     className="h-8 bg-transparent border-0 p-0 text-[16px] text-white focus-visible:ring-0"
                   />
                 </div>
-                {/* Payment ID */}
-                <div className="px-4 py-2.5 flex items-center gap-3">
+                <div className="px-4 py-2.5 flex items-center gap-3 min-h-[48px]">
                   <span className="text-[16px] text-[#888888] w-32 shrink-0">Payment ID</span>
                   <Input
                     value={paymentId}
@@ -160,9 +158,8 @@ export default function EditSignupSheet({
                     className="h-8 bg-transparent border-0 p-0 text-[16px] text-white font-mono focus-visible:ring-0"
                   />
                 </div>
-                {/* Actual fee */}
-                <div className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Actual Fee</span>
+                <div className="px-4 py-2.5 flex items-center gap-3 min-h-[48px]">
+                  <span className="text-[16px] text-[#888888] w-32 shrink-0">Actual fee</span>
                   <Input
                     type="number"
                     step="0.01"
@@ -172,13 +169,14 @@ export default function EditSignupSheet({
                   />
                 </div>
               </div>
-              <p className="text-[16px] text-[#888888] px-1">
+              {/* Helper text — fs-meta: 13px/400 */}
+              <p className="text-[13px] text-[#888888] px-1">
                 Calculated fee for this activity: {formatFee(calculatedFee)}
               </p>
             </div>
           )}
 
-          {/* ── Activity picker (all users) ─────────── */}
+          {/* ── Activity chips ── */}
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55 mb-2">
               Activity
@@ -193,14 +191,16 @@ export default function EditSignupSheet({
                       setActivity(a);
                       if (!isAdmin) setActualFee(fee.toString());
                     }}
-                    className={`rounded-full border-[1.5px] text-[14px] font-medium px-[14px] py-[6px] bg-transparent transition-all flex flex-col items-start ${
+                    className={`rounded-full border-[1.5px] px-[14px] py-[6px] transition-all flex flex-col items-start ${
                       activity === a
-                        ? "border-[#2196F3] text-[#2196F3]"
-                        : "border-[#888888] text-white"
+                        ? "bg-[#2196F3] border-[#2196F3]"
+                        : "bg-[#1E1E1E] border-[#888888]"
                     }`}
                   >
-                    <span className="leading-tight">{a}</span>
-                    <span className={`text-[14px] mt-0.5 ${activity === a ? "text-[#2196F3]" : "text-[#888888]"}`}>
+                    {/* Chip label — fs-content: 14px */}
+                    <span className="text-[14px] font-medium text-white leading-tight">{a}</span>
+                    {/* Price sub-label — fs-meta: 13px/400 */}
+                    <span className={`text-[13px] mt-0.5 ${activity === a ? "text-white/80" : "text-[#888888]"}`}>
                       {formatFee(fee)}
                     </span>
                   </button>
@@ -209,18 +209,20 @@ export default function EditSignupSheet({
             </div>
           </div>
 
-          {/* ── Fee summary ─────────────────────────── */}
+          {/* ── Fee summary — stacked label/value ── */}
           <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 flex items-center justify-between">
-            <span className="text-[16px] text-[#888888]">Fee</span>
-            <span className="text-[18px] font-medium text-white">{formatFee(displayFee)}</span>
+            {/* Stacked label — fs-meta: 13px */}
+            <span className="text-[13px] text-[#888888]">Fee</span>
+            {/* Stacked value — fs-content: 14px */}
+            <span className="text-[14px] text-white">{formatFee(displayFee)}</span>
           </div>
 
-          {/* ── Actions ─────────────────────────────── */}
+          {/* ── Actions — fs-primary: 15px/500 ── */}
           <div className="space-y-2">
             <button
               onClick={handleSave}
               disabled={isPending}
-              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {editMutation.isPending ? "Saving…" : "Save changes"}
@@ -230,7 +232,7 @@ export default function EditSignupSheet({
               <AlertDialogTrigger asChild>
                 <button
                   disabled={isPending}
-                  className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[14px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
+                  className="w-full h-[48px] rounded-full border border-red-500/40 text-red-400 text-[15px] font-medium disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-red-400/8 transition-colors"
                 >
                   {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {deleteMutation.isPending ? "Deleting…" : "Delete sign-up"}
