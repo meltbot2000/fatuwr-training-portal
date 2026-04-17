@@ -384,9 +384,13 @@ export const appRouter = router({
         }
 
         const signups = await getSignUpsForSession(session.trainingDate, session.pool);
+        const revenue = signups.reduce((sum, su) => sum + (su.actualFees ?? 0), 0);
+        const pnl = revenue - (session.venueCost ?? 0);
         return {
           ...session,
           poolImageUrl: convertDriveUrl(session.poolImageUrl),
+          revenue,
+          pnl,
           signups: signups.map(su => ({
             name: su.name,
             email: su.email,
@@ -961,7 +965,6 @@ export const appRouter = router({
         notes: z.string().optional(),
         trainingObjective: z.string().optional(),
         venueCost: z.number().optional(),
-        revenue: z.number().optional(),
         rainOff: z.string().optional(),
         isClosed: z.string().optional(),
       }))
@@ -987,7 +990,6 @@ export const appRouter = router({
         if (fields.notes !== undefined) updates.notes = fields.notes;
         if (fields.trainingObjective !== undefined) updates.trainingObjective = fields.trainingObjective;
         if (fields.venueCost !== undefined) updates.venueCost = fields.venueCost;
-        if (fields.revenue !== undefined) updates.revenue = fields.revenue;
         if (fields.rainOff !== undefined) updates.rainOff = fields.rainOff;
         if (fields.isClosed !== undefined) updates.isClosed = fields.isClosed;
         if (Object.keys(updates).length === 0) return { success: true };

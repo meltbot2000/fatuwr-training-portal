@@ -37,7 +37,8 @@ export interface SessionForEdit {
   notes: string | null;
   trainingObjective: string | null;
   venueCost?: number;
-  revenue?: number;
+  revenue?: number;  // computed — read-only display only
+  pnl?: number;      // computed — read-only display only
   rainOff?: string;
   isClosed?: string;
 }
@@ -93,7 +94,6 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
     notes: session.notes ?? "",
     trainingObjective: session.trainingObjective ?? "",
     venueCost: String(session.venueCost ?? 0),
-    revenue: String(session.revenue ?? 0),
     rainOff: session.rainOff ?? "",
     isClosed: session.isClosed ?? "",
   });
@@ -113,7 +113,6 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
       notes: session.notes ?? "",
       trainingObjective: session.trainingObjective ?? "",
       venueCost: String(session.venueCost ?? 0),
-      revenue: String(session.revenue ?? 0),
       rainOff: session.rainOff ?? "",
       isClosed: session.isClosed ?? "",
     });
@@ -159,7 +158,6 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
       notes: form.notes,
       trainingObjective: form.trainingObjective,
       venueCost: parseFee(form.venueCost),
-      revenue: parseFee(form.revenue),
       rainOff: form.rainOff,
       isClosed: form.isClosed,
     });
@@ -250,9 +248,28 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
             <FieldRow label="Venue cost">
               <FieldInput type="number" min="0" step="0.50" value={form.venueCost} onChange={set("venueCost")} />
             </FieldRow>
-            <FieldRow label="Revenue">
-              <FieldInput type="number" min="0" step="0.50" value={form.revenue} onChange={set("revenue")} />
-            </FieldRow>
+            {/* Revenue — auto-calculated from actual fees collected */}
+            <div className="flex items-center gap-3 px-4 min-h-[48px] border-b border-[#2C2C2C]">
+              <span className="text-[16px] text-[#888888] w-36 shrink-0">Revenue</span>
+              <span className="flex-1 text-[16px] text-white/50">
+                ${(session.revenue ?? 0).toFixed(2)}
+                <span className="ml-2 text-[12px] text-white/25">auto</span>
+              </span>
+            </div>
+            {/* PnL — Revenue minus Venue cost */}
+            {(() => {
+              const revenue = session.revenue ?? 0;
+              const cost = parseFee(form.venueCost);
+              const pnl = revenue - cost;
+              return (
+                <div className="flex items-center gap-3 px-4 min-h-[48px]">
+                  <span className="text-[16px] text-[#888888] w-36 shrink-0">Session PnL</span>
+                  <span className={`flex-1 text-[16px] font-medium ${pnl >= 0 ? "text-[#4CAF50]" : "text-[#F44336]"}`}>
+                    {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── Notes ───────────────────────────────────── */}
