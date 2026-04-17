@@ -182,9 +182,9 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
               <span className="text-[16px] text-[#888888]">Session closed</span>
               <button
                 onClick={() => setForm(f => ({ ...f, isClosed: f.isClosed.trim() ? "" : "Closed" }))}
-                className={`w-11 h-6 rounded-full transition-colors relative ${isClosed ? "bg-[#2196F3]" : "bg-white/15"}`}
+                className={`w-11 h-6 rounded-full transition-colors relative overflow-hidden ${isClosed ? "bg-[#2196F3]" : "bg-white/15"}`}
               >
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isClosed ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                <span className={`absolute top-[2px] left-0 w-5 h-5 rounded-full bg-white shadow transition-transform ${isClosed ? "translate-x-[22px]" : "translate-x-[2px]"}`} />
               </button>
             </div>
             {/* Rain off toggle */}
@@ -192,9 +192,9 @@ export function EditSessionSheet({ open, onOpenChange, session, onDone }: EditSe
               <span className="text-[16px] text-[#888888]">Rain off</span>
               <button
                 onClick={() => setForm(f => ({ ...f, rainOff: f.rainOff.trim() ? "" : "Rain Off" }))}
-                className={`w-11 h-6 rounded-full transition-colors relative ${isRainOff ? "bg-[#2196F3]" : "bg-white/15"}`}
+                className={`w-11 h-6 rounded-full transition-colors relative overflow-hidden ${isRainOff ? "bg-[#2196F3]" : "bg-white/15"}`}
               >
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isRainOff ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                <span className={`absolute top-[2px] left-0 w-5 h-5 rounded-full bg-white shadow transition-transform ${isRainOff ? "translate-x-[22px]" : "translate-x-[2px]"}`} />
               </button>
             </div>
           </div>
