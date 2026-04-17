@@ -60,6 +60,9 @@ export interface SessionRow {
   isClosed: string;
   trainingObjective: string;
   signUpCloseTime: string;
+  venueCost: number;
+  revenue: number;
+  rainOff: string;
 }
 
 export interface UserRow {
@@ -374,6 +377,9 @@ function dbSessionToSessionRow(r: any): SessionRow {
     isClosed: r.isClosed ?? "",
     trainingObjective: r.trainingObjective ?? "",
     signUpCloseTime: r.signUpCloseTime ?? "",
+    venueCost: r.venueCost ?? 0,
+    revenue: r.revenue ?? 0,
+    rainOff: r.rainOff ?? "",
   };
 }
 

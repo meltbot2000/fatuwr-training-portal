@@ -960,6 +960,10 @@ export const appRouter = router({
         trainerFee: z.number().optional(),
         notes: z.string().optional(),
         trainingObjective: z.string().optional(),
+        venueCost: z.number().optional(),
+        revenue: z.number().optional(),
+        rainOff: z.string().optional(),
+        isClosed: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.clubRole !== "Admin") {
@@ -968,7 +972,6 @@ export const appRouter = router({
         const sessDb = await db.getDb();
         if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         const { rowId, ...fields } = input;
-        // Only include fields that were actually provided
         const updates: Record<string, unknown> = {};
         if (fields.trainingDate !== undefined) updates.trainingDate = fields.trainingDate;
         if (fields.day !== undefined) updates.day = fields.day;
@@ -983,6 +986,10 @@ export const appRouter = router({
         if (fields.trainerFee !== undefined) updates.trainerFee = fields.trainerFee;
         if (fields.notes !== undefined) updates.notes = fields.notes;
         if (fields.trainingObjective !== undefined) updates.trainingObjective = fields.trainingObjective;
+        if (fields.venueCost !== undefined) updates.venueCost = fields.venueCost;
+        if (fields.revenue !== undefined) updates.revenue = fields.revenue;
+        if (fields.rainOff !== undefined) updates.rainOff = fields.rainOff;
+        if (fields.isClosed !== undefined) updates.isClosed = fields.isClosed;
         if (Object.keys(updates).length === 0) return { success: true };
         await sessDb.update(sheetSessions)
           .set(updates)

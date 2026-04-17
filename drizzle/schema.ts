@@ -56,6 +56,9 @@ export const sheetSessions = mysqlTable("sheet_sessions", {
   isClosed: varchar("isClosed", { length: 64 }).default(""),
   trainingObjective: text("trainingObjective"),
   signUpCloseTime: varchar("signUpCloseTime", { length: 64 }).default(""),
+  venueCost: double("venueCost").default(0),
+  revenue: double("revenue").default(0),
+  rainOff: varchar("rainOff", { length: 16 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
 });
 export type SheetSession = typeof sheetSessions.$inferSelect;
