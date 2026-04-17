@@ -173,7 +173,7 @@ export default function SignUpForm() {
           </div>
         )}
 
-        {/* User info — horizontal label/value rows: fs-body 16px/400 both */}
+        {/* User info — read-only rows: fs-content 14px/400 */}
         <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C]">
           {[
             { label: "Name",   value: user?.name  || "—" },
@@ -181,8 +181,8 @@ export default function SignUpForm() {
             { label: "Status", value: trialExpiredWarning ? "Non-Member (trial expired)" : membershipOnDate },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between px-4 py-3 min-h-[48px]">
-              <span className="text-[16px] text-[#888888]">{label}</span>
-              <span className="text-[16px] text-white">{value}</span>
+              <span className="text-[14px] text-[#888888]">{label}</span>
+              <span className="text-[14px] text-white">{value}</span>
             </div>
           ))}
         </div>
