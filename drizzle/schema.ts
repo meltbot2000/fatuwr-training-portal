@@ -108,3 +108,15 @@ export const sheetUsers = mysqlTable("sheet_users", {
   syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
 });
 export type SheetUser = typeof sheetUsers.$inferSelect;
+
+export const announcements = mysqlTable("announcements", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }),
+  imageUrl: varchar("imageUrl", { length: 500 }),
+  position: int("position").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: varchar("createdBy", { length: 255 }),
+});
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;

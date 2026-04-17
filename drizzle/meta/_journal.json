@@ -43,6 +43,20 @@
       "when": 1776277059051,
       "tag": "0005_rare_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1776440560201,
+      "tag": "0006_magical_jetstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1776441290188,
+      "tag": "0007_bitter_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

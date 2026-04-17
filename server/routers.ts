@@ -21,8 +21,8 @@ import {
 import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
-import { eq, and, sql } from "drizzle-orm";
-import { sheetSignups, sheetSessions, sheetUsers, sheetPayments } from "../drizzle/schema";
+import { eq, and, sql, max } from "drizzle-orm";
+import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements } from "../drizzle/schema";
 
 
 /**
@@ -995,6 +995,91 @@ export const appRouter = router({
           .set(updates)
           .where(eq(sheetSessions.rowId, rowId));
         clearSessionsCache();
+        return { success: true };
+      }),
+  }),
+
+  announcements: router({
+    list: publicProcedure.query(async () => {
+      const aDb = await db.getDb();
+      if (!aDb) return [];
+      return aDb.select().from(announcements).orderBy(announcements.position);
+    }),
+
+    create: protectedProcedure
+      .input(z.object({
+        title: z.string().optional(),
+        imageUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const aDb = await db.getDb();
+        if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        if (!input.title && !input.imageUrl) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Title or image URL is required" });
+        }
+        const [maxRow] = await aDb.select({ maxPos: max(announcements.position) }).from(announcements);
+        const nextPos = (maxRow?.maxPos ?? 0) + 1;
+        await aDb.insert(announcements).values({
+          title: input.title || null,
+          imageUrl: input.imageUrl || null,
+          position: nextPos,
+          createdBy: ctx.user.email || "",
+        });
+        return { success: true };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        imageUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const aDb = await db.getDb();
+        if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const updates: Record<string, unknown> = {};
+        if (input.title !== undefined) updates.title = input.title || null;
+        if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl || null;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await aDb.update(announcements).set(updates).where(eq(announcements.id, input.id));
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const aDb = await db.getDb();
+        if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await aDb.delete(announcements).where(eq(announcements.id, input.id));
+        return { success: true };
+      }),
+
+    reorder: protectedProcedure
+      .input(z.object({ orderedIds: z.array(z.number()) }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const aDb = await db.getDb();
+        if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await Promise.all(
+          input.orderedIds.map((id, index) =>
+            aDb.update(announcements).set({ position: index + 1 }).where(eq(announcements.id, id))
+          )
+        );
         return { success: true };
       }),
   }),

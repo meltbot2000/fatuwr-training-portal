@@ -1,147 +1,147 @@
+import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import AppHeader from "@/components/AppHeader";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Calendar, AlertTriangle } from "lucide-react";
-import { useMemo } from "react";
+import { CalendarPlus, CircleDollarSign, BookOpen, Sparkles, Plus } from "lucide-react";
+import AnnouncementSheet from "@/components/AnnouncementSheet";
 
-const MAX_SESSIONS = 6;
+const QUICK_ACTIONS = [
+  { icon: CalendarPlus,       label: "Sign Up",      href: "/sessions" },
+  { icon: CircleDollarSign,   label: "Payments",     href: "/payments" },
+  { icon: BookOpen,           label: "New to Club?", href: "/newbie" },
+  { icon: Sparkles,           label: "Fun Stuff",    href: "/fun-resources" },
+];
 
-function SessionCardSkeleton() {
+export default function Home() {
+  const { user } = useAuth();
+  const clubRole = (user as any)?.clubRole || "";
+  const canManage = clubRole === "Admin" || clubRole === "Helper";
+
+  const { data: announcements = [], refetch } = trpc.announcements.list.useQuery();
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const preview = announcements.slice(0, 5);
+
   return (
-    <div className="rounded-2xl overflow-hidden">
-      <Skeleton className="h-48 w-full bg-[#2a2a2a]" />
-      <div className="bg-[#1E1E1E] px-4 py-3 space-y-2">
-        <Skeleton className="h-3 w-20 bg-[#2a2a2a]" />
-        <Skeleton className="h-5 w-40 bg-[#2a2a2a]" />
-        <Skeleton className="h-4 w-32 bg-[#2a2a2a]" />
-      </div>
+    <div className="min-h-screen bg-[#111111] pb-24">
+      {/* Top bar */}
+      <header className="sticky top-0 z-50 bg-[#2196F3]">
+        <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14">
+          <span className="text-[17px] font-semibold text-white">Home</span>
+          {canManage && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center"
+              aria-label="Create announcement"
+            >
+              <Plus className="w-4 h-4 text-[#2196F3]" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[480px] px-4 pt-5 space-y-6">
+
+        {/* Quick Actions */}
+        <section>
+          <p className="text-[13px] font-medium text-[#888888] mb-3">Quick Actions</p>
+          <div className="flex justify-between">
+            {QUICK_ACTIONS.map(({ icon: Icon, label, href }) => (
+              <Link key={href} href={href}>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-14 h-14 rounded-full bg-[#1E1E1E] flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-[#2196F3]" />
+                  </div>
+                  <span className="text-[13px] text-[#888888] text-center leading-tight max-w-[56px]">{label}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Announcements */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[15px] font-medium text-white">Announcements</span>
+            <Link href="/announcements">
+              <span className="text-[15px] font-medium text-[#2196F3]">See all</span>
+            </Link>
+          </div>
+
+          {preview.length === 0 ? (
+            <div className="bg-[#1E1E1E] rounded-2xl px-4 py-6 text-center">
+              <p className="text-[13px] text-[#888888]">No announcements yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {preview.map((ann) => (
+                <AnnouncementCard
+                  key={ann.id}
+                  ann={ann}
+                  canManage={canManage}
+                  onRefetch={refetch}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+      </main>
+
+      {canManage && (
+        <AnnouncementSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onDone={refetch}
+        />
+      )}
     </div>
   );
 }
 
-export default function Home() {
-  const { user, isAuthenticated } = useAuth();
-  const { data: sessions, isLoading, error } = trpc.sessions.list.useQuery();
+type AnnType = { id: number; title: string | null; imageUrl: string | null; position: number };
 
-  const visibleSessions = useMemo(() => {
-    if (!sessions) return [];
-    return sessions.slice(0, MAX_SESSIONS);
-  }, [sessions]);
+function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canManage: boolean; onRefetch: () => void }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const deleteMutation = trpc.announcements.delete.useMutation({
+    onSuccess: () => { onRefetch(); },
+  });
+
+  const handleLongPress = () => {
+    if (!canManage) return;
+    if (confirm("Delete this announcement?")) {
+      deleteMutation.mutate({ id: ann.id });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#111111]">
-      <AppHeader title="Training Sessions" />
-
-      <main className="mx-auto max-w-[480px] px-4 py-4 pb-8">
-        {/* Sign-in prompt */}
-        {!isAuthenticated && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-[#1E1E1E] border border-[#2C2C2C]">
-            <p className="text-[16px] text-[#888888]">
-              <Link href="/login" className="font-semibold text-[#2196F3] underline">Sign in</Link>
-              {" "}to register for sessions and view your fees.
-            </p>
-          </div>
+    <>
+      <div
+        className="bg-[#1E1E1E] rounded-2xl overflow-hidden"
+        onContextMenu={(e) => { e.preventDefault(); handleLongPress(); }}
+        onClick={() => canManage && setEditOpen(true)}
+      >
+        {ann.imageUrl && (
+          <img
+            src={ann.imageUrl}
+            alt={ann.title || "Announcement"}
+            className="w-full object-cover"
+            style={{ height: 200 }}
+          />
         )}
-
-        {isLoading && (
-          <div className="space-y-3">
-            <SessionCardSkeleton />
-            <SessionCardSkeleton />
-            <SessionCardSkeleton />
-          </div>
+        {ann.title && (
+          <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>
         )}
+      </div>
 
-        {error && (
-          <div className="text-center py-12">
-            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-            <p className="text-[15px] font-medium text-red-400">Failed to load sessions</p>
-            <p className="text-[13px] text-white/40 mt-1">{error.message}</p>
-          </div>
-        )}
-
-        {!isLoading && !error && sessions?.length === 0 && (
-          <div className="text-center py-12">
-            <Calendar className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-[15px] font-medium text-white/60">No upcoming sessions</p>
-            <p className="text-[13px] text-white/30 mt-1">Check back later for new training sessions.</p>
-          </div>
-        )}
-
-        {visibleSessions.length > 0 && (
-          <div className="space-y-3">
-            {visibleSessions.map((session) => {
-              const isClosed = session.isClosed && session.isClosed.trim().length > 0;
-              const signupCount = (session as any).signupCount ?? 0;
-
-              return (
-                <Link
-                  key={session.rowId}
-                  href={`/session/${session.rowId}`}
-                >
-                  <div className="rounded-2xl overflow-hidden active:scale-[0.99] transition-transform">
-                    {/* Hero image */}
-                    <div className="relative h-48 overflow-hidden">
-                      {session.poolImageUrl ? (
-                        <img
-                          src={session.poolImageUrl}
-                          alt={`${session.pool} pool`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            const el = e.target as HTMLImageElement;
-                            el.style.display = "none";
-                            el.parentElement!.style.background = "linear-gradient(135deg, #1E3A5F, #1E73D2)";
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-[#1E3A5F] to-[#1E73D2]" />
-                      )}
-
-                      {/* Closed overlay */}
-                      {isClosed && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[15px] px-4 py-1.5 rounded-full tracking-wide">
-                            Session closed
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card body */}
-                    <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-                      {/* Day badge — fs-badge: 11px/600/uppercase */}
-                      <p className="text-[11px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
-                        {session.day}
-                      </p>
-                      {/* Date + time — fs-content: 14px/400 */}
-                      <p className="text-[14px] text-white leading-tight mb-1">
-                        {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
-                      </p>
-                      {/* Pool + count — fs-meta: 13px/400 */}
-                      <p className="text-[13px] text-[#888888]">
-                        {session.pool}
-                        {" · "}
-                        {isClosed
-                          ? `Attendance: ${signupCount}`
-                          : `${signupCount} signed up`}
-                      </p>
-
-                      {/* Notes warning — fs-meta: 13px/400 */}
-                      {session.notes && !isClosed && (
-                        <div className="mt-2.5 bg-[#3D3500] rounded-xl px-4 py-4 text-[13px] text-[#F5C518]">
-                          {session.notes}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+      {canManage && (
+        <AnnouncementSheet
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          existing={ann}
+          onDone={onRefetch}
+        />
+      )}
+    </>
   );
 }
