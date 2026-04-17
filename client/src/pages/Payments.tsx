@@ -142,13 +142,13 @@ export default function Payments() {
               <div className="px-4 py-3">
                 <p className="text-[13px] text-[#888888] mb-0.5">Amount owed</p>
                 {data.debt > 0 ? (
-                  /* Debt — fs-content: 14px in warning colour */
-                  <p className="text-[14px] text-[#F5C518]">{formatFee(data.debt)}</p>
+                  /* Top-level debt — fs-primary: 15px/500 (only this amount is larger) */
+                  <p className="text-[15px] font-medium text-[#F5C518]">{formatFee(data.debt)}</p>
                 ) : (
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-[#4CAF50]" />
-                    {/* Credit — fs-content: 14px in success colour */}
-                    <p className="text-[14px] text-[#4CAF50]">
+                    {/* Top-level credit — fs-primary: 15px/500 */}
+                    <p className="text-[15px] font-medium text-[#4CAF50]">
                       {data.totalPaid > data.totalFees
                         ? `Credit: ${formatFee(data.totalPaid - data.totalFees)}`
                         : "All paid up"}
@@ -209,7 +209,7 @@ export default function Payments() {
                   ))}
                   <div className="flex items-center justify-between py-3">
                     <p className="text-[14px] font-medium text-white">Total</p>
-                    <p className="text-[14px] font-medium text-white tabular-nums">{formatFee(data.totalTrainingFees)}</p>
+                    <p className="text-[14px] text-white tabular-nums">{formatFee(data.totalTrainingFees)}</p>
                   </div>
                 </div>
               )}
@@ -234,7 +234,7 @@ export default function Payments() {
                   ))}
                   <div className="flex items-center justify-between py-3">
                     <p className="text-[14px] font-medium text-white">Total</p>
-                    <p className="text-[14px] font-medium text-white tabular-nums">{formatFee(data.totalMembershipFees)}</p>
+                    <p className="text-[14px] text-white tabular-nums">{formatFee(data.totalMembershipFees)}</p>
                   </div>
                 </div>
               </CollapsibleSection>
@@ -260,7 +260,7 @@ export default function Payments() {
                   ))}
                   <div className="flex items-center justify-between py-3">
                     <p className="text-[14px] font-medium text-white">Total</p>
-                    <p className="text-[14px] font-medium text-[#4CAF50] tabular-nums">{formatFee(data.totalPaid)}</p>
+                    <p className="text-[14px] text-[#4CAF50] tabular-nums">{formatFee(data.totalPaid)}</p>
                   </div>
                 </div>
               )}

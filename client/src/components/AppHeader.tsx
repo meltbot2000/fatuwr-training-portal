@@ -6,9 +6,10 @@ interface AppHeaderProps {
   title?: string;
   showBack?: boolean;
   backPath?: string;
+  rightAction?: React.ReactNode;
 }
 
-export default function AppHeader({ title = "FATUWR", showBack = false, backPath = "/" }: AppHeaderProps) {
+export default function AppHeader({ title = "FATUWR", showBack = false, backPath = "/", rightAction }: AppHeaderProps) {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 
@@ -31,7 +32,8 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
           {title}
         </span>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {rightAction}
           {isAuthenticated ? (
             <Link href="/profile" className="flex items-center gap-2 hover:bg-white/10 rounded-full p-1.5 transition-colors">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">

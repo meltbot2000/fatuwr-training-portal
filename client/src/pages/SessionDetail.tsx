@@ -14,7 +14,6 @@ function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(p => p[0]?.toUpperCase() || "").slice(0, 2).join("");
 }
 
-/** Returns true if the session start datetime has passed. */
 function hasSessionStarted(trainingDate: string, trainingTime?: string): boolean {
   const date = new Date(trainingDate);
   if (isNaN(date.getTime())) return false;
@@ -42,16 +41,9 @@ export default function SessionDetail() {
   );
 
   const userEmail = ((user as any)?.email || "").toLowerCase().trim();
-  const isAdminUser = (user as any)?.clubRole === "Admin";
+  const isAdminUser = (user as any)?.clubRole === "Admin" || (user as any)?.clubRole === "Helper";
 
   const utils = trpc.useUtils();
-  const closeSessionMutation = trpc.admin.closeSession.useMutation({
-    onSuccess: async () => {
-      toast.success("Session closed.");
-      await utils.sessions.detail.invalidate({ rowId: rowId || "" });
-    },
-    onError: (err) => toast.error(err.message || "Failed to close session."),
-  });
 
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
@@ -64,10 +56,21 @@ export default function SessionDetail() {
     actualFees: number;
   } | null>(null);
 
+  // Admin pencil icon for top bar right slot
+  const adminTopBarAction = isAdminUser ? (
+    <button
+      onClick={() => setEditSessionOpen(true)}
+      className="p-2 rounded-full hover:bg-white/10 transition-colors"
+      aria-label="Edit session"
+    >
+      <Pencil className="w-5 h-5 text-white" />
+    </button>
+  ) : undefined;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Session" showBack />
+        <AppHeader title="Session" showBack rightAction={adminTopBarAction} />
         <main className="mx-auto max-w-[480px] space-y-3 px-4 py-4">
           <Skeleton className="h-48 w-full rounded-none" style={{ background: "#1E1E1E" }} />
           <Skeleton className="h-20 w-full rounded-xl" style={{ background: "#1E1E1E" }} />
@@ -85,7 +88,7 @@ export default function SessionDetail() {
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
           <p className="text-[13px] text-white/50">Session not found</p>
           <Link href="/">
-            <button className="mt-4 px-5 py-2 rounded-xl border border-white/10 text-white/60 text-[15px] font-medium">
+            <button className="mt-4 px-5 py-2 rounded-full border-[1.5px] border-white/20 text-white/60 text-[15px] font-medium">
               Back to sessions
             </button>
           </Link>
@@ -98,16 +101,15 @@ export default function SessionDetail() {
   const sessionStarted = hasSessionStarted(session.trainingDate, session.trainingTime ?? "");
   const mySignup = session.signups?.find(s => s.email.toLowerCase().trim() === userEmail);
   const signupCount = session.signups?.length ?? 0;
-
-  // Non-admins cannot edit/delete once session has started
   const userCanEdit = !!mySignup && !isClosed && !sessionStarted;
 
   return (
     <div className="min-h-screen bg-[#111111]">
-      <AppHeader title="Session" showBack />
+      {/* Admin pencil icon lives in the top bar right slot */}
+      <AppHeader title="Session" showBack rightAction={adminTopBarAction} />
 
       <main className="mx-auto max-w-[480px] pb-28">
-        {/* Hero image */}
+        {/* 1. Hero image */}
         <div className="relative h-48 overflow-hidden">
           {session.poolImageUrl ? (
             <img
@@ -125,35 +127,38 @@ export default function SessionDetail() {
           )}
           {isClosed && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[15px] px-4 py-1.5 rounded-full tracking-wide">
+              <span className="bg-white/10 border border-white/20 text-white/80 font-medium text-[15px] px-4 py-1.5 rounded-full">
                 Session closed
               </span>
             </div>
           )}
         </div>
 
-        {/* Session info card */}
+        {/* 2. Day name + location + training time */}
         <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-          {/* Day badge — fs-meta special: 13px/600/uppercase */}
-          <p className="text-[13px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+          {/* Day heading — fs-header: 17px/600, white, normal case (NOT badge/uppercase) */}
+          <p className="text-[17px] font-semibold text-white leading-tight mb-1">
             {session.day}
           </p>
-          {/* Date + time — fs-content: 14px/400 */}
-          <p className="text-[14px] text-white leading-tight mb-1">
-            {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
-          </p>
-          {/* Pool + count — fs-meta: 13px/400 */}
+          {/* Location — fs-meta: 13px/400, grey */}
           <p className="text-[13px] text-[#888888]">
             {session.pool}
             {" · "}
             {isClosed ? `Attendance: ${signupCount}` : `${signupCount} signed up`}
           </p>
+          {/* Training time — label + value */}
+          {session.trainingDate && (
+            <p className="text-[14px] text-white mt-0.5">
+              {session.trainingDate}{session.trainingTime ? `, ${session.trainingTime}` : ""}
+            </p>
+          )}
         </div>
 
-        <div className="px-4 pt-4 space-y-3">
+        <div className="px-4 pt-4">
+
           {/* Training objective */}
           {session.trainingObjective && (
-            <div className="bg-[#1E1E1E] rounded-xl px-4 py-3">
+            <div className="bg-[#1E1E1E] rounded-xl px-4 py-3 mb-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
                 Training objective
               </p>
@@ -161,66 +166,60 @@ export default function SessionDetail() {
             </div>
           )}
 
-          {/* Notes — warning banner: fs-meta 13px/400 */}
+          {/* Warning banner (notes) */}
           {session.notes && (
-            <div className="bg-[#3D3500] rounded-xl px-4 py-4">
+            <div className="bg-[#3D3500] rounded-xl px-4 py-4 mb-3">
               <p className="text-[13px] text-[#F5C518] leading-snug">{session.notes}</p>
             </div>
           )}
 
-          {/* Splits reminder */}
-          {!isClosed && (
-            <div className="bg-[#1E1E1E] rounded-xl px-4 py-4">
-              <p className="text-[13px] text-[#888888] leading-snug">
-                If splits have been sent, let the splits team know if you sign up or drop out.
-              </p>
-            </div>
-          )}
-
-          {/* ── Primary CTA — fs-primary: 15px/500 ── */}
-          {!isAuthenticated ? (
-            <Link href="/login">
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
-                Sign in to register
-              </button>
-            </Link>
-          ) : isClosed ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
-              Sign-ups closed
-            </button>
-          ) : sessionStarted && !mySignup ? (
-            <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
-              Session in progress
-            </button>
-          ) : mySignup ? (
-            <div className="w-full h-[48px] rounded-full bg-white/5 text-white/30 cursor-default text-[15px] flex items-center justify-center">
-              You're signed up
-            </div>
-          ) : (
-            <Link href={`/signup/${rowId}`}>
-              <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
-                Sign up
-              </button>
-            </Link>
-          )}
-
-          {/* Splits button — secondary: 15px/500 */}
+          {/* 3. Splits pill — self-sized, outlined chip style, left-aligned */}
           {isAuthenticated && (
-            <Link href={`/session/${rowId}/splits`}>
-              <button className="w-full h-[48px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[15px] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors">
-                <Pencil className="w-4 h-4" />
-                Splits
-              </button>
-            </Link>
+            <div className="mb-4">
+              <Link href={`/session/${rowId}/splits`}>
+                <button className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#888888] bg-transparent text-white text-[14px] px-[14px] py-[6px] hover:bg-white/5 transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                  Splits
+                </button>
+              </Link>
+            </div>
           )}
 
-          {/* Sign-ups list */}
-          {session.signups && session.signups.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2 mt-1">
-                Sign-ups
-              </p>
+          {/* 5. Sign up button — full width, primary. 16px gap below Splits. */}
+          <div className="mb-6">
+            {!isAuthenticated ? (
+              <Link href="/login">
+                <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
+                  Sign in to register
+                </button>
+              </Link>
+            ) : isClosed ? (
+              <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
+                Sign-ups closed
+              </button>
+            ) : sessionStarted && !mySignup ? (
+              <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
+                Session in progress
+              </button>
+            ) : mySignup ? (
+              <div className="w-full h-[48px] rounded-full bg-white/5 text-white/30 cursor-default text-[15px] flex items-center justify-center">
+                You're signed up
+              </div>
+            ) : (
+              <Link href={`/signup/${rowId}`}>
+                <button className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px]">
+                  Sign up
+                </button>
+              </Link>
+            )}
+          </div>
 
+          {/* 6 & 7. "Training Sign-ups" header + list — always below Sign up button */}
+          {session.signups && session.signups.length > 0 && (
+            <div className="mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">
+                Training sign-ups
+              </p>
               <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C] overflow-hidden">
                 {session.signups.map((su, idx) => {
                   const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
@@ -235,12 +234,10 @@ export default function SessionDetail() {
                         {getInitials(su.name) || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        {/* Name — fs-primary: 15px/500 */}
                         <p className="text-[15px] font-medium text-white truncate">
                           {su.name}
                           {isMe && <span className="ml-1.5 text-[11px] text-[#2196F3] font-normal">you</span>}
                         </p>
-                        {/* Activity — fs-meta: 13px/400 */}
                         <p className="text-[13px] text-[#888888]">{su.activity}</p>
                       </div>
                       {tappable && <ChevronRight className="w-4 h-4 text-white/25 shrink-0" />}
@@ -251,51 +248,10 @@ export default function SessionDetail() {
             </div>
           )}
 
-          {/* Admin controls */}
-          {isAdminUser && (
-            <div className="space-y-2 pt-1 border-t border-white/8">
-              <button
-                className="w-full h-[48px] rounded-full bg-red-500/15 border border-red-500/30 text-[15px] text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/25 transition-colors"
-                onClick={() => setEditSessionOpen(true)}
-              >
-                <Pencil className="w-4 h-4" />
-                Admin: edit session
-              </button>
-
-              {!isClosed && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      className="w-full h-[48px] rounded-full bg-red-500/15 border border-red-500/30 text-[15px] text-red-400 font-medium flex items-center justify-center hover:bg-red-500/25 transition-colors"
-                      disabled={closeSessionMutation.isPending}
-                    >
-                      Admin: close sign-ups
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Close sign-ups?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        No new sign-ups for {session.trainingDate} at {session.pool}. This cannot be undone here.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-white hover:bg-destructive/90"
-                        onClick={() => closeSessionMutation.mutate({ rowId: rowId || "" })}
-                      >
-                        Close session
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          )}
         </div>
       </main>
 
+      {/* 8. Admin edit session sheet — triggered from top bar icon */}
       {isAdminUser && session && (
         <EditSessionSheet open={editSessionOpen} onOpenChange={setEditSessionOpen} session={session} />
       )}

@@ -111,8 +111,8 @@ export default function Home() {
 
                     {/* Card body */}
                     <div className="bg-[#1E1E1E] px-4 pt-3 pb-3.5">
-                      {/* Day badge — fs-meta special: 13px/600/uppercase */}
-                      <p className="text-[13px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
+                      {/* Day badge — fs-badge: 11px/600/uppercase */}
+                      <p className="text-[11px] font-semibold uppercase text-[#2196F3] mb-0.5" style={{ letterSpacing: "0.08em" }}>
                         {session.day}
                       </p>
                       {/* Date + time — fs-content: 14px/400 */}
