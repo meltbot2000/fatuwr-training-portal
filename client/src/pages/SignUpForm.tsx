@@ -148,21 +148,21 @@ export default function SignUpForm() {
         {/* Warnings */}
         {trialExpiredWarning && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[14px] text-[#F5C518] leading-snug">
+            <p className="text-[13px] text-[#F5C518] leading-snug">
               Your trial will have expired by this date — you'll be charged the non-member rate.
             </p>
           </div>
         )}
         {debtBlocking && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[14px] text-[#F5C518] leading-snug">
+            <p className="text-[13px] text-[#F5C518] leading-snug">
               Outstanding balance of {formatFee(debt)} — please settle before signing up.
             </p>
           </div>
         )}
         {debtWarning && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-3">
-            <p className="text-[14px] text-[#F5C518] leading-snug">
+            <p className="text-[13px] text-[#F5C518] leading-snug">
               Reminder: outstanding balance of {formatFee(debt)}. Please pay soon.
             </p>
           </div>
