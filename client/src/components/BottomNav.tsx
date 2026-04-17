@@ -35,7 +35,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-[#1E1E1E] border-t border-[#2C2C2C] safe-area-inset-bottom">
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-[#1E1E1E] border-t border-[#2C2C2C] safe-area-inset-bottom" style={{ transform: "translateZ(0)" }}>
         <div className="mx-auto max-w-[480px] flex">
           {tabs.map((tab) => {
             const active = isActive(tab);
@@ -46,7 +46,7 @@ export default function BottomNav() {
                   if (tab.path === null) { setMoreOpen(true); return; }
                   navigate(tab.path);
                 }}
-                className="flex-1 flex flex-col items-center justify-center py-3 min-h-[64px] relative"
+                className="flex-1 flex flex-col items-center justify-center py-[17px] min-h-[72px] relative"
                 aria-label={tab.label}
               >
                 {active && (

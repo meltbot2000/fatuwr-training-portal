@@ -108,7 +108,7 @@ export default function SessionDetail() {
       {/* Admin pencil icon lives in the top bar right slot */}
       <AppHeader title="Session" showBack rightAction={adminTopBarAction} />
 
-      <main className="mx-auto max-w-[480px] pb-28">
+      <main className="mx-auto max-w-[480px] pb-32">
         {/* 1. Hero image */}
         <div className="relative h-48 overflow-hidden">
           {session.poolImageUrl ? (

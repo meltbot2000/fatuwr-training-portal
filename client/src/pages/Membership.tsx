@@ -237,7 +237,7 @@ export default function Membership() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen bg-background pb-32">
         <AppHeader title="Membership" />
       </div>
     );
@@ -255,7 +255,7 @@ export default function Membership() {
   const trialActive = trialEndParsed !== null && trialEndParsed >= today;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-32">
       <AppHeader title="Membership" />
 
       <main className="mx-auto max-w-[480px] px-4 py-4 space-y-4">

@@ -23,7 +23,7 @@ export default function Home() {
   const preview = announcements.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-[#111111] pb-24">
+    <div className="min-h-screen bg-[#111111] pb-32">
       {/* Top bar */}
       <header className="sticky top-0 z-50 bg-[#2196F3]">
         <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14">

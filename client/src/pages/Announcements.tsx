@@ -53,7 +53,7 @@ export default function Announcements() {
   ) : undefined;
 
   return (
-    <div className="min-h-screen bg-[#111111] pb-24">
+    <div className="min-h-screen bg-[#111111] pb-32">
       <AppHeader title="Announcements" showBack backPath="/" rightAction={addBtn} />
 
       <main className="mx-auto max-w-[480px] px-4 pt-4">

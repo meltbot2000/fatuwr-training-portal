@@ -86,7 +86,7 @@ export default function Payments() {
   });
 
   return (
-    <div className="min-h-screen bg-[#111111] pb-24">
+    <div className="min-h-screen bg-[#111111] pb-32">
       <AppHeader title="Payments" />
 
       <main className="mx-auto max-w-[480px] px-4 py-4">

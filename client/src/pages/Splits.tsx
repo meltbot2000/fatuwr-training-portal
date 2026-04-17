@@ -36,7 +36,7 @@ export default function Splits() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen bg-background pb-32">
         <AppHeader title="Splits" showBack backPath={`/session/${rowId}`} />
         <main className="mx-auto max-w-[480px] px-4 py-4 space-y-3">
           <Skeleton className="h-12 w-full" />
@@ -49,7 +49,7 @@ export default function Splits() {
 
   if (error || !session) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen bg-background pb-32">
         <AppHeader title="Splits" showBack backPath={`/session/${rowId}`} />
         <main className="mx-auto max-w-[480px] px-4 py-12 text-center">
           <AlertTriangle className="w-10 h-10 text-destructive mx-auto mb-2" />
@@ -97,7 +97,7 @@ export default function Splits() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-32">
       <AppHeader
         title={`Splits — ${session.day} ${session.trainingDate}`}
         showBack
