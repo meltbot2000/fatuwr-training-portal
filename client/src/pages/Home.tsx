@@ -63,15 +63,15 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[480px] px-4 pt-[50px] space-y-6">
+      <main className="mx-auto max-w-[480px] px-4 pt-[28px] space-y-6">
 
         {/* Quick Actions */}
         <section>
-          <div className="flex justify-center gap-5">
+          <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 flex justify-around">
             {QUICK_ACTIONS.map(({ icon: Icon, label, href }) => (
               <Link key={href} href={href}>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-14 h-14 rounded-full bg-[#1E1E1E] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-14 h-14 rounded-full bg-[#2A2A2A] flex items-center justify-center">
                     <Icon className="w-6 h-6 text-[#2196F3]" />
                   </div>
                   <span className="text-[13px] text-[#888888] text-center leading-tight max-w-[56px]">{label}</span>
