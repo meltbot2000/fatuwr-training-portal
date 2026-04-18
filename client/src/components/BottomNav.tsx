@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Home, CalendarPlus, CircleDollarSign, MoreHorizontal, ShieldCheck, CreditCard, Sparkles, BookOpen, ChevronRight } from "lucide-react";
+import { Home, CalendarPlus, CircleDollarSign, ShieldCheck, CreditCard, Sparkles, BookOpen, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Link } from "wouter";
 
@@ -23,7 +23,7 @@ export default function BottomNav() {
     { label: "Home",     Icon: Home,              path: "/",         exact: true  },
     { label: "Training", Icon: CalendarPlus,       path: "/sessions", exact: false },
     { label: "Payments", Icon: CircleDollarSign,   path: "/payments", exact: false },
-    { label: "More",     Icon: MoreHorizontal,     path: null,        exact: false },
+    { label: "More",     Icon: Sparkles,           path: null,        exact: false },
     ...(isAdmin ? [{ label: "Admin", Icon: ShieldCheck, path: "/admin", exact: false }] : []),
   ] as const;
 

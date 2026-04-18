@@ -726,6 +726,7 @@ export default function Admin() {
             <TabsTrigger value="members" className="flex-1">Members</TabsTrigger>
             <TabsTrigger value="payments" className="flex-1">Payments</TabsTrigger>
             {isAdmin && <TabsTrigger value="sessions" className="flex-1">Sessions</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="data" className="flex-1">Data</TabsTrigger>}
           </TabsList>
 
           {/* ── Members tab ─────────────────────────────────────────── */}
@@ -1012,6 +1013,83 @@ export default function Admin() {
                   </div>
                 );
               })}
+            </TabsContent>
+          )}
+
+          {/* ── Data tab (Admin only) ────────────────────────────────── */}
+          {isAdmin && (
+            <TabsContent value="data" className="space-y-4">
+              {(() => {
+                const allSess = sessions ?? [];
+                const totalRevenue = allSess.reduce((s, sess) => s + ((sess as any).revenue ?? 0), 0);
+                const totalCost    = allSess.reduce((s, sess) => s + ((sess as any).venueCost ?? 0), 0);
+                const overallPnL   = totalRevenue - totalCost;
+                const sortedSess   = [...allSess].sort((a, b) =>
+                  (new Date(b.trainingDate).getTime() || 0) - (new Date(a.trainingDate).getTime() || 0)
+                );
+
+                return (
+                  <>
+                    {/* Overall PnL summary card */}
+                    <div className="bg-[#1E1E1E] rounded-xl px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-1">Overall PnL</p>
+                      <p className={`text-[22px] font-semibold ${overallPnL >= 0 ? "text-[#4CAF50]" : "text-[#F44336]"}`}>
+                        {overallPnL >= 0 ? "+" : ""}${overallPnL.toFixed(2)}
+                      </p>
+                      <p className="text-[13px] text-[#888888] mt-1">
+                        Revenue ${totalRevenue.toFixed(2)} · Cost ${totalCost.toFixed(2)}
+                      </p>
+                    </div>
+
+                    {/* Per-session PnL table */}
+                    {sessionsLoading && (
+                      <div className="space-y-2">
+                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+                      </div>
+                    )}
+
+                    {!sessionsLoading && sortedSess.length === 0 && (
+                      <p className="text-center text-sm text-white/60 py-8">No session data yet.</p>
+                    )}
+
+                    {sortedSess.length > 0 && (
+                      <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
+                        {sortedSess.map((s) => {
+                          const revenue  = (s as any).revenue ?? 0;
+                          const cost     = (s as any).venueCost ?? 0;
+                          const pnl      = revenue - cost;
+                          const isRainOff = (s as any).rainOff && String((s as any).rainOff).trim().length > 0;
+                          const attendance = (s as any).attendance ?? 0;
+                          return (
+                            <button
+                              key={s.rowId}
+                              onClick={() => setEditingSession(s as any)}
+                              className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-white/4 active:bg-white/6 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[14px] text-white truncate">
+                                  {s.trainingDate}
+                                  {isRainOff && (
+                                    <span className="ml-2 text-[11px] font-medium text-[#F5C518] bg-[#3D3500] px-1.5 py-0.5 rounded">
+                                      Rain
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[13px] text-[#888888]">
+                                  {s.day} · {attendance} {attendance === 1 ? "attendee" : "attendees"}
+                                </p>
+                              </div>
+                              <p className={`text-[14px] font-medium shrink-0 ${pnl > 0 ? "text-[#4CAF50]" : pnl < 0 ? "text-[#F44336]" : "text-[#888888]"}`}>
+                                {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </TabsContent>
           )}
         </Tabs>

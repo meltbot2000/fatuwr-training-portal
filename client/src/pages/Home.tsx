@@ -26,17 +26,8 @@ export default function Home() {
     <div className="min-h-screen bg-[#111111] pb-32">
       {/* Top bar */}
       <header className="sticky top-0 z-50 bg-[#2196F3]">
-        <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14">
+        <div className="mx-auto max-w-[480px] flex items-center justify-center px-4 h-14">
           <span className="text-[17px] font-semibold text-white">Home</span>
-          {canManage && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="w-8 h-8 rounded-full bg-white flex items-center justify-center"
-              aria-label="Create announcement"
-            >
-              <Plus className="w-4 h-4 text-[#2196F3]" />
-            </button>
-          )}
         </div>
       </header>
 
@@ -44,8 +35,7 @@ export default function Home() {
 
         {/* Quick Actions */}
         <section>
-          <p className="text-[13px] font-medium text-[#888888] mb-3">Quick Actions</p>
-          <div className="flex justify-between">
+          <div className="flex justify-center gap-5">
             {QUICK_ACTIONS.map(({ icon: Icon, label, href }) => (
               <Link key={href} href={href}>
                 <div className="flex flex-col items-center gap-1">
@@ -62,9 +52,20 @@ export default function Home() {
         {/* Announcements */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[15px] font-medium text-white">Announcements</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] font-medium text-white">Announcements</span>
+              {canManage && (
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="w-6 h-6 rounded-full bg-[#1E1E1E] flex items-center justify-center"
+                  aria-label="Create announcement"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#2196F3]" />
+                </button>
+              )}
+            </div>
             <Link href="/announcements">
-              <span className="text-[15px] font-medium text-[#2196F3]">See all</span>
+              <span className="text-[14px] text-[#888888]">See all</span>
             </Link>
           </div>
 
@@ -99,7 +100,7 @@ export default function Home() {
   );
 }
 
-type AnnType = { id: number; title: string | null; imageUrl: string | null; position: number };
+type AnnType = { id: number; title: string | null; content?: string | null; imageUrl: string | null; position: number };
 
 function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canManage: boolean; onRefetch: () => void }) {
   const [editOpen, setEditOpen] = useState(false);

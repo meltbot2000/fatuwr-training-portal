@@ -1011,6 +1011,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         title: z.string().optional(),
+        content: z.string().optional(),
         imageUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1020,13 +1021,14 @@ export const appRouter = router({
         }
         const aDb = await db.getDb();
         if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        if (!input.title && !input.imageUrl) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Title or image URL is required" });
+        if (!input.title && !input.content && !input.imageUrl) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "At least one field is required" });
         }
         const [maxRow] = await aDb.select({ maxPos: max(announcements.position) }).from(announcements);
         const nextPos = (maxRow?.maxPos ?? 0) + 1;
         await aDb.insert(announcements).values({
           title: input.title || null,
+          content: input.content || null,
           imageUrl: input.imageUrl || null,
           position: nextPos,
           createdBy: ctx.user.email || "",
@@ -1038,6 +1040,7 @@ export const appRouter = router({
       .input(z.object({
         id: z.number(),
         title: z.string().optional(),
+        content: z.string().optional(),
         imageUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1049,6 +1052,7 @@ export const appRouter = router({
         if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         const updates: Record<string, unknown> = {};
         if (input.title !== undefined) updates.title = input.title || null;
+        if (input.content !== undefined) updates.content = input.content || null;
         if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl || null;
         if (Object.keys(updates).length === 0) return { success: true };
         await aDb.update(announcements).set(updates).where(eq(announcements.id, input.id));

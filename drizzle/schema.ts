@@ -112,7 +112,8 @@ export type SheetUser = typeof sheetUsers.$inferSelect;
 export const announcements = mysqlTable("announcements", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }),
-  imageUrl: varchar("imageUrl", { length: 500 }),
+  content: text("content"),
+  imageUrl: text("imageUrl"),   // text (not varchar) to support base64-encoded uploads
   position: int("position").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
