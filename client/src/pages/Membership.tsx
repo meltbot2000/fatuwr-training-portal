@@ -238,7 +238,7 @@ export default function Membership() {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-background pb-32">
-        <AppHeader title="Membership" />
+        <AppHeader title="Membership" showBack backPath="/" />
       </div>
     );
   }
