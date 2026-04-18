@@ -11,6 +11,7 @@ import { testEmailSending } from "../email";
 import { getLatestOtp } from "../db";
 import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus } from "../sync";
 import { seedMerchIfEmpty } from "../merchSeed";
+import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
 import { sheetSessions, sheetSignups, sheetPayments, sheetUsers } from "../../drizzle/schema";
 import { ENV } from "./env";
@@ -260,6 +261,7 @@ async function startServer() {
     // Start background Sheets → DB sync after server is up
     startBackgroundSync();
     seedMerchIfEmpty().catch(e => console.error("[Seed] merch failed:", e));
+    startDailyBackup();
   });
 }
 
