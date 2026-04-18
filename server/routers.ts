@@ -642,7 +642,13 @@ export const appRouter = router({
           actualFee: s.actualFees,
         }));
 
-      const myPayments = myPaymentsRaw.map(p => ({ amount: p.amount, date: p.date }));
+      const myPayments = myPaymentsRaw
+        .map(p => ({ amount: p.amount, date: p.date }))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Sort most-recent first
+      trainingFees.sort((a, b) => new Date(b.trainingDate).getTime() - new Date(a.trainingDate).getTime());
+      membershipFees.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       const totalTrainingFees  = trainingFees.reduce((sum, f) => sum + f.actualFee, 0);
       const totalMembershipFees = membershipFees.reduce((sum, f) => sum + f.actualFee, 0);
