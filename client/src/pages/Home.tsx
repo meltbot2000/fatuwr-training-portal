@@ -26,8 +26,13 @@ export default function Home() {
     <div className="min-h-screen bg-[#111111] pb-32">
       {/* Top bar */}
       <header className="sticky top-0 z-50 bg-[#2196F3]">
-        <div className="mx-auto max-w-[480px] flex items-center justify-center px-4 h-14">
+        <div className="mx-auto max-w-[480px] relative flex items-center justify-center px-4 h-14">
           <span className="text-[17px] font-semibold text-white">Home</span>
+          <Link href="/profile" className="absolute right-3 flex items-center hover:bg-white/10 rounded-full p-1 transition-colors">
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
+              {(user as any)?.name?.charAt(0)?.toUpperCase() || (user as any)?.email?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+          </Link>
         </div>
       </header>
 
