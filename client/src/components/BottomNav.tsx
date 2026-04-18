@@ -22,31 +22,40 @@ export default function BottomNav() {
   }
 
   return (
-    <>
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-[#1E1E1E] border-t border-[#2C2C2C] safe-area-inset-bottom" style={{ transform: "translateZ(0)" }}>
-        <div className="mx-auto max-w-[480px] flex">
-          {tabs.map((tab) => {
-            const active = isActive(tab);
-            return (
-              <button
-                key={tab.label}
-                onClick={() => navigate(tab.path)}
-                className="flex-1 flex flex-col items-center justify-start pt-[10px] min-h-[80px] relative"
-                aria-label={tab.label}
-              >
-                {active && (
-                  <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#2196F3]" />
-                )}
-                <tab.Icon
-                  className={`w-5 h-5 ${active ? "text-[#2196F3]" : "text-[#888888]"}`}
-                  strokeWidth={1.8}
-                />
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-    </>
+    <nav
+      style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backgroundColor: "#1E1E1E",
+        borderTop: "1px solid #2C2C2C",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
+    >
+      <div className="mx-auto max-w-[480px] flex">
+        {tabs.map((tab) => {
+          const active = isActive(tab);
+          return (
+            <button
+              key={tab.label}
+              onClick={() => navigate(tab.path)}
+              style={{ minHeight: 80, paddingTop: 10 }}
+              className="flex-1 flex flex-col items-center justify-start relative"
+              aria-label={tab.label}
+            >
+              {active && (
+                <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#2196F3]" />
+              )}
+              <tab.Icon
+                className={`w-5 h-5 ${active ? "text-[#2196F3]" : "text-[#888888]"}`}
+                strokeWidth={1.8}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
