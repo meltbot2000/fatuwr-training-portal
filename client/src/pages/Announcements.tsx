@@ -98,7 +98,7 @@ export default function Announcements() {
               onClick={() => { if (!reordering) navigate(`/announcements/${ann.id}`); }}
             >
               {ann.imageUrl && (
-                <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" style={{ height: 160 }} />
+                <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" style={{ height: 240 }} />
               )}
               {ann.title && (
                 <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>

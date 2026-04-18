@@ -183,7 +183,7 @@ function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canMana
           src={ann.imageUrl}
           alt={ann.title || "Announcement"}
           className="w-full object-cover"
-          style={{ height: 160 }}
+          style={{ height: 240 }}
         />
       )}
       {ann.title && (
