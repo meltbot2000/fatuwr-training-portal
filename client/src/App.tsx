@@ -17,6 +17,7 @@ import Membership from "./pages/Membership";
 import Admin from "./pages/Admin";
 import Splits from "./pages/Splits";
 import Announcements from "./pages/Announcements";
+import AnnouncementDetail from "./pages/AnnouncementDetail";
 import FunResources from "./pages/FunResources";
 import FunResourcesPolicies from "./pages/FunResourcesPolicies";
 import FunResourcesInvite from "./pages/FunResourcesInvite";
@@ -47,6 +48,7 @@ function AppShell() {
         <Route path="/admin" component={Admin} />
         <Route path="/profile" component={Profile} />
         <Route path="/announcements" component={Announcements} />
+        <Route path="/announcements/:id" component={AnnouncementDetail} />
         <Route path="/fun-resources" component={FunResources} />
         <Route path="/fun-resources/policies" component={FunResourcesPolicies} />
         <Route path="/fun-resources/invite" component={FunResourcesInvite} />

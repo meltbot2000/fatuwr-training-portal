@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CalendarPlus, CircleDollarSign, BookOpen, Sparkles, Plus } from "lucide-react";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
 
@@ -108,46 +108,32 @@ export default function Home() {
 type AnnType = { id: number; title: string | null; content?: string | null; imageUrl: string | null; position: number };
 
 function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canManage: boolean; onRefetch: () => void }) {
-  const [editOpen, setEditOpen] = useState(false);
+  const [, navigate] = useLocation();
   const deleteMutation = trpc.announcements.delete.useMutation({
     onSuccess: () => { onRefetch(); },
   });
 
-  const handleLongPress = () => {
-    if (!canManage) return;
-    if (confirm("Delete this announcement?")) {
-      deleteMutation.mutate({ id: ann.id });
-    }
-  };
-
   return (
-    <>
-      <div
-        className="bg-[#1E1E1E] rounded-2xl overflow-hidden"
-        onContextMenu={(e) => { e.preventDefault(); handleLongPress(); }}
-        onClick={() => canManage && setEditOpen(true)}
-      >
-        {ann.imageUrl && (
-          <img
-            src={ann.imageUrl}
-            alt={ann.title || "Announcement"}
-            className="w-full object-cover"
-            style={{ height: 200 }}
-          />
-        )}
-        {ann.title && (
-          <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>
-        )}
-      </div>
-
-      {canManage && (
-        <AnnouncementSheet
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          existing={ann}
-          onDone={onRefetch}
+    <div
+      className="bg-[#1E1E1E] rounded-2xl overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!canManage) return;
+        if (confirm("Delete this announcement?")) deleteMutation.mutate({ id: ann.id });
+      }}
+      onClick={() => navigate(`/announcements/${ann.id}`)}
+    >
+      {ann.imageUrl && (
+        <img
+          src={ann.imageUrl}
+          alt={ann.title || "Announcement"}
+          className="w-full object-cover"
+          style={{ height: 160 }}
         />
       )}
-    </>
+      {ann.title && (
+        <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>
+      )}
+    </div>
   );
 }

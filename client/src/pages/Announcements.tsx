@@ -5,6 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
 import { Plus, GripVertical } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 type AnnType = { id: number; title: string | null; imageUrl: string | null; position: number };
 
@@ -15,7 +16,6 @@ export default function Announcements() {
 
   const { data: all = [], refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<AnnType | null>(null);
   const [reordering, setReordering] = useState(false);
   const [order, setOrder] = useState<AnnType[]>([]);
 
@@ -45,6 +45,7 @@ export default function Announcements() {
   };
 
   const list = reordering ? order : all;
+  const [, navigate] = useLocation();
 
   const addBtn = canManage ? (
     <button onClick={() => setCreateOpen(true)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center" aria-label="Add announcement">
@@ -94,10 +95,10 @@ export default function Announcements() {
                 if (!canManage) return;
                 if (confirm("Delete this announcement?")) deleteMutation.mutate({ id: ann.id });
               }}
-              onClick={() => { if (canManage && !reordering) setEditTarget(ann); }}
+              onClick={() => { if (!reordering) navigate(`/announcements/${ann.id}`); }}
             >
               {ann.imageUrl && (
-                <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" style={{ height: 200 }} />
+                <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" style={{ height: 160 }} />
               )}
               {ann.title && (
                 <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>
@@ -113,17 +114,7 @@ export default function Announcements() {
       </main>
 
       {canManage && (
-        <>
-          <AnnouncementSheet open={createOpen} onOpenChange={setCreateOpen} onDone={refetch} />
-          {editTarget && (
-            <AnnouncementSheet
-              open={!!editTarget}
-              onOpenChange={(v) => { if (!v) setEditTarget(null); }}
-              existing={editTarget}
-              onDone={() => { setEditTarget(null); refetch(); }}
-            />
-          )}
-        </>
+        <AnnouncementSheet open={createOpen} onOpenChange={setCreateOpen} onDone={refetch} />
       )}
     </div>
   );

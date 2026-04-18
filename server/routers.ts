@@ -1035,6 +1035,16 @@ export const appRouter = router({
       return aDb.select().from(announcements).orderBy(announcements.position);
     }),
 
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const aDb = await db.getDb();
+        if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await aDb.select().from(announcements).where(eq(announcements.id, input.id)).limit(1);
+        if (!rows.length) throw new TRPCError({ code: "NOT_FOUND" });
+        return rows[0];
+      }),
+
     create: protectedProcedure
       .input(z.object({
         title: z.string().optional(),
