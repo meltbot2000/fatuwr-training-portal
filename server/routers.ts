@@ -480,7 +480,7 @@ export const appRouter = router({
         const editDb = await db.getDb();
         if (!editDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-        // Debt guard: non-admins cannot change activity if it would push their balance over $56
+        // Debt guard: non-admins cannot change activity if it would push their balance over $50
         if (!isAdmin) {
           const userEmail = (user.email || "").toLowerCase().trim();
           const userPaymentId = (user.paymentId || "").trim();
@@ -496,10 +496,10 @@ export const appRouter = router({
           );
           const oldFee = oldSignup?.actualFees ?? 0;
           const projectedDebt = currentDebt - oldFee + input.actualFee;
-          if (projectedDebt > 56) {
+          if (projectedDebt > 50) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: `This change would bring your outstanding balance to $${projectedDebt.toFixed(2)}, which exceeds the $56 limit. Please settle your balance first.`,
+              message: `This change would bring your outstanding balance to $${projectedDebt.toFixed(2)}, which exceeds the $50 limit. Please settle your balance first.`,
             });
           }
         }

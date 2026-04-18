@@ -100,7 +100,7 @@ export default function EditSignupSheet({
 
   // Debt guard: projected debt = existing debt − old fee + new fee
   const projectedDebt = currentDebt - signup.actualFees + displayFee;
-  const debtWouldBlock = !isAdmin && projectedDebt > 56;
+  const debtWouldBlock = !isAdmin && projectedDebt > 50;
 
   const isPending = editMutation.isPending || deleteMutation.isPending || refreshMutation.isPending;
 
@@ -232,7 +232,7 @@ export default function EditSignupSheet({
           {debtWouldBlock && (
             <div className="bg-[#3D3500] rounded-xl px-4 py-3">
               <p className="text-[13px] text-[#F5C518] leading-snug">
-                This change would bring your outstanding balance to {formatFee(projectedDebt)}, which exceeds the $56 limit. Please settle your balance first.
+                This change would bring your outstanding balance to {formatFee(projectedDebt)}, which exceeds the $50 limit. Please settle your balance first.
               </p>
             </div>
           )}

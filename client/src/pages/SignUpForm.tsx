@@ -38,8 +38,8 @@ export default function SignUpForm() {
 
   const debtQuery = trpc.signups.myDebt.useQuery(undefined, { enabled: !!user, retry: false });
   const debt = debtQuery.data?.debt ?? 0;
-  const debtBlocking = debt > 56;
-  const debtWarning = debt > 26 && debt <= 56;
+  const debtBlocking = debt > 50;
+  const debtWarning = debt > 26 && debt <= 50;
 
   const isFreeActivity = activity === "First Timer" || activity === "Trainer";
 
@@ -161,14 +161,14 @@ export default function SignUpForm() {
         {debtBlocking && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-4">
             <p className="text-[13px] text-[#F5C518] leading-snug">
-              Account blocked — outstanding balance of {formatFee(debt)} exceeds $56. Please settle before signing up.
+              Account blocked — outstanding balance of {formatFee(debt)} exceeds $50. Please settle before signing up.
             </p>
           </div>
         )}
         {debtWarning && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-4">
             <p className="text-[13px] text-[#F5C518] leading-snug">
-              Reminder: you have an outstanding balance of {formatFee(debt)}. You will be blocked from signing up once this exceeds $56.
+              Reminder: you have an outstanding balance of {formatFee(debt)}. You will be blocked from signing up once this exceeds $50.
             </p>
           </div>
         )}
@@ -186,6 +186,15 @@ export default function SignUpForm() {
             </div>
           ))}
         </div>
+
+        {/* Non-member savings nudge */}
+        {membershipOnDate === "Non-Member" && !isFreeActivity && (
+          <div className="bg-[#3D3500] rounded-xl px-4 py-3.5">
+            <p className="text-[13px] text-[#F5C518] leading-snug">
+              Save ${Math.max(0, calculateFee({ ...session! }, "Non-Member", activity) - calculateFee({ ...session! }, "Member", activity)).toFixed(0)} on regular training sessions by signing up for Trial or Annual Membership
+            </p>
+          </div>
+        )}
 
         {/* Activity chips */}
         <div className="bg-[#1E1E1E] rounded-xl px-4 pt-3.5 pb-3">

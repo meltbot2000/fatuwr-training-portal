@@ -1,9 +1,22 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
-import { CalendarPlus, CircleDollarSign, BookOpen, Sparkles, Plus } from "lucide-react";
+import { CalendarPlus, CircleDollarSign, BookOpen, Sparkles, Plus, Star } from "lucide-react";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
+
+function parseFlexDate(s: string): Date | null {
+  if (!s || s === "NA") return null;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  const parts = s.split("/");
+  if (parts.length === 3) {
+    const [dd, mm, yyyy] = parts;
+    const d2 = new Date(`${yyyy}-${mm}-${dd}`);
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  return null;
+}
 
 const QUICK_ACTIONS = [
   { icon: CalendarPlus,       label: "Sign Up",      href: "/sessions" },
@@ -16,6 +29,20 @@ export default function Home() {
   const { user } = useAuth();
   const clubRole = (user as any)?.clubRole || "";
   const canManage = clubRole === "Admin" || clubRole === "Helper";
+
+  const memberStatus: string = (user as any)?.memberStatus || "Non-Member";
+  const trialEndDate: string = (user as any)?.trialEndDate || "";
+  const isNonMember = !!user && memberStatus === "Non-Member";
+  const isTrial = !!user && memberStatus === "Trial";
+
+  const trialEndDisplay = useMemo(() => {
+    if (!isTrial || !trialEndDate) return null;
+    const end = parseFlexDate(trialEndDate);
+    if (!end) return null;
+    const daysLeft = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysLeft > 14) return null;
+    return end.toLocaleDateString("en-SG", { day: "numeric", month: "long", year: "numeric" });
+  }, [isTrial, trialEndDate]);
 
   const { data: announcements = [], refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
@@ -53,6 +80,34 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        {/* Non-member membership nudge */}
+        {isNonMember && (
+          <section className="space-y-2 -mt-2">
+            <div className="px-4 py-3.5 rounded-xl bg-[#1A2A3A]">
+              <p className="text-[14px] text-white leading-snug">
+                You're currently not a member — click the button below to find out how to become a Trial or Annual Member
+              </p>
+            </div>
+            <Link href="/membership">
+              <div className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] flex items-center justify-center gap-2 cursor-pointer">
+                <Star className="w-4 h-4" />
+                How to become a Member
+              </div>
+            </Link>
+          </section>
+        )}
+
+        {/* Trial expiry warning (within 14 days) */}
+        {trialEndDisplay && (
+          <div className="-mt-2 px-4 py-3.5 rounded-xl bg-[#2A2A2A]">
+            <p className="text-[14px] text-white leading-snug">
+              Your Trial Membership ends on {trialEndDisplay} — go to the{" "}
+              <Link href="/membership" className="text-[#2196F3] underline">Membership tab</Link>{" "}
+              to sign up for annual membership
+            </p>
+          </div>
+        )}
 
         {/* Announcements */}
         <section>

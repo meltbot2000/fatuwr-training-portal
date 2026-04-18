@@ -159,17 +159,17 @@ export default function Payments() {
             </div>
 
             {/* Debt banners — warning banner: fs-meta 13px/400, padding 16px */}
-            {data.debt > 56 && (
+            {data.debt > 50 && (
               <div className="bg-[#3D3500] rounded-xl px-4 py-4">
                 <p className="text-[13px] text-[#F5C518] leading-snug">
-                  Account blocked — outstanding balance of {formatFee(data.debt)} exceeds $56. Please settle before signing up for sessions.
+                  Account blocked — outstanding balance of {formatFee(data.debt)} exceeds $50. Please settle before signing up for sessions.
                 </p>
               </div>
             )}
-            {data.debt > 26 && data.debt <= 56 && (
+            {data.debt > 26 && data.debt <= 50 && (
               <div className="bg-[#3D3500] rounded-xl px-4 py-4">
                 <p className="text-[13px] text-[#F5C518] leading-snug">
-                  Reminder: outstanding balance of {formatFee(data.debt)}. You will be blocked from signing up once this exceeds $56.
+                  Reminder: outstanding balance of {formatFee(data.debt)}. You will be blocked from signing up once this exceeds $50.
                 </p>
               </div>
             )}
