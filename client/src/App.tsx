@@ -21,6 +21,7 @@ import FunResources from "./pages/FunResources";
 import FunResourcesPolicies from "./pages/FunResourcesPolicies";
 import FunResourcesInvite from "./pages/FunResourcesInvite";
 import FunResourcesMerch from "./pages/FunResourcesMerch";
+import MerchDetail from "./pages/MerchDetail";
 import FunResourcesResources from "./pages/FunResourcesResources";
 import FunResourcesVideos from "./pages/FunResourcesVideos";
 import NewToClub from "./pages/NewToClub";
@@ -50,6 +51,7 @@ function AppShell() {
         <Route path="/fun-resources/policies" component={FunResourcesPolicies} />
         <Route path="/fun-resources/invite" component={FunResourcesInvite} />
         <Route path="/fun-resources/merch" component={FunResourcesMerch} />
+        <Route path="/fun-resources/merch/:id" component={MerchDetail} />
         <Route path="/fun-resources/resources" component={FunResourcesResources} />
         <Route path="/fun-resources/videos" component={FunResourcesVideos} />
         <Route path="/newbie" component={NewToClub} />

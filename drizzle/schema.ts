@@ -121,3 +121,20 @@ export const announcements = mysqlTable("announcements", {
 });
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
+
+export const merchItems = mysqlTable("merch_items", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  memberPrice: varchar("memberPrice", { length: 255 }).default(""),
+  nonMemberPrice: varchar("nonMemberPrice", { length: 255 }).default(""),
+  photo1: mediumtext("photo1"),
+  photo2: mediumtext("photo2"),
+  availableSizes: varchar("availableSizes", { length: 512 }).default(""),
+  howToPurchase: text("howToPurchase"),
+  inventory: text("inventory"),
+  sortOrder: double("sortOrder").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MerchItem = typeof merchItems.$inferSelect;

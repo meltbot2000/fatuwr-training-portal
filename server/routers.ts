@@ -21,8 +21,8 @@ import {
 import * as appsScript from "./appsScript";
 import { syncTab } from "./sync";
 import { nanoid } from "nanoid";
-import { eq, and, sql, max } from "drizzle-orm";
-import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements } from "../drizzle/schema";
+import { eq, and, sql, max, asc } from "drizzle-orm";
+import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems } from "../drizzle/schema";
 
 
 /**
@@ -1113,6 +1113,92 @@ export const appRouter = router({
             aDb.update(announcements).set({ position: index + 1 }).where(eq(announcements.id, id))
           )
         );
+        return { success: true };
+      }),
+  }),
+
+  merch: router({
+    list: protectedProcedure.query(async () => {
+      const mDb = await db.getDb();
+      if (!mDb) return [];
+      return mDb.select().from(merchItems).orderBy(asc(merchItems.sortOrder), asc(merchItems.id));
+    }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const mDb = await db.getDb();
+        if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await mDb.select().from(merchItems).where(eq(merchItems.id, input.id)).limit(1);
+        if (!rows.length) throw new TRPCError({ code: "NOT_FOUND" });
+        return rows[0];
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        memberPrice: z.string().optional(),
+        nonMemberPrice: z.string().optional(),
+        photo1: z.string().optional(),
+        photo2: z.string().optional(),
+        availableSizes: z.string().optional(),
+        howToPurchase: z.string().optional(),
+        inventory: z.string().optional(),
+        sortOrder: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
+        const mDb = await db.getDb();
+        if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const result = await mDb.insert(merchItems).values({
+          name: input.name,
+          description: input.description ?? null,
+          memberPrice: input.memberPrice ?? "",
+          nonMemberPrice: input.nonMemberPrice ?? "",
+          photo1: input.photo1 ?? null,
+          photo2: input.photo2 ?? null,
+          availableSizes: input.availableSizes ?? "",
+          howToPurchase: input.howToPurchase ?? null,
+          inventory: input.inventory ?? null,
+          sortOrder: input.sortOrder ?? 0,
+        });
+        return { success: true, id: Number((result as any).insertId ?? 0) };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        memberPrice: z.string().optional(),
+        nonMemberPrice: z.string().optional(),
+        photo1: z.string().optional(),
+        photo2: z.string().optional(),
+        availableSizes: z.string().optional(),
+        howToPurchase: z.string().optional(),
+        inventory: z.string().optional(),
+        sortOrder: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
+        const mDb = await db.getDb();
+        if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...fields } = input;
+        await mDb.update(merchItems).set(fields).where(eq(merchItems.id, id));
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const role = ctx.user.clubRole;
+        if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
+        const mDb = await db.getDb();
+        if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await mDb.delete(merchItems).where(eq(merchItems.id, input.id));
         return { success: true };
       }),
   }),
