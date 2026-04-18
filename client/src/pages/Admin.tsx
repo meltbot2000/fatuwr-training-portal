@@ -32,6 +32,50 @@ function getDayFromDate(dateStr: string): string {
   return DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1];
 }
 
+/**
+ * A session is considered "past" (completed) if:
+ *   - it is explicitly closed (isClosed is non-empty), OR
+ *   - the session date + training start time is more than 1 hour ago
+ *
+ * trainingTime examples: "7:30 PM – 9:30 PM", "19:30 - 21:30"
+ * We parse the first time component to determine the start hour.
+ */
+function isPastSession(sess: { trainingDate: string; trainingTime?: string | null; isClosed?: string | null }): boolean {
+  // Closed flag takes priority
+  if (sess.isClosed && String(sess.isClosed).trim().length > 0) return true;
+
+  // Parse training date
+  const datePart = sess.trainingDate?.trim() || "";
+  if (!datePart) return false;
+
+  // Parse start time from trainingTime string (e.g. "7:30 PM – 9:30 PM" or "19:30 - 21:30")
+  let startHour = 0;
+  let startMin = 0;
+  if (sess.trainingTime) {
+    const t = sess.trainingTime.trim();
+    // Take the first token before "–" or "-"
+    const startStr = t.split(/[–\-]/)[0].trim(); // e.g. "7:30 PM" or "19:30"
+    const match = startStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const ampm = (match[3] || "").toLowerCase();
+      if (ampm === "pm" && h < 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+      startHour = h;
+      startMin = m;
+    }
+  }
+
+  // Build session start datetime
+  const sessionStart = new Date(datePart);
+  if (isNaN(sessionStart.getTime())) return false;
+  sessionStart.setHours(startHour, startMin, 0, 0);
+
+  // Past = session start + 1 hour is before now
+  return Date.now() > sessionStart.getTime() + 60 * 60 * 1000;
+}
+
 function formatFee(n: number) {
   return `$${n.toFixed(2)}`;
 }
@@ -1060,11 +1104,17 @@ export default function Admin() {
                 </Button>
               </div>
               {(() => {
-                const allSess = sessions ?? [];
-                const totalRevenue = allSess.reduce((s, sess) => s + ((sess as any).revenue ?? 0), 0);
-                const totalCost    = allSess.reduce((s, sess) => s + ((sess as any).venueCost ?? 0), 0);
+                // Only include completed (past) sessions in all Data tab calculations
+                const pastSess = (sessions ?? []).filter(s => isPastSession({
+                  trainingDate: s.trainingDate,
+                  trainingTime: s.trainingTime,
+                  isClosed: s.isClosed,
+                }));
+                const totalRevenue = pastSess.reduce((s, sess) => s + ((sess as any).revenue ?? 0), 0);
+                const totalCost    = pastSess.reduce((s, sess) => s + ((sess as any).venueCost ?? 0), 0);
                 const overallPnL   = totalRevenue - totalCost;
-                const sortedSess   = [...allSess].sort((a, b) =>
+                // Latest session first
+                const sortedSess   = [...pastSess].sort((a, b) =>
                   (new Date(b.trainingDate).getTime() || 0) - (new Date(a.trainingDate).getTime() || 0)
                 );
 

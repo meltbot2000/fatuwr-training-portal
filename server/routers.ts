@@ -19,7 +19,7 @@ import {
   clearSessionsCache,
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
-import { syncTab } from "./sync";
+import { syncTab, forceSyncTab } from "./sync";
 import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems } from "../drizzle/schema";
@@ -897,13 +897,13 @@ export const appRouter = router({
         }
         if (input.tab === "all") {
           await Promise.all([
-            syncTab("sessions"),
-            syncTab("payments"),
-            syncTab("signups"),
-            syncTab("users"),
+            forceSyncTab("sessions"),
+            forceSyncTab("payments"),
+            forceSyncTab("signups"),
+            forceSyncTab("users"),
           ]);
         } else {
-          await syncTab(input.tab);
+          await forceSyncTab(input.tab as any);
         }
         return { ok: true, tab: input.tab, syncedAt: new Date().toISOString() };
       }),
