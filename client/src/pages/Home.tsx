@@ -31,7 +31,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[480px] px-4 pt-5 space-y-6">
+      <main className="mx-auto max-w-[480px] px-4 pt-[50px] space-y-6">
 
         {/* Quick Actions */}
         <section>
