@@ -888,6 +888,26 @@ export const appRouter = router({
       });
     }),
 
+    forceSync: protectedProcedure
+      .input(z.object({ tab: z.enum(["sessions", "payments", "signups", "users", "all"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const { clubRole } = ctx.user;
+        if (clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        if (input.tab === "all") {
+          await Promise.all([
+            syncTab("sessions"),
+            syncTab("payments"),
+            syncTab("signups"),
+            syncTab("users"),
+          ]);
+        } else {
+          await syncTab(input.tab);
+        }
+        return { ok: true, tab: input.tab, syncedAt: new Date().toISOString() };
+      }),
+
     addSession: protectedProcedure
       .input(z.object({
         trainingDate: z.string(),

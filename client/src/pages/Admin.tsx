@@ -629,6 +629,14 @@ export default function Admin() {
     onError: (err) => toast.error(err.message || "Failed to close session."),
   });
 
+  const forceSyncMutation = trpc.admin.forceSync.useMutation({
+    onSuccess: async (data) => {
+      toast.success(`Synced ${data.tab} from Sheets.`);
+      await utils.admin.allSessions.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Sync failed."),
+  });
+
   const statusCounts = useMemo(() => {
     if (!users) return {} as Record<string, number>;
     const counts: Record<string, number> = { All: users.length };
@@ -874,13 +882,29 @@ export default function Admin() {
           {/* ── Sessions tab (Admin only) ────────────────────────────── */}
           {isAdmin && (
             <TabsContent value="sessions" className="space-y-3">
-              <Button
-                onClick={() => setAddSessionOpen(true)}
-                className="w-full bg-navy text-white hover:bg-navy/90 h-10"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add session
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setAddSessionOpen(true)}
+                  className="flex-1 bg-navy text-white hover:bg-navy/90 h-10"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add session
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3"
+                  disabled={forceSyncMutation.isPending}
+                  onClick={() => forceSyncMutation.mutate({ tab: "sessions" })}
+                  title="Re-sync sessions from Google Sheets"
+                >
+                  {forceSyncMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
 
               <Input
                 placeholder="Search by date, pool, or day…"
@@ -1019,6 +1043,22 @@ export default function Admin() {
           {/* ── Data tab (Admin only) ────────────────────────────────── */}
           {isAdmin && (
             <TabsContent value="data" className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  disabled={forceSyncMutation.isPending}
+                  onClick={() => forceSyncMutation.mutate({ tab: "all" })}
+                >
+                  {forceSyncMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  Sync from Sheets
+                </Button>
+              </div>
               {(() => {
                 const allSess = sessions ?? [];
                 const totalRevenue = allSess.reduce((s, sess) => s + ((sess as any).revenue ?? 0), 0);
