@@ -32,7 +32,7 @@ export type SyncTab = "sessions" | "payments" | "signups" | "users";
  * Syncing from Sheets would overwrite those writes, so we skip it.
  * Add a tab here after migrating its write path away from GAS.
  */
-export const DB_PRIMARY_TABS = new Set<SyncTab>(["signups"]);
+export const DB_PRIMARY_TABS = new Set<SyncTab>(["signups", "sessions"]);
 
 const syncStatus: Record<SyncTab, { lastSync: number; error: string | null }> = {
   sessions: { lastSync: 0, error: null },
