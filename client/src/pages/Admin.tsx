@@ -1087,21 +1087,48 @@ export default function Admin() {
           {/* ── Data tab (Admin only) ────────────────────────────────── */}
           {isAdmin && (
             <TabsContent value="data" className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  disabled={forceSyncMutation.isPending}
-                  onClick={() => forceSyncMutation.mutate({ tab: "all" })}
-                >
-                  {forceSyncMutation.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  )}
-                  Sync from Sheets
-                </Button>
+
+              {/* Import from Sheets — migration / re-seed tool */}
+              <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3">
+                <div>
+                  <p className="text-[13px] font-semibold text-white">Import from Google Sheets</p>
+                  <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
+                    Seeds the database from the live Sheet. Run this once when migrating, or to restore data after a reset. Safe to run at any time — existing DB records are replaced with Sheet data.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["sessions", "signups", "users"] as const).map((tab) => (
+                    <Button
+                      key={tab}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 text-xs gap-1.5 capitalize"
+                      disabled={forceSyncMutation.isPending}
+                      onClick={() => forceSyncMutation.mutate({ tab })}
+                    >
+                      {forceSyncMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      {tab}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 text-xs gap-1.5 col-span-2 border-[#2196F3]/40 text-[#2196F3]"
+                    disabled={forceSyncMutation.isPending}
+                    onClick={() => forceSyncMutation.mutate({ tab: "all" })}
+                  >
+                    {forceSyncMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    Import all tabs
+                  </Button>
+                </div>
               </div>
               {(() => {
                 // Only include completed (past) sessions in all Data tab calculations
