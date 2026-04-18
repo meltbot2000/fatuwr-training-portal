@@ -21,8 +21,8 @@ function parseFlexDate(s: string): Date | null {
 const QUICK_ACTIONS = [
   { icon: CalendarPlus,       label: "Sign Up",      href: "/sessions" },
   { icon: CircleDollarSign,   label: "Payments",     href: "/payments" },
-  { icon: BookOpen,           label: "New to Club?", href: "/newbie" },
-  { icon: Sparkles,           label: "Fun Stuff",    href: "/fun-resources" },
+  { icon: BookOpen,           label: "Newbie",       href: "/newbie" },
+  { icon: Sparkles,           label: "More",         href: "/fun-resources" },
 ];
 
 export default function Home() {

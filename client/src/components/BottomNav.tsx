@@ -31,7 +31,7 @@ export default function BottomNav() {
               <button
                 key={tab.label}
                 onClick={() => navigate(tab.path)}
-                className="flex-1 flex flex-col items-center justify-start pt-[9px] min-h-[72px] relative"
+                className="flex-1 flex flex-col items-center justify-start pt-[10px] min-h-[80px] relative"
                 aria-label={tab.label}
               >
                 {active && (
