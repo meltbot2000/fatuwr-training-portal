@@ -144,8 +144,8 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-navy">{heading ?? "Annual Membership"}</p>
-        <span className="text-sm font-semibold text-navy tabular-nums">${fee} <span className="text-xs font-normal text-muted-foreground">joining {month}</span></span>
+        <p className="text-sm font-medium text-blue-300">{heading ?? "Annual Membership"}</p>
+        <span className="text-sm font-semibold text-blue-300 tabular-nums">${fee} <span className="text-xs font-normal text-muted-foreground">joining {month}</span></span>
       </div>
 
       <AlertDialog>
@@ -345,7 +345,7 @@ export default function Membership() {
               <Card className="border-gold/40 bg-gold/5">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-0.5">
-                    <p className="font-semibold text-navy">3-Month Trial — $10</p>
+                    <p className="font-semibold text-blue-300">3-Month Trial — $10</p>
                     <Badge className="bg-gold text-navy hover:bg-gold shrink-0">Trial</Badge>
                   </div>
                   <p className="text-sm text-foreground/70 mb-3">

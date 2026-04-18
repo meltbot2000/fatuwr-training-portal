@@ -1,4 +1,4 @@
-import { double, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { double, int, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -113,7 +113,7 @@ export const announcements = mysqlTable("announcements", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }),
   content: text("content"),
-  imageUrl: text("imageUrl"),   // text (not varchar) to support base64-encoded uploads
+  imageUrl: mediumtext("imageUrl"),   // mediumtext supports up to 16 MB for base64-encoded uploads
   position: int("position").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

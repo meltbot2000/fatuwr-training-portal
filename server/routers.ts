@@ -479,6 +479,31 @@ export const appRouter = router({
         const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const editDb = await db.getDb();
         if (!editDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Debt guard: non-admins cannot change activity if it would push their balance over $56
+        if (!isAdmin) {
+          const userEmail = (user.email || "").toLowerCase().trim();
+          const userPaymentId = (user.paymentId || "").trim();
+          const allPayments = await getPayments();
+          const { myPayments: myPmts, myPaymentRefs } = await getMyPayments(userEmail, allPayments, userPaymentId);
+          const mySignups = await getAllSignupsByEmail(userEmail, myPaymentRefs);
+          const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
+          const totalPaid = myPmts.reduce((sum, p) => sum + p.amount, 0);
+          const currentDebt = Math.max(0, totalFees - totalPaid);
+          // Find the old fee for this specific signup to compute the delta
+          const oldSignup = mySignups.find(
+            s => s.dateOfTraining === input.sessionDate && s.pool === input.sessionPool
+          );
+          const oldFee = oldSignup?.actualFees ?? 0;
+          const projectedDebt = currentDebt - oldFee + input.actualFee;
+          if (projectedDebt > 56) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `This change would bring your outstanding balance to $${projectedDebt.toFixed(2)}, which exceeds the $56 limit. Please settle your balance first.`,
+            });
+          }
+        }
+
         const fields: Record<string, any> = {
           activity: input.activity,
           baseFee: input.baseFee,
@@ -598,8 +623,10 @@ export const appRouter = router({
       const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
 
       // Separate training sign-ups from membership fee entries
+      const MEMBERSHIP_ACTIVITIES = ["Membership Fee", "Trial Membership"];
+
       const trainingFees = mySignups
-        .filter(s => s.activity !== "Membership Fee")
+        .filter(s => !MEMBERSHIP_ACTIVITIES.includes(s.activity))
         .map(s => ({
           trainingDate: s.dateOfTraining,
           pool: s.pool,
@@ -608,7 +635,7 @@ export const appRouter = router({
         }));
 
       const membershipFees = mySignups
-        .filter(s => s.activity === "Membership Fee")
+        .filter(s => MEMBERSHIP_ACTIVITIES.includes(s.activity))
         .map(s => ({
           date: s.dateTimeOfSignUp,  // date they signed up / paid
           activity: s.activity,

@@ -18,6 +18,11 @@ import Admin from "./pages/Admin";
 import Splits from "./pages/Splits";
 import Announcements from "./pages/Announcements";
 import FunResources from "./pages/FunResources";
+import FunResourcesPolicies from "./pages/FunResourcesPolicies";
+import FunResourcesInvite from "./pages/FunResourcesInvite";
+import FunResourcesMerch from "./pages/FunResourcesMerch";
+import FunResourcesResources from "./pages/FunResourcesResources";
+import FunResourcesVideos from "./pages/FunResourcesVideos";
 import NewToClub from "./pages/NewToClub";
 
 const NO_NAV_PATHS = ["/login"];
@@ -42,6 +47,11 @@ function AppShell() {
         <Route path="/profile" component={Profile} />
         <Route path="/announcements" component={Announcements} />
         <Route path="/fun-resources" component={FunResources} />
+        <Route path="/fun-resources/policies" component={FunResourcesPolicies} />
+        <Route path="/fun-resources/invite" component={FunResourcesInvite} />
+        <Route path="/fun-resources/merch" component={FunResourcesMerch} />
+        <Route path="/fun-resources/resources" component={FunResourcesResources} />
+        <Route path="/fun-resources/videos" component={FunResourcesVideos} />
         <Route path="/newbie" component={NewToClub} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { calculateFee, type FeeSession } from "@/lib/feeUtils";
 import {
   Sheet,
@@ -60,6 +61,10 @@ export default function EditSignupSheet({
 }: Props) {
   const { user } = useAuth();
   const isAdmin = (user as any)?.clubRole === "Admin";
+  const [, navigate] = useLocation();
+
+  const debtQuery = trpc.signups.myDebt.useQuery(undefined, { enabled: !isAdmin });
+  const currentDebt = debtQuery.data?.debt ?? 0;
 
   const [activity, setActivity] = useState<Activity>(
     (ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity
@@ -77,6 +82,7 @@ export default function EditSignupSheet({
     await utils.sessions.detail.invalidate({ rowId: sessionRowId });
     onOpenChange(false);
     onDone();
+    if (!isAdmin) navigate("/sessions");
   };
 
   const editMutation = trpc.signups.edit.useMutation({
@@ -91,6 +97,11 @@ export default function EditSignupSheet({
 
   const calculatedFee = calculateFee(session, memberStatus, activity);
   const displayFee = isAdmin ? (parseFloat(actualFee) || 0) : calculatedFee;
+
+  // Debt guard: projected debt = existing debt − old fee + new fee
+  const projectedDebt = currentDebt - signup.actualFees + displayFee;
+  const debtWouldBlock = !isAdmin && projectedDebt > 56;
+
   const isPending = editMutation.isPending || deleteMutation.isPending || refreshMutation.isPending;
 
   const handleSave = () => {
@@ -217,11 +228,20 @@ export default function EditSignupSheet({
             <span className="text-[14px] text-white">{formatFee(displayFee)}</span>
           </div>
 
+          {/* Debt block warning */}
+          {debtWouldBlock && (
+            <div className="bg-[#3D3500] rounded-xl px-4 py-3">
+              <p className="text-[13px] text-[#F5C518] leading-snug">
+                This change would bring your outstanding balance to {formatFee(projectedDebt)}, which exceeds the $56 limit. Please settle your balance first.
+              </p>
+            </div>
+          )}
+
           {/* ── Actions — fs-primary: 15px/500 ── */}
           <div className="space-y-2">
             <button
               onClick={handleSave}
-              disabled={isPending}
+              disabled={isPending || debtWouldBlock}
               className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}

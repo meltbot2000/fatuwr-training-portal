@@ -1,0 +1,1 @@
+ALTER TABLE `announcements` MODIFY COLUMN `imageUrl` mediumtext;

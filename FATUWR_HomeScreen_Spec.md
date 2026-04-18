@@ -22,7 +22,7 @@
 - Visible to: Admin and Helper roles (`clubRole === "Admin" || clubRole === "Helper"`)
 
 ### 2. Quick Shortcuts Row
-- Label: **"Quick Actions"** — `--text-sm`, bold, `--color-text-secondary`, left-aligned, 16px padding
+- Label: **"Quick Actions"** — `--fs-meta (13px/500)`, `--color-text-secondary`, left-aligned, 16px padding
 - Horizontal row of 4 circular shortcuts, equal spacing
 
 | Shortcut | Icon (lucide) | Label | Destination |
@@ -34,20 +34,21 @@
 
 **Shortcut circle spec:**
 - Size: 56px diameter
-- Background: `--color-bg-card` (#1E1E1E)
+- Background: `--color-bg-card`
 - Icon: 24px, `--color-primary`
-- Label: `--text-xs`, `--color-text-secondary`, centred below, `--space-1` gap
+- Label: `--fs-meta (13px/400)`, `--color-text-secondary`, centred below, 4px gap
 
 ### 3. Announcements Feed
-- Section header: **"Announcements"** bold white left + **"See all"** `--color-primary` right
+- Section header: **"Announcements"** — `--fs-primary (15px/500)`, `--color-text-primary`, left-aligned
+- **"See all"** — `--fs-primary (15px/500)`, `--color-primary`, right-aligned
 - "See all" navigates to /announcements (full list)
 - Show the **5 most recent announcements** ordered by `position` (admin-controlled order)
 - Card style:
   - Background: `--color-bg-card`, `--radius-lg`
   - Image: full-width, ~200px height, rounded top corners
-  - Title text below image: `--text-base`, bold, white, 12px padding
+  - Title text below image: `--fs-primary (15px/500)`, `--color-text-primary`, 12px padding
   - Title is optional — image-only cards are valid (no empty space if no title)
-  - Gap between cards: `--space-3`
+  - Gap between cards: 12px
 
 ---
 
@@ -70,7 +71,7 @@ Tapping More opens a dark bottom sheet (same modal style as sign-up sheet) with 
 - Fun Resources — `Sparkles` icon
 - New to the Club? — `BookOpen` icon
 
-Each row: icon (left, `--color-primary`) + label (white) + chevron (right, gray). Thin dividers between rows.
+Each row: icon left (`--color-primary`, 20px) + label (`--fs-body (16px/400)`, `--color-text-primary`) + chevron right (`--color-text-secondary`). 1px `--color-divider` between rows.
 
 ---
 
@@ -194,8 +195,9 @@ Remove the existing Announcements (megaphone) tab entirely.
   - Fun Resources (Sparkles icon)   → /fun-resources
   - New to the Club? (BookOpen icon) → /newbie
 
-Row style: left icon in --color-primary + white label + right gray chevron.
-Thin --color-divider between rows. Close on backdrop tap or swipe down.
+Row style: left icon (--color-primary, 20px) + label (--fs-body 16px/400, --color-text-primary)
++ right chevron (--color-text-secondary).
+1px --color-divider between rows. Close on backdrop tap or swipe down.
 
 ─── PART 3: HOME SCREEN ─────────────────────────────────────────
 
@@ -203,26 +205,28 @@ Create client/src/pages/Home.tsx.
 
 Layout (scrollable):
 
-1. Blue header (#2196F3)
-   - Title "Home" large bold white left-aligned, no hamburger icon
-   - Circular + button top-right (white bg, blue +)
+1. Top bar (--color-primary background, 56px height)
+   - Title "Home": --fs-header (17px/600), --color-text-primary, left-aligned
+   - No hamburger icon
+   - Circular + button top-right (white bg, --color-primary +, 32px diameter)
    - Only render + if user.clubRole === "Admin" || user.clubRole === "Helper"
    - Tapping + opens the Create Announcement bottom sheet
 
-2. Quick Actions row
-   - "Quick Actions" label in gray small bold, 16px padding
-   - 4 x 56px circles equally spaced, bg #1E1E1E, icons in #2196F3
-   - CalendarPlus  → training sessions list
-   - CircleDollarSign → payments
-   - BookOpen      → /newbie
-   - Sparkles      → /fun-resources
-   - Small gray label below each circle
+2. Quick Actions row (16px horizontal padding)
+   - "Quick Actions" label: --fs-meta (13px/500), --color-text-secondary
+   - 4 x 56px circles equally spaced, --color-bg-card background, --color-primary icons
+   - CalendarPlus  → training sessions list    label "Sign Up"
+   - CircleDollarSign → payments               label "Payments"
+   - BookOpen      → /newbie                   label "New to Club?"
+   - Sparkles      → /fun-resources            label "Fun Stuff"
+   - Label below each circle: --fs-meta (13px/400), --color-text-secondary, 4px gap
 
-3. Announcements section
-   - "Announcements" bold white left + "See all" blue right → /announcements
+3. Announcements section (16px horizontal padding)
+   - Row: "Announcements" --fs-primary (15px/500) --color-text-primary left
+          "See all" --fs-primary (15px/500) --color-primary right → /announcements
    - Fetch via announcements.list, show first 5 (already ordered by position)
-   - Card: #1E1E1E bg, 16px border radius, full-width image ~200px tall,
-     optional title below image in bold white
+   - Card: --color-bg-card, --radius-lg, full-width image ~200px tall (rounded top corners),
+     optional title below image: --fs-primary (15px/500), --color-text-primary, 12px padding
    - 12px gap between cards
 
 ─── PART 4: ANNOUNCEMENT MANAGEMENT UI ──────────────────────────
@@ -258,10 +262,10 @@ client/src/pages/NewToClub.tsx — blue header "New to the Club?", dark bg,
 
 ─── STYLE ───────────────────────────────────────────────────────
 
-All styling follows FATUWR_DesignSystem.md:
-  bg #111111, card bg #1E1E1E, primary #2196F3
-  white text, gray #888 secondary, 16px border radius cards
-  16px horizontal page padding
+All styling follows FATUWR_DesignSystem.md without exception.
+Use design system tokens (--color-bg-base, --color-bg-card, --color-primary,
+--color-text-primary, --color-text-secondary, --radius-lg, etc.) — no hardcoded
+hex values or px sizes in components. Typography must use the 6 token sizes only.
 
 ─── DONE ────────────────────────────────────────────────────────
 

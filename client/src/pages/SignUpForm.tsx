@@ -38,8 +38,8 @@ export default function SignUpForm() {
 
   const debtQuery = trpc.signups.myDebt.useQuery(undefined, { enabled: !!user, retry: false });
   const debt = debtQuery.data?.debt ?? 0;
-  const debtBlocking = debt >= 54;
-  const debtWarning = debt >= 26 && debt < 54;
+  const debtBlocking = debt > 56;
+  const debtWarning = debt > 26 && debt <= 56;
 
   const isFreeActivity = activity === "First Timer" || activity === "Trainer";
 
@@ -50,10 +50,10 @@ export default function SignUpForm() {
 
   useEffect(() => {
     if (submitted) {
-      const t = setTimeout(() => navigate(`/session/${rowId}`), 1800);
+      const t = setTimeout(() => navigate("/sessions"), 1800);
       return () => clearTimeout(t);
     }
-  }, [submitted, rowId, navigate]);
+  }, [submitted, navigate]);
 
   const submitMutation = trpc.signups.submit.useMutation({
     onSuccess: (data) => { setSubmitted(true); toast.success(data.message); },
@@ -161,14 +161,14 @@ export default function SignUpForm() {
         {debtBlocking && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-4">
             <p className="text-[13px] text-[#F5C518] leading-snug">
-              Outstanding balance of {formatFee(debt)} — please settle before signing up.
+              Account blocked — outstanding balance of {formatFee(debt)} exceeds $56. Please settle before signing up.
             </p>
           </div>
         )}
         {debtWarning && (
           <div className="bg-[#3D3500] rounded-xl px-4 py-4">
             <p className="text-[13px] text-[#F5C518] leading-snug">
-              Reminder: outstanding balance of {formatFee(debt)}. Please pay soon.
+              Reminder: you have an outstanding balance of {formatFee(debt)}. You will be blocked from signing up once this exceeds $56.
             </p>
           </div>
         )}

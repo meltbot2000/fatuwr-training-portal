@@ -64,6 +64,13 @@
       "when": 1776474567387,
       "tag": "0008_quick_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1776484178339,
+      "tag": "0009_dear_ghost_rider",
+      "breakpoints": true
     }
   ]
 }
