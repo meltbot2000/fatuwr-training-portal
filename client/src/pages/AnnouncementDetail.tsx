@@ -52,7 +52,7 @@ export default function AnnouncementDetail() {
         {/* Full-width image */}
         {ann.imageUrl && (
           <div className="rounded-2xl overflow-hidden">
-            <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" />
+            <img src={ann.imageUrl} alt={ann.title || "Announcement"} className="w-full object-cover" style={{ height: 192 }} />
           </div>
         )}
 
