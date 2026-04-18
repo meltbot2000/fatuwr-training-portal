@@ -1087,49 +1087,6 @@ export default function Admin() {
           {/* ── Data tab (Admin only) ────────────────────────────────── */}
           {isAdmin && (
             <TabsContent value="data" className="space-y-4">
-
-              {/* Import from Sheets — migration / re-seed tool */}
-              <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3">
-                <div>
-                  <p className="text-[13px] font-semibold text-white">Import from Google Sheets</p>
-                  <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
-                    Seeds the database from the live Sheet. Run this once when migrating, or to restore data after a reset. Safe to run at any time — existing DB records are replaced with Sheet data.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["sessions", "signups", "users"] as const).map((tab) => (
-                    <Button
-                      key={tab}
-                      variant="outline"
-                      size="sm"
-                      className="h-9 text-xs gap-1.5 capitalize"
-                      disabled={forceSyncMutation.isPending}
-                      onClick={() => forceSyncMutation.mutate({ tab })}
-                    >
-                      {forceSyncMutation.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      )}
-                      {tab}
-                    </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 text-xs gap-1.5 col-span-2 border-[#2196F3]/40 text-[#2196F3]"
-                    disabled={forceSyncMutation.isPending}
-                    onClick={() => forceSyncMutation.mutate({ tab: "all" })}
-                  >
-                    {forceSyncMutation.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    )}
-                    Import all tabs
-                  </Button>
-                </div>
-              </div>
               {(() => {
                 // Only include completed (past) sessions in all Data tab calculations
                 const pastSess = (sessions ?? []).filter(s => isPastSession({
@@ -1207,6 +1164,92 @@ export default function Admin() {
                   </>
                 );
               })()}
+
+              {/* Import from Sheets — at the bottom, destructive action */}
+              <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3 mt-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-[#F5C518] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[13px] font-semibold text-white">Import from Google Sheets</p>
+                    <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
+                      Replaces all existing DB records for the selected tab with live data from the Sheet. Use for initial migration or to reset a table. This cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["sessions", "signups", "users"] as const).map((tab) => (
+                    <AlertDialog key={tab}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 text-xs gap-1.5 capitalize border-white/10 text-white/70"
+                          disabled={forceSyncMutation.isPending}
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Import {tab}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Import {tab} from Sheets?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will <strong>delete all current {tab} records</strong> in the database and replace them with data pulled live from Google Sheets. Any changes made in the app since the last import will be lost.
+                            <br /><br />
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                            onClick={() => forceSyncMutation.mutate({ tab })}
+                          >
+                            Yes, import {tab}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ))}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs gap-1.5 col-span-2 border-[#F44336]/40 text-[#F44336]"
+                        disabled={forceSyncMutation.isPending}
+                      >
+                        {forceSyncMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Import all tabs
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Import all tabs from Sheets?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will <strong>delete and replace all records</strong> for sessions, signups, users, and payments in the database with live data pulled from Google Sheets.
+                          <br /><br />
+                          Any changes made in the app since the last import will be lost. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-white hover:bg-destructive/90"
+                          onClick={() => forceSyncMutation.mutate({ tab: "all" })}
+                        >
+                          Yes, import everything
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+
             </TabsContent>
           )}
         </Tabs>
