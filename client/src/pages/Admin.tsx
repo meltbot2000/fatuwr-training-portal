@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRight, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
@@ -649,6 +649,8 @@ export default function Admin() {
   const [sessionStatusFilter, setSessionStatusFilter] = useState("All");
   const [editingUser, setEditingUser] = useState<{ name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; membershipStartDate: string; trialStartDate: string; trialEndDate: string; dob: string } | null>(null);
   const [editingSession, setEditingSession] = useState<SessionForEdit | null>(null);
+  const [viewingSessionRowId, setViewingSessionRowId] = useState<string | null>(null);
+  const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
   const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
@@ -680,6 +682,33 @@ export default function Admin() {
     },
     onError: (err) => toast.error(err.message || "Sync failed."),
   });
+
+  const { data: attendees, isLoading: attendeesLoading } = trpc.admin.sessionAttendees.useQuery(
+    { rowId: viewingSessionRowId ?? "" },
+    { enabled: !!viewingSessionRowId }
+  );
+
+  const editSignupMutation = trpc.admin.editSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Sign-up updated.");
+      setEditingAttendeeId(null);
+      await utils.admin.sessionAttendees.invalidate({ rowId: viewingSessionRowId ?? "" });
+      await utils.admin.allSessions.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to update sign-up."),
+  });
+
+  const deleteSignupMutation = trpc.admin.deleteSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Sign-up deleted.");
+      setEditingAttendeeId(null);
+      await utils.admin.sessionAttendees.invalidate({ rowId: viewingSessionRowId ?? "" });
+      await utils.admin.allSessions.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete sign-up."),
+  });
+
+  const editingAttendee = editingAttendeeId != null ? attendees?.find(a => a.id === editingAttendeeId) : null;
 
   const statusCounts = useMemo(() => {
     if (!users) return {} as Record<string, number>;
@@ -1022,7 +1051,11 @@ export default function Admin() {
               {filteredSessions && filteredSessions.map((s) => {
                 const isClosed = s.isClosed && s.isClosed.trim().length > 0;
                 return (
-                  <div key={s.rowId} className="rounded-lg border bg-card px-4 py-3">
+                  <div
+                    key={s.rowId}
+                    className="rounded-lg border bg-card px-4 py-3 cursor-pointer hover:bg-white/5 active:bg-white/8 transition-colors"
+                    onClick={() => setViewingSessionRowId(s.rowId)}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-sm text-white truncate">
@@ -1030,7 +1063,7 @@ export default function Admin() {
                         </p>
                         <p className="text-xs text-white/60">{s.pool} · {s.trainingTime}</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1287,6 +1320,191 @@ export default function Admin() {
           onDone={() => setEditingPayment(null)}
         />
       )}
+
+      {/* ── Session Attendees Sheet ───────────────────────────────────── */}
+      <Sheet open={!!viewingSessionRowId} onOpenChange={(v) => { if (!v) { setViewingSessionRowId(null); setEditingAttendeeId(null); } }}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8 px-0">
+          <SheetHeader className="px-4 pb-2">
+            <SheetTitle className="text-[15px] font-medium text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#2196F3]" />
+              Attendees
+            </SheetTitle>
+          </SheetHeader>
+          <div className="pb-8">
+            {attendeesLoading && (
+              <div className="space-y-2 px-4">
+                {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-[#1E1E1E] animate-pulse" />)}
+              </div>
+            )}
+            {!attendeesLoading && (!attendees || attendees.length === 0) && (
+              <div className="px-4 py-8 text-center">
+                <Users className="w-8 h-8 text-white/20 mx-auto mb-2" />
+                <p className="text-[13px] text-[#888888]">No sign-ups for this session.</p>
+              </div>
+            )}
+            {attendees && attendees.length > 0 && (
+              <div className="mx-4 bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
+                {attendees.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setEditingAttendeeId(a.id)}
+                    className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/8 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] text-white font-medium truncate">{a.name || a.email}</p>
+                      <p className="text-[12px] text-[#888888]">{a.activity}{a.activityValue ? ` · ${a.activityValue}` : ""}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-[13px] font-medium ${(a.actualFees ?? 0) < 0 ? "text-[#4CAF50]" : "text-white"}`}>
+                        {(a.actualFees ?? 0) < 0 ? "" : ""}${(a.actualFees ?? 0).toFixed(2)}
+                      </p>
+                      <p className="text-[11px] text-[#888888]">{a.memberOnTrainingDate || "—"}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {attendees && attendees.length > 0 && (
+              <p className="text-[12px] text-[#888888] text-center mt-3">
+                {attendees.length} sign-up{attendees.length !== 1 ? "s" : ""} ·{" "}
+                Total collected: ${attendees.reduce((s, a) => s + (a.actualFees ?? 0), 0).toFixed(2)}
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Edit Attendee Sheet ───────────────────────────────────────── */}
+      <Sheet open={!!editingAttendee} onOpenChange={(v) => { if (!v) setEditingAttendeeId(null); }}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8 px-0">
+          <SheetHeader className="px-4 pb-2">
+            <SheetTitle className="text-[15px] font-medium text-white">Edit sign-up</SheetTitle>
+          </SheetHeader>
+          {editingAttendee && (
+            <AdminEditAttendee
+              attendee={editingAttendee}
+              onSave={(updates) => editSignupMutation.mutate({ id: editingAttendee.id, ...updates })}
+              onDelete={() => deleteSignupMutation.mutate({ id: editingAttendee.id })}
+              isSaving={editSignupMutation.isPending}
+              isDeleting={deleteSignupMutation.isPending}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+// ─── Admin Edit Attendee inline component ─────────────────────────────────────
+
+type AttendeeRow = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  activity: string | null;
+  activityValue: string | null;
+  baseFee: number | null;
+  actualFees: number | null;
+  memberOnTrainingDate: string | null;
+};
+
+function AdminEditAttendee({
+  attendee,
+  onSave,
+  onDelete,
+  isSaving,
+  isDeleting,
+}: {
+  attendee: AttendeeRow;
+  onSave: (u: { name?: string; email?: string; activity?: string; activityValue?: string; baseFee?: number; actualFees?: number; memberOnTrainingDate?: string }) => void;
+  onDelete: () => void;
+  isSaving: boolean;
+  isDeleting: boolean;
+}) {
+  const [form, setForm] = useState({
+    name: attendee.name ?? "",
+    email: attendee.email ?? "",
+    activity: attendee.activity ?? "",
+    activityValue: attendee.activityValue ?? "",
+    baseFee: String(attendee.baseFee ?? 0),
+    actualFees: String(attendee.actualFees ?? 0),
+    memberOnTrainingDate: attendee.memberOnTrainingDate ?? "",
+  });
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const set = (f: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [f]: e.target.value }));
+
+  return (
+    <div className="pb-8">
+      <div className="bg-[#1E1E1E] rounded-xl mx-4 overflow-hidden divide-y divide-[#2C2C2C]">
+        {[
+          { label: "Name",         field: "name"               as const },
+          { label: "Email",        field: "email"              as const },
+          { label: "Activity",     field: "activity"           as const },
+          { label: "Activity val", field: "activityValue"      as const },
+          { label: "Base fee",     field: "baseFee"            as const, type: "number" },
+          { label: "Actual fee",   field: "actualFees"         as const, type: "number" },
+          { label: "Member status",field: "memberOnTrainingDate" as const },
+        ].map(({ label, field, type }) => (
+          <div key={field} className="flex items-center gap-3 px-4 min-h-[48px]">
+            <span className="text-[14px] text-[#888888] w-28 shrink-0">{label}</span>
+            <input
+              type={type ?? "text"}
+              value={form[field]}
+              onChange={set(field)}
+              step={type === "number" ? "0.01" : undefined}
+              className="flex-1 bg-transparent text-[14px] text-white outline-none py-2"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="px-4 mt-5 space-y-2">
+        <button
+          onClick={() => onSave({
+            name: form.name,
+            email: form.email,
+            activity: form.activity,
+            activityValue: form.activityValue,
+            baseFee: parseFloat(form.baseFee) || 0,
+            actualFees: parseFloat(form.actualFees) || 0,
+            memberOnTrainingDate: form.memberOnTrainingDate,
+          })}
+          disabled={isSaving}
+          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+          {isSaving ? "Saving…" : "Save changes"}
+        </button>
+
+        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={isDeleting}
+            className="w-full h-[48px] rounded-full border-[1.5px] border-[#F44336]/50 text-[#F44336] font-medium text-[15px] flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete sign-up
+          </button>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete sign-up?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete {attendee.name || attendee.email}'s sign-up record. Their debt balance will be adjusted accordingly. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-white hover:bg-destructive/90"
+                onClick={onDelete}
+              >
+                {isDeleting ? "Deleting…" : "Yes, delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }

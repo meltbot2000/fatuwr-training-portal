@@ -881,12 +881,138 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
       }
       const sessions = await getSessions();
+      // Compute revenue live from sign-ups (sum of actualFees per session)
+      const sessDb = await db.getDb();
+      let revenueMap: Record<string, number> = {};
+      if (sessDb) {
+        const rows = await sessDb.select({
+          dateOfTraining: sheetSignups.dateOfTraining,
+          pool: sheetSignups.pool,
+          revenue: sql<number>`SUM(${sheetSignups.actualFees})`,
+        }).from(sheetSignups).groupBy(sheetSignups.dateOfTraining, sheetSignups.pool);
+        for (const r of rows) {
+          const key = `${r.dateOfTraining}__${r.pool}`;
+          revenueMap[key] = Number(r.revenue ?? 0);
+        }
+      }
       return [...sessions].sort((a, b) => {
         const dA = new Date(a.trainingDate).getTime() || 0;
         const dB = new Date(b.trainingDate).getTime() || 0;
         return dB - dA;
-      });
+      }).map(s => ({
+        ...s,
+        revenue: revenueMap[`${s.trainingDate}__${s.pool}`] ?? 0,
+      }));
     }),
+
+    sessionAttendees: protectedProcedure
+      .input(z.object({ rowId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin" && ctx.user.clubRole !== "Helper") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const [session] = await sessDb.select().from(sheetSessions).where(eq(sheetSessions.rowId, input.rowId));
+        if (!session) return [];
+        const signups = await sessDb.select().from(sheetSignups).where(
+          and(eq(sheetSignups.dateOfTraining, session.trainingDate), eq(sheetSignups.pool, session.pool ?? ""))
+        );
+        return signups;
+      }),
+
+    editSignup: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        email: z.string().optional(),
+        activity: z.string().optional(),
+        activityValue: z.string().optional(),
+        baseFee: z.number().optional(),
+        actualFees: z.number().optional(),
+        memberOnTrainingDate: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { id, ...fields } = input;
+        const updates: Record<string, unknown> = {};
+        if (fields.name !== undefined) updates.name = fields.name;
+        if (fields.email !== undefined) updates.email = fields.email.toLowerCase().trim();
+        if (fields.activity !== undefined) updates.activity = fields.activity;
+        if (fields.activityValue !== undefined) updates.activityValue = fields.activityValue;
+        if (fields.baseFee !== undefined) updates.baseFee = fields.baseFee;
+        if (fields.actualFees !== undefined) updates.actualFees = fields.actualFees;
+        if (fields.memberOnTrainingDate !== undefined) updates.memberOnTrainingDate = fields.memberOnTrainingDate;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await sessDb.update(sheetSignups).set(updates).where(eq(sheetSignups.id, id));
+        return { success: true };
+      }),
+
+    deleteSignup: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await sessDb.delete(sheetSignups).where(eq(sheetSignups.id, input.id));
+        return { success: true };
+      }),
+
+    processRainOff: protectedProcedure
+      .input(z.object({
+        rowId: z.string(),
+        type: z.enum(["half", "full"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const [session] = await sessDb.select().from(sheetSessions).where(eq(sheetSessions.rowId, input.rowId));
+        if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+
+        // Get all sign-ups for this session with a positive fee
+        const signups = await sessDb.select().from(sheetSignups).where(
+          and(eq(sheetSignups.dateOfTraining, session.trainingDate), eq(sheetSignups.pool, session.pool ?? ""))
+        );
+        const eligible = signups.filter(s => (s.actualFees ?? 0) > 0 && s.activity !== "Rain Off Refund");
+
+        // Insert a refund record for each eligible sign-up
+        const refundMultiplier = input.type === "full" ? 1 : 0.5;
+        const label = input.type === "full" ? "Full Rain Off Refund" : "Half Rain Off Refund";
+
+        if (eligible.length > 0) {
+          await sessDb.insert(sheetSignups).values(
+            eligible.map(s => ({
+              name: s.name ?? "",
+              email: s.email ?? "",
+              paymentId: s.paymentId ?? "",
+              dateTimeOfSignUp: new Date().toISOString(),
+              pool: s.pool ?? "",
+              dateOfTraining: s.dateOfTraining ?? "",
+              activity: "Rain Off Refund",
+              activityValue: label,
+              baseFee: -Math.round((s.actualFees ?? 0) * refundMultiplier * 100) / 100,
+              actualFees: -Math.round((s.actualFees ?? 0) * refundMultiplier * 100) / 100,
+              memberOnTrainingDate: s.memberOnTrainingDate ?? "",
+            }))
+          );
+        }
+
+        // Update session rainOff flag
+        const rainOffValue = input.type === "full" ? "Full Rain Off" : "Half Rain Off";
+        await sessDb.update(sheetSessions).set({ rainOff: rainOffValue }).where(eq(sheetSessions.rowId, input.rowId));
+        clearSessionsCache();
+
+        return { success: true, refundsIssued: eligible.length, type: input.type };
+      }),
 
     forceSync: protectedProcedure
       .input(z.object({ tab: z.enum(["sessions", "payments", "signups", "users", "all"]) }))
