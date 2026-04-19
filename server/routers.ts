@@ -385,7 +385,7 @@ export const appRouter = router({
       return sessions.map(s => ({
         ...s,
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
-        signupCount: signupCounts[`${s.trainingDate}|${s.pool}`] ?? 0,
+        signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${s.pool}`] ?? 0,
       }));
     }),
 
