@@ -1,18 +1,19 @@
 /**
- * Daily DB backup — emails CSV snapshots of users, sessions and payments
- * to fatuwrevents@gmail.com every day at 08:00 SGT (UTC+8).
+ * Daily DB backup — emails CSV snapshots of users, sessions, signups and payments
+ * to fatuwrevents@gmail.com every day at 23:59 SGT (UTC+8).
  *
  * This gives a safe restore point in case data is accidentally overwritten
  * (e.g. an "Import from Sheets" that shouldn't have been run).
  *
- * Three attachments per email:
+ * Four attachments per email:
  *   - users.csv      (sheet_users table)
  *   - sessions.csv   (sheet_sessions table — all, not just past)
+ *   - signups.csv    (sheet_signups table)
  *   - payments.csv   (sheet_payments table)
  */
 
 import { getDb } from "./db";
-import { sheetUsers, sheetSessions, sheetPayments } from "../drizzle/schema";
+import { sheetUsers, sheetSessions, sheetPayments, sheetSignups } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 const BACKUP_RECIPIENT = "fatuwrevents@gmail.com";
@@ -115,16 +116,18 @@ export async function runDailyBackup(): Promise<void> {
   const timeStr  = now.toLocaleTimeString("en-SG", { timeZone: "Asia/Singapore", hour: "2-digit", minute: "2-digit" });
 
   try {
-    // Fetch all three tables
-    const [users, sessions, payments] = await Promise.all([
+    // Fetch all four tables
+    const [users, sessions, signups, payments] = await Promise.all([
       db.select().from(sheetUsers),
       db.select().from(sheetSessions),
+      db.select().from(sheetSignups),
       db.select().from(sheetPayments),
     ]);
 
     const attachments = [
       { filename: `users_${dateStr.replace(/ /g, "_")}.csv`,    content: rowsToCsv(users    as any[]) },
       { filename: `sessions_${dateStr.replace(/ /g, "_")}.csv`, content: rowsToCsv(sessions as any[]) },
+      { filename: `signups_${dateStr.replace(/ /g, "_")}.csv`,  content: rowsToCsv(signups  as any[]) },
       { filename: `payments_${dateStr.replace(/ /g, "_")}.csv`, content: rowsToCsv(payments as any[]) },
     ];
 
@@ -140,6 +143,7 @@ export async function runDailyBackup(): Promise<void> {
           </tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;">Users</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #eee;">${users.length}</td></tr>
           <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;">Sessions</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #eee;">${sessions.length}</td></tr>
+          <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;">Sign-ups</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #eee;">${signups.length}</td></tr>
           <tr><td style="padding:8px 12px;">Payments</td><td style="text-align:right;padding:8px 12px;">${payments.length}</td></tr>
         </table>
         <p style="color:#888;font-size:12px;margin-top:24px;">This is an automated backup from the FATUWR Training Portal. To restore data from a backup, use the "Import from Sheets" tool in Admin → Data and re-seed, or contact your developer.</p>
@@ -150,7 +154,7 @@ export async function runDailyBackup(): Promise<void> {
     if (ENV.sendgridApiKey && ENV.sendgridFrom) {
       try {
         sent = await sendViaSendGrid(subject, html, attachments);
-        if (sent) console.log(`[Backup] Email sent via SendGrid to ${BACKUP_RECIPIENT} — ${users.length} users, ${sessions.length} sessions, ${payments.length} payments`);
+        if (sent) console.log(`[Backup] Email sent via SendGrid to ${BACKUP_RECIPIENT} — ${users.length} users, ${sessions.length} sessions, ${signups.length} signups, ${payments.length} payments`);
       } catch (err: any) {
         console.error("[Backup] SendGrid failed:", err.message);
       }
@@ -175,30 +179,30 @@ export async function runDailyBackup(): Promise<void> {
 // ─── Scheduler ───────────────────────────────────────────────────────────────
 
 /**
- * Schedules the daily backup to fire at 08:00 SGT every day.
- * On startup it calculates the ms until the next 08:00 SGT, waits,
+ * Schedules the daily backup to fire at 23:59 SGT every day.
+ * On startup it calculates the ms until the next 23:59 SGT, waits,
  * fires once, then repeats every 24 hours.
  */
 export function startDailyBackup(): void {
-  const msUntilNext8amSGT = (): number => {
-    const nowUtcMs  = Date.now();
-    const nowSgtMs  = nowUtcMs + SGT_OFFSET_MS;
-    const sgtDate   = new Date(nowSgtMs);
+  const msUntilNext2359SGT = (): number => {
+    const nowUtcMs = Date.now();
+    const nowSgtMs = nowUtcMs + SGT_OFFSET_MS;
 
-    // Next 08:00 SGT expressed in UTC ms
-    const todayAt8  = new Date(nowSgtMs);
-    todayAt8.setUTCHours(0, 0, 0, 0);          // midnight of today in SGT
-    todayAt8.setUTCHours(todayAt8.getUTCHours() + 8); // 08:00 SGT = 00:00 UTC+8
+    // Build 23:59:00 SGT for today (in UTC epoch ms)
+    const todayMidnightSgt = new Date(nowSgtMs);
+    todayMidnightSgt.setUTCHours(0, 0, 0, 0); // midnight of today in SGT time
+    const today2359UtcMs = todayMidnightSgt.getTime() - SGT_OFFSET_MS  // → real UTC midnight SGT
+                           + (23 * 60 + 59) * 60 * 1000;               // + 23h59m
 
-    let next8amUtcMs = todayAt8.getTime() - SGT_OFFSET_MS; // back to real UTC
-    if (next8amUtcMs <= nowUtcMs) next8amUtcMs += 24 * 60 * 60 * 1000; // already passed — use tomorrow
+    let next = today2359UtcMs;
+    if (next <= nowUtcMs) next += 24 * 60 * 60 * 1000; // already passed — use tomorrow
 
-    return next8amUtcMs - nowUtcMs;
+    return next - nowUtcMs;
   };
 
-  const delay = msUntilNext8amSGT();
+  const delay = msUntilNext2359SGT();
   const hoursUntil = (delay / 3_600_000).toFixed(1);
-  console.log(`[Backup] Daily backup scheduled — first run in ${hoursUntil}h (08:00 SGT)`);
+  console.log(`[Backup] Daily backup scheduled — first run in ${hoursUntil}h (23:59 SGT)`);
 
   setTimeout(() => {
     runDailyBackup().catch(console.error);
