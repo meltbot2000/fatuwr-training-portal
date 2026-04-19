@@ -185,6 +185,32 @@ export default function Payments() {
               </p>
             </div>
 
+            {/* Payments received */}
+            <CollapsibleSection
+              title="Payments received"
+              count={data.payments.length}
+              total={formatFee(data.totalPaid)}
+            >
+              {data.payments.length === 0 ? (
+                <p className="text-[13px] text-[#888888] text-center py-3">No payments recorded yet.</p>
+              ) : (
+                <div className="divide-y divide-[#2C2C2C]">
+                  {data.payments.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between py-3">
+                      {/* Date — fs-meta: 13px (secondary info) */}
+                      <p className="text-[13px] text-[#888888]">{formatDate(p.date)}</p>
+                      {/* Amount — fs-content: 14px, success colour */}
+                      <p className="text-[14px] text-[#4CAF50] tabular-nums">{formatFee(p.amount)}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between py-3">
+                    <p className="text-[14px] font-medium text-white">Total</p>
+                    <p className="text-[14px] text-[#4CAF50] tabular-nums">{formatFee(data.totalPaid)}</p>
+                  </div>
+                </div>
+              )}
+            </CollapsibleSection>
+
             {/* Training fees */}
             <CollapsibleSection
               title="Training fees"
@@ -239,32 +265,6 @@ export default function Payments() {
                 </div>
               </CollapsibleSection>
             )}
-
-            {/* Payments received */}
-            <CollapsibleSection
-              title="Payments received"
-              count={data.payments.length}
-              total={formatFee(data.totalPaid)}
-            >
-              {data.payments.length === 0 ? (
-                <p className="text-[13px] text-[#888888] text-center py-3">No payments recorded yet.</p>
-              ) : (
-                <div className="divide-y divide-[#2C2C2C]">
-                  {data.payments.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between py-3">
-                      {/* Date — fs-meta: 13px (secondary info) */}
-                      <p className="text-[13px] text-[#888888]">{formatDate(p.date)}</p>
-                      {/* Amount — fs-content: 14px, success colour */}
-                      <p className="text-[14px] text-[#4CAF50] tabular-nums">{formatFee(p.amount)}</p>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between py-3">
-                    <p className="text-[14px] font-medium text-white">Total</p>
-                    <p className="text-[14px] text-[#4CAF50] tabular-nums">{formatFee(data.totalPaid)}</p>
-                  </div>
-                </div>
-              )}
-            </CollapsibleSection>
           </div>
         )}
       </main>
