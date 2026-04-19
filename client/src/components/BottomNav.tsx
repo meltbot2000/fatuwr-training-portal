@@ -10,7 +10,7 @@ export default function BottomNav() {
 
   const tabs = [
     { label: "Trainings", Icon: CalendarPlus,    path: "/",              exact: true  },
-    { label: "Announcements", Icon: Megaphone,     path: "/home",          exact: true  },
+    { label: "Info",      Icon: Megaphone,        path: "/home",          exact: true  },
     { label: "Payments",  Icon: CircleDollarSign, path: "/payments",      exact: false },
     { label: "More",      Icon: Sparkles,         path: "/fun-resources", exact: false },
     ...(isAdmin ? [{ label: "Admin", Icon: ShieldCheck, path: "/admin", exact: false }] : []),
@@ -54,12 +54,12 @@ export default function BottomNav() {
               />
               <span
                 style={{
-                  fontSize: tab.label === "Announcements" ? 8.5 : 10,
+                  fontSize: 10,
                   fontWeight: 500,
                   color: active ? "#2196F3" : "#888888",
                   lineHeight: 1,
                   letterSpacing: "0.01em",
-                  whiteSpace: "nowrap",
+
                 }}
               >
                 {tab.label}
