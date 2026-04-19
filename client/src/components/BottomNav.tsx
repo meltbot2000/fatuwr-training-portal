@@ -49,7 +49,7 @@ export default function BottomNav() {
                 <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#2196F3]" />
               )}
               <tab.Icon
-                className={`w-5 h-5 ${active ? "text-[#2196F3]" : "text-[#888888]"}`}
+                className={`w-[26px] h-[26px] ${active ? "text-[#2196F3]" : "text-[#888888]"}`}
                 strokeWidth={1.8}
               />
             </button>
