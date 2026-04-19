@@ -6,55 +6,57 @@ import { toast } from "sonner";
 
 const APP_URL = "https://fatuwr.up.railway.app";
 
+// Palette: alternates between the app's primary blue and a dark grey card.
+// Blue shades stay close to #2196F3 (app primary).
 const SECTIONS = [
-  {
-    label: "New to the Club",
-    sub: "Beginner's guide to FATUWR",
-    href: "/newbie",
-    Icon: Waves,
-    gradient: "linear-gradient(135deg, #1565C0 0%, #1E88E5 100%)",
-  },
   {
     label: "Membership",
     sub: "Fees, trials & renewals",
     href: "/membership",
     Icon: Users,
-    gradient: "linear-gradient(135deg, #0D47A1 0%, #1976D2 100%)",
+    gradient: "linear-gradient(135deg, #1565C0 0%, #2196F3 100%)",
   },
   {
     label: "Club Policies",
     sub: "Training rules & guidelines",
     href: "/fun-resources/policies",
     Icon: ShieldCheck,
-    gradient: "linear-gradient(135deg, #2E7D32 0%, #43A047 100%)",
+    gradient: "linear-gradient(135deg, #2A2A2A 0%, #3A3A3A 100%)",
   },
   {
     label: "Invite a Friend",
     sub: "Bring someone new to try UWR",
     href: "/fun-resources/invite",
     Icon: UserPlus,
-    gradient: "linear-gradient(135deg, #6A1B9A 0%, #AB47BC 100%)",
+    gradient: "linear-gradient(135deg, #1565C0 0%, #2196F3 100%)",
   },
   {
     label: "Merchandise",
     sub: "FATUWR gear & apparel",
     href: "/fun-resources/merch",
     Icon: ShoppingBag,
-    gradient: "linear-gradient(135deg, #BF360C 0%, #EF6C00 100%)",
+    gradient: "linear-gradient(135deg, #2A2A2A 0%, #3A3A3A 100%)",
+  },
+  {
+    label: "New to the Club",
+    sub: "Beginner's guide to FATUWR",
+    href: "/newbie",
+    Icon: Waves,
+    gradient: "linear-gradient(135deg, #1565C0 0%, #2196F3 100%)",
   },
   {
     label: "Resources & Links",
     sub: "Useful documents & websites",
     href: "/fun-resources/resources",
     Icon: BookOpen,
-    gradient: "linear-gradient(135deg, #00695C 0%, #26A69A 100%)",
+    gradient: "linear-gradient(135deg, #2A2A2A 0%, #3A3A3A 100%)",
   },
   {
     label: "Videos",
     sub: "Highlights & tutorials",
     href: "/fun-resources/videos",
     Icon: Video,
-    gradient: "linear-gradient(135deg, #AD1457 0%, #E91E63 100%)",
+    gradient: "linear-gradient(135deg, #1565C0 0%, #2196F3 100%)",
   },
 ] as const;
 
