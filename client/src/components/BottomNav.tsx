@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Home, CalendarPlus, CircleDollarSign, ShieldCheck, Sparkles } from "lucide-react";
+import { Megaphone, CalendarPlus, CircleDollarSign, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function BottomNav() {
   const [location, navigate] = useLocation();
@@ -9,10 +9,10 @@ export default function BottomNav() {
   const isAdmin = clubRole === "Admin";
 
   const tabs = [
-    { label: "Home",       Icon: Home,              path: "/",              exact: true  },
-    { label: "Training",   Icon: CalendarPlus,       path: "/sessions",      exact: false },
-    { label: "Payments",   Icon: CircleDollarSign,   path: "/payments",      exact: false },
-    { label: "Fun Stuff",  Icon: Sparkles,           path: "/fun-resources", exact: false },
+    { label: "Training",      Icon: CalendarPlus,     path: "/",              exact: true  },
+    { label: "Announcements", Icon: Megaphone,         path: "/home",          exact: true  },
+    { label: "Payments",      Icon: CircleDollarSign,  path: "/payments",      exact: false },
+    { label: "Fun Stuff",     Icon: Sparkles,          path: "/fun-resources", exact: false },
     ...(isAdmin ? [{ label: "Admin", Icon: ShieldCheck, path: "/admin", exact: false }] : []),
   ] as const;
 

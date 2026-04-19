@@ -70,7 +70,7 @@ export default function SessionDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Session" showBack backPath="/sessions" rightAction={adminTopBarAction} />
+        <AppHeader title="Session" showBack backPath="/" rightAction={adminTopBarAction} />
         <main className="mx-auto max-w-[480px] space-y-3 px-4 py-4">
           <Skeleton className="h-48 w-full rounded-none" style={{ background: "#1E1E1E" }} />
           <Skeleton className="h-20 w-full rounded-xl" style={{ background: "#1E1E1E" }} />
@@ -83,7 +83,7 @@ export default function SessionDetail() {
   if (error || !session) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Session" showBack backPath="/sessions" />
+        <AppHeader title="Session" showBack backPath="/" />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
           <p className="text-[13px] text-white/50">Session not found</p>
@@ -106,7 +106,7 @@ export default function SessionDetail() {
   return (
     <div className="min-h-screen bg-[#111111]">
       {/* Admin pencil icon lives in the top bar right slot */}
-      <AppHeader title="Session" showBack backPath="/sessions" rightAction={adminTopBarAction} />
+      <AppHeader title="Session" showBack backPath="/" rightAction={adminTopBarAction} />
 
       <main className="mx-auto max-w-[480px] pb-32">
         {/* 1. Hero image */}

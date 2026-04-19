@@ -50,7 +50,7 @@ export default function SignUpForm() {
 
   useEffect(() => {
     if (submitted) {
-      const t = setTimeout(() => navigate("/sessions"), 1800);
+      const t = setTimeout(() => navigate("/"), 1800);
       return () => clearTimeout(t);
     }
   }, [submitted, navigate]);
@@ -91,7 +91,7 @@ export default function SignUpForm() {
   if (!session) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Sign up" showBack backPath="/sessions" />
+        <AppHeader title="Sign up" showBack backPath="/" />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
           <p className="text-[13px] text-white/50">Session not found</p>
@@ -104,7 +104,7 @@ export default function SignUpForm() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Sign up" showBack backPath="/sessions" />
+        <AppHeader title="Sign up" showBack backPath="/" />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <CheckCircle2 className="w-14 h-14 text-green-400 mx-auto mb-4" />
           {/* fs-primary: 15px/500 */}

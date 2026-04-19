@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Switch, Redirect, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import BottomNav from "./components/BottomNav";
@@ -37,8 +37,9 @@ function AppShell() {
   return (
     <>
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/sessions" component={Sessions} />
+        <Route path="/" component={Sessions} />
+        <Route path="/home" component={Home} />
+        <Route path="/sessions">{() => <Redirect to="/" />}</Route>
         <Route path="/login" component={Login} />
         <Route path="/session/:rowId/splits" component={Splits} />
         <Route path="/session/:rowId" component={SessionDetail} />

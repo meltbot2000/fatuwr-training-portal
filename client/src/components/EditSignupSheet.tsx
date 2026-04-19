@@ -82,7 +82,7 @@ export default function EditSignupSheet({
     await utils.sessions.detail.invalidate({ rowId: sessionRowId });
     onOpenChange(false);
     onDone();
-    if (!isAdmin) navigate("/sessions");
+    if (!isAdmin) navigate("/");
   };
 
   const editMutation = trpc.signups.edit.useMutation({
