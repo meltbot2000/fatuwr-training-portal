@@ -792,7 +792,21 @@ export default function Admin() {
     if (sessionDayFilter !== "All") result = result.filter(s => s.day === sessionDayFilter);
     if (sessionStatusFilter === "Open") result = result.filter(s => !s.isClosed || s.isClosed.trim() === "");
     else if (sessionStatusFilter === "Closed") result = result.filter(s => s.isClosed && s.isClosed.trim() !== "");
-    return result;
+
+    // ── Custom ordering ───────────────────────────────────────────
+    // Top: past 2 (most-recent first) + upcoming 6 (earliest first)
+    // Then: all remaining sessions sorted chronologically Jan → Dec
+    const dateMs = (s: typeof result[number]) => new Date(s.trainingDate).getTime() || 0;
+    const past = result.filter(s => isPastSession(s)).sort((a, b) => dateMs(b) - dateMs(a));
+    const upcoming = result.filter(s => !isPastSession(s)).sort((a, b) => dateMs(a) - dateMs(b));
+
+    const pinned = [...past.slice(0, 2), ...upcoming.slice(0, 6)];
+    const pinnedSet = new Set(pinned.map(s => s.rowId));
+    const remainder = result
+      .filter(s => !pinnedSet.has(s.rowId))
+      .sort((a, b) => dateMs(a) - dateMs(b));
+
+    return [...pinned, ...remainder];
   }, [sessions, sessionSearch, sessionMonthFilter, sessionPoolFilter, sessionDayFilter, sessionStatusFilter]);
 
   if (loading || !user || !isAdminOrHelper) return null;
