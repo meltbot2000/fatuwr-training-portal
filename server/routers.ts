@@ -17,6 +17,7 @@ import {
   findUserByEmail,
   convertDriveUrl,
   clearSessionsCache,
+  fetchSheetsUsers,
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
@@ -635,6 +636,19 @@ export const appRouter = router({
         image: "",
       };
     }),
+
+    updatePhoto: protectedProcedure
+      .input(z.object({ image: z.string() }))  // base64 data URL or ""
+      .mutation(async ({ ctx, input }) => {
+        const email = (ctx.user.email ?? "").toLowerCase().trim();
+        if (!email) throw new Error("No email");
+        const photoDb = await db.getDb();
+        if (!photoDb) throw new Error("DB unavailable");
+        await photoDb.update(sheetUsers)
+          .set({ image: input.image || null })
+          .where(eq(sheetUsers.email, email));
+        return { ok: true };
+      }),
   }),
   payments: router({
     myData: protectedProcedure.query(async ({ ctx }) => {
@@ -1090,6 +1104,17 @@ export const appRouter = router({
         }
         return { ok: true, tab: input.tab, syncedAt: new Date().toISOString() };
       }),
+
+    debugSheetUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.clubRole !== "Admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const rows = await fetchSheetsUsers();
+      const byStatus = rows.reduce((acc: Record<string, number>, u) => {
+        acc[u.memberStatus || ""] = (acc[u.memberStatus || ""] || 0) + 1;
+        return acc;
+      }, {});
+      const sample = rows.filter(u => u.memberStatus === "Trial").slice(0, 5);
+      return { total: rows.length, byStatus, trialSample: sample };
+    }),
 
     addSession: protectedProcedure
       .input(z.object({

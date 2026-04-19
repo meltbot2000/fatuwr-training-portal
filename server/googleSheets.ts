@@ -308,17 +308,20 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
   const users: UserRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || row.length < 4) continue;
-    const email = (row[3] || "").toLowerCase().trim();
-    if (!email) continue; // skip rows with no email
+    if (!row || row.length < 2) continue;
     // User sheet column mapping (0-indexed):
     //   A(0) = PaymentID   B(1) = name   C(2) = userEmail   D(3) = email
     //   E(4) = image       F(5) = clubRole                   H(7) = phone (ignored)
     //   J(9) = memberStatus   K(10) = trialStartDate   L(11) = trialEndDate
+    //
+    // Trial users often have no PaymentID so col D (email) may be blank — fall
+    // back to col C (userEmail) so they aren't skipped during import.
+    const email = (row[2] || "").toLowerCase().trim(); // col C = userEmail (primary)
+    if (!email) continue; // skip rows with no email at all
     users.push({
       id: row[0] || "",        // col A = PaymentID (e.g. "mel", "hayley")
       name: row[1] || "",
-      userEmail: row[2] || "",
+      userEmail: email,
       email,
       image: row[4] || "",
       clubRole: row[5] || "",
