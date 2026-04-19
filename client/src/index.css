@@ -138,3 +138,25 @@
     }
   }
 }
+
+/* ── Rich content (announcements + invite page) ───────────────────────────── */
+.rich-content {
+  font-size: 14px;
+  color: #CCCCCC;
+  line-height: 1.65;
+}
+.rich-content p   { margin: 0 0 0.85em; }
+.rich-content h1  { font-size: 20px; font-weight: 700; color: #fff; margin: 1.1em 0 0.4em; }
+.rich-content h2  { font-size: 17px; font-weight: 600; color: #fff; margin: 1.1em 0 0.4em; }
+.rich-content h3  { font-size: 15px; font-weight: 600; color: #fff; margin: 1em 0 0.35em; }
+.rich-content b,
+.rich-content strong { font-weight: 600; color: #fff; }
+.rich-content i,
+.rich-content em  { font-style: italic; }
+.rich-content a   { color: #2196F3; text-decoration: underline; word-break: break-word; }
+.rich-content a:hover { opacity: 0.85; }
+.rich-content ul  { margin: 0 0 0.85em 1.25em; padding: 0; list-style: disc; }
+.rich-content ol  { margin: 0 0 0.85em 1.25em; padding: 0; list-style: decimal; }
+.rich-content li  { margin-bottom: 0.3em; }
+.rich-content > *:first-child { margin-top: 0; }
+.rich-content > *:last-child  { margin-bottom: 0; }

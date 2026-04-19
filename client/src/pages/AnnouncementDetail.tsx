@@ -61,11 +61,11 @@ export default function AnnouncementDetail() {
           <h1 className="text-[20px] font-bold text-white leading-snug">{ann.title}</h1>
         )}
 
-        {/* Content */}
+        {/* Content — supports basic HTML (bold, italic, headings, links, lists) */}
         {ann.content && (
-          <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4">
-            <p className="text-[14px] text-[#CCCCCC] leading-relaxed whitespace-pre-wrap">{ann.content}</p>
-          </div>
+          <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 rich-content"
+            dangerouslySetInnerHTML={{ __html: ann.content }}
+          />
         )}
 
         {/* Date */}
