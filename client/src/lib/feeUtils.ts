@@ -1,3 +1,5 @@
+import { parseAnyDate } from "./dateUtils";
+
 export type FeeSession = {
   memberFee: number;
   memberSwimFee: number;
@@ -9,16 +11,16 @@ export type FeeSession = {
 
 export function getMembershipOnTrainingDate(
   currentStatus: string,
-  trialEndDate: string,   // "DD/MM/YYYY" or "" or "NA"
+  trialEndDate: string,   // any supported date format or "" or "NA"
   trainingDateStr: string // the session's training date string
 ): string {
   if (currentStatus === "Member" || currentStatus === "Student") return currentStatus;
   if (currentStatus === "Trial") {
-    if (!trialEndDate || trialEndDate === "NA") return "Non-Member";
-    const [d, m, y] = trialEndDate.split("/").map(Number);
-    const trialEnd = new Date(y, m - 1, d);
-    const trainingDate = new Date(trainingDateStr);
-    if (isNaN(trainingDate.getTime())) return "Non-Member";
+    const trialEnd = parseAnyDate(trialEndDate);
+    if (!trialEnd) return "Non-Member";
+    const trainingDate = parseAnyDate(trainingDateStr);
+    if (!trainingDate) return "Non-Member";
+    // Trial is valid on the training date if trialEnd >= trainingDate (inclusive)
     return trialEnd >= trainingDate ? "Trial" : "Non-Member";
   }
   return "Non-Member";

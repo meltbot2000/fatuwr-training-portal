@@ -28,7 +28,7 @@ import {
   fetchSheetsSignups,
   fetchSheetsUsers,
 } from "./googleSheets";
-import { sql } from "drizzle-orm";
+import { sql, eq, and, lte, ne } from "drizzle-orm";
 
 export type SyncTab = "sessions" | "payments" | "signups" | "users";
 
@@ -178,9 +178,82 @@ async function seedIfEmpty(tab: SyncTab): Promise<void> {
   }
 }
 
+// ─── Trial expiry ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse any date string into a JS Date (server-side mirror of client dateUtils).
+ * Handles ISO timestamps, YYYY-MM-DD, DD/MM/YYYY, M/D/YYYY.
+ */
+function parseAnyDateServer(str: string): Date | null {
+  if (!str || str === "NA" || str === "N/A") return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  const ddmm = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmm) {
+    const [, dd, mm, yyyy] = ddmm.map(Number);
+    const d = new Date(yyyy, mm - 1, dd);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    const [, m, d, y] = mdy.map(Number);
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return null;
+}
+
+/**
+ * Expire trial memberships: set memberStatus = "Non-Member" for any user whose
+ * trialEndDate is in the past and who is still marked as "Trial".
+ * Runs at startup and every 24 hours.
+ */
+async function expireTrialMemberships(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    const trialUsers = await db
+      .select({ id: sheetUsers.id, trialEndDate: sheetUsers.trialEndDate })
+      .from(sheetUsers)
+      .where(eq(sheetUsers.memberStatus, "Trial"));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiredIds: number[] = [];
+    for (const u of trialUsers) {
+      const end = parseAnyDateServer(u.trialEndDate || "");
+      if (end && end < today) expiredIds.push(u.id);
+    }
+
+    if (expiredIds.length === 0) {
+      console.log("[TrialExpiry] No expired trials found.");
+      return;
+    }
+
+    // Update in batches of 100 to avoid huge IN clauses
+    for (let i = 0; i < expiredIds.length; i += 100) {
+      const batch = expiredIds.slice(i, i + 100);
+      for (const id of batch) {
+        await db.update(sheetUsers)
+          .set({ memberStatus: "Non-Member" })
+          .where(eq(sheetUsers.id, id));
+      }
+    }
+    console.log(`[TrialExpiry] Expired ${expiredIds.length} trial membership(s) → Non-Member`);
+  } catch (err: any) {
+    console.error("[TrialExpiry] Error:", err?.message);
+  }
+}
+
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;       // 5 minutes
+const DAY_MS           = 24 * 60 * 60 * 1000; // 24 hours
 
 export function startBackgroundSync(): void {
   // Seed DB-primary tables from Sheets if empty (fresh deployment / first run)
@@ -192,6 +265,10 @@ export function startBackgroundSync(): void {
   // Regular sync for Sheets-managed tabs only (payments)
   setTimeout(() => syncTab("payments").catch(console.error), 5_000);
   setInterval(() => syncTab("payments").catch(console.error), SYNC_INTERVAL_MS);
+
+  // Expire trial memberships at startup, then once every 24 hours
+  setTimeout(() => expireTrialMemberships().catch(console.error), 6_000);
+  setInterval(() => expireTrialMemberships().catch(console.error), DAY_MS);
 
   console.log("[Sync] Background sync started — DB-primary: sessions, signups, users | Sheets-managed: payments");
 }

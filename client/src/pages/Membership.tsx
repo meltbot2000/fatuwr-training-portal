@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { parseAnyDate, formatDisplayDate } from "@/lib/dateUtils";
 
 // ── Annual membership fee (full year) ────────────────────────────────────────
 const ANNUAL_FEE = 80;
@@ -38,24 +39,6 @@ function getCurrentMonthEntry() {
 
 const CLUB_UEN = "T14SS0144D";
 
-function parseDDMMYYYY(str: string): Date | null {
-  if (!str || str === "NA") return null;
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) return d;
-  const parts = str.split("/").map(Number);
-  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-    const [dd, mm, yy] = parts;
-    const d2 = new Date(yy, mm - 1, dd);
-    if (!isNaN(d2.getTime())) return d2;
-  }
-  return null;
-}
-
-function formatDisplayDate(str: string): string {
-  const d = parseDDMMYYYY(str);
-  if (!d) return str;
-  return d.toLocaleDateString("en-SG", { day: "numeric", month: "long", year: "numeric" });
-}
 
 // ── Annual membership fee schedule ───────────────────────────────────────────
 
@@ -249,7 +232,7 @@ export default function Membership() {
   const paymentId: string = (user as any)?.paymentId || "";
 
   const hasTrialled = trialStartDate !== "" && trialStartDate !== "NA";
-  const trialEndParsed = parseDDMMYYYY(trialEndDate);
+  const trialEndParsed = parseAnyDate(trialEndDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const trialActive = trialEndParsed !== null && trialEndParsed >= today;

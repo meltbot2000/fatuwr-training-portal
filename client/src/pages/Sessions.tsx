@@ -5,19 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Calendar, AlertTriangle, Star } from "lucide-react";
 import { useMemo } from "react";
-
-function parseFlexDate(s: string): Date | null {
-  if (!s || s === "NA") return null;
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
-  const parts = s.split("/");
-  if (parts.length === 3) {
-    const [dd, mm, yyyy] = parts;
-    const d2 = new Date(`${yyyy}-${mm}-${dd}`);
-    if (!isNaN(d2.getTime())) return d2;
-  }
-  return null;
-}
+import { parseAnyDate } from "@/lib/dateUtils";
 
 const MAX_SESSIONS = 6;
 
@@ -46,7 +34,7 @@ export default function Sessions() {
   // Trial expiry: warn if within 14 days
   const trialEndDisplay = useMemo(() => {
     if (!isTrial || !trialEndDate) return null;
-    const end = parseFlexDate(trialEndDate);
+    const end = parseAnyDate(trialEndDate);
     if (!end) return null;
     const daysLeft = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     if (daysLeft > 14) return null;

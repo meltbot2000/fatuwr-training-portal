@@ -16,6 +16,7 @@ import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRi
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
+import { formatDisplayDate } from "@/lib/dateUtils";
 
 const STATUS_COLORS: Record<string, string> = {
   "Member": "bg-green-500 text-white",
@@ -943,6 +944,17 @@ export default function Admin() {
                     </div>
                   </div>
                   <p className="text-xs text-white/60">{displayEmail || "(no email)"}</p>
+                  {/* Show trial / membership dates under the email */}
+                  {(u as any).trialEndDate && (u as any).trialEndDate !== "NA" && (
+                    <p className="text-xs text-white/40">
+                      Trial ends: {formatDisplayDate((u as any).trialEndDate)}
+                    </p>
+                  )}
+                  {(u as any).membershipStartDate && (u as any).membershipStartDate !== "NA" && (
+                    <p className="text-xs text-white/40">
+                      Member since: {formatDisplayDate((u as any).membershipStartDate)}
+                    </p>
+                  )}
                 </button>
               );
             })}
