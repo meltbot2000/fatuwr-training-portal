@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRight, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRight, Trash2, KeyRound, ChevronDown } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
@@ -627,6 +627,164 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
+
+const IMPORT_PIN = "1987";
+const IMPORT_TABS = ["sessions", "signups", "users", "payments"] as const;
+
+function SpreadsheetImportPanel({ forceSyncMutation }: { forceSyncMutation: ReturnType<typeof trpc.admin.forceSync.useMutation> }) {
+  const [open, setOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinError, setPinError] = useState(false);
+
+  function handlePinSubmit() {
+    if (pin === IMPORT_PIN) {
+      setUnlocked(true);
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setPin("");
+    }
+  }
+
+  function handleClose() {
+    setOpen(false);
+    setUnlocked(false);
+    setPin("");
+    setPinError(false);
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-[#1E1E1E] rounded-xl text-white/60 text-[13px] hover:bg-[#252525] transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <KeyRound className="w-4 h-4" />
+          Spreadsheet Import
+        </span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="bg-[#1E1E1E] rounded-xl px-4 pb-4 pt-2 mt-0.5 space-y-3">
+          {!unlocked ? (
+            /* PIN entry */
+            <div className="space-y-2 pt-2">
+              <p className="text-[12px] text-[#888888]">Enter PIN to access import tools</p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="••••"
+                  value={pin}
+                  onChange={e => { setPin(e.target.value.replace(/\D/g, "").slice(0, 4)); setPinError(false); }}
+                  onKeyDown={e => e.key === "Enter" && handlePinSubmit()}
+                  className={`flex-1 h-10 rounded-lg bg-[#2a2a2a] border text-white text-center text-[18px] tracking-[0.4em] outline-none focus:border-[#2196F3] ${pinError ? "border-red-500" : "border-white/10"}`}
+                />
+                <button
+                  onClick={handlePinSubmit}
+                  className="h-10 px-4 rounded-lg bg-[#2196F3] text-white text-[13px] font-medium"
+                >
+                  Unlock
+                </button>
+              </div>
+              {pinError && <p className="text-[12px] text-red-400">Incorrect PIN</p>}
+            </div>
+          ) : (
+            /* Unlocked — show import buttons */
+            <>
+              <div className="flex items-start gap-2 pt-2">
+                <AlertTriangle className="w-4 h-4 text-[#F5C518] mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[13px] font-semibold text-white">Import from Google Sheets</p>
+                  <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
+                    Replaces all existing DB records for the selected tab with live data from the Sheet. Cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {IMPORT_TABS.map((tab) => (
+                  <AlertDialog key={tab}>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs gap-1.5 capitalize border-white/10 text-white/70"
+                        disabled={forceSyncMutation.isPending}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Import {tab}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Import {tab} from Sheets?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will <strong>delete all current {tab} records</strong> in the database and replace them with data pulled live from Google Sheets. Any changes made in the app since the last import will be lost.
+                          <br /><br />
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-white hover:bg-destructive/90"
+                          onClick={() => forceSyncMutation.mutate({ tab })}
+                        >
+                          Yes, import {tab}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ))}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 text-xs gap-1.5 col-span-2 border-[#F44336]/40 text-[#F44336]"
+                      disabled={forceSyncMutation.isPending}
+                    >
+                      {forceSyncMutation.isPending
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <RefreshCw className="w-3.5 h-3.5" />}
+                      Import all tabs
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Import all tabs from Sheets?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will <strong>delete and replace all records</strong> for sessions, sign-ups, users, and payments in the database with live data pulled from Google Sheets.
+                        <br /><br />
+                        Any changes made in the app since the last import will be lost. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                        onClick={() => forceSyncMutation.mutate({ tab: "all" })}
+                      >
+                        Yes, import everything
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+              <button onClick={handleClose} className="text-[11px] text-white/30 hover:text-white/50 pt-1">
+                Lock
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Admin() {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
@@ -1332,90 +1490,8 @@ export default function Admin() {
                 );
               })()}
 
-              {/* Import from Sheets — at the bottom, destructive action */}
-              <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3 mt-2">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-[#F5C518] mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-[13px] font-semibold text-white">Import from Google Sheets</p>
-                    <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
-                      Replaces all existing DB records for the selected tab with live data from the Sheet. Use for initial migration or to reset a table. This cannot be undone.
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["sessions", "signups", "users"] as const).map((tab) => (
-                    <AlertDialog key={tab}>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 text-xs gap-1.5 capitalize border-white/10 text-white/70"
-                          disabled={forceSyncMutation.isPending}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          Import {tab}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Import {tab} from Sheets?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will <strong>delete all current {tab} records</strong> in the database and replace them with data pulled live from Google Sheets. Any changes made in the app since the last import will be lost.
-                            <br /><br />
-                            This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-white hover:bg-destructive/90"
-                            onClick={() => forceSyncMutation.mutate({ tab })}
-                          >
-                            Yes, import {tab}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  ))}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 text-xs gap-1.5 col-span-2 border-[#F44336]/40 text-[#F44336]"
-                        disabled={forceSyncMutation.isPending}
-                      >
-                        {forceSyncMutation.isPending ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        )}
-                        Import all tabs
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Import all tabs from Sheets?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will <strong>delete and replace all records</strong> for sessions, signups, users, and payments in the database with live data pulled from Google Sheets.
-                          <br /><br />
-                          Any changes made in the app since the last import will be lost. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-white hover:bg-destructive/90"
-                          onClick={() => forceSyncMutation.mutate({ tab: "all" })}
-                        >
-                          Yes, import everything
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
+              {/* Spreadsheet Import — PIN-gated */}
+              <SpreadsheetImportPanel forceSyncMutation={forceSyncMutation} />
 
             </TabsContent>
           )}
