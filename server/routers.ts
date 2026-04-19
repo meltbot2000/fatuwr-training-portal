@@ -24,6 +24,22 @@ import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems } from "../drizzle/schema";
 
+/**
+ * Normalise any date string to YYYY-MM-DD so SQL-stored dates and Sheets-sourced
+ * dates (M/D/YYYY) can be compared consistently.
+ */
+function toIsoDate(raw: string): string {
+  if (!raw) return raw;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const mdyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mdyMatch) {
+    const [, m, d, y] = mdyMatch;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  const date = new Date(raw);
+  if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  return raw;
+}
 
 /**
  * Parses a date string that may be in either:
@@ -492,7 +508,7 @@ export const appRouter = router({
           const currentDebt = Math.max(0, totalFees - totalPaid);
           // Find the old fee for this specific signup to compute the delta
           const oldSignup = mySignups.find(
-            s => s.dateOfTraining === input.sessionDate && s.pool === input.sessionPool
+            s => toIsoDate(s.dateOfTraining ?? "") === toIsoDate(input.sessionDate) && s.pool === input.sessionPool
           );
           const oldFee = oldSignup?.actualFees ?? 0;
           const projectedDebt = currentDebt - oldFee + input.actualFee;
@@ -514,13 +530,16 @@ export const appRouter = router({
           if (input.memberOnTrainingDate !== undefined) fields.memberOnTrainingDate = input.memberOnTrainingDate;
           if (input.paymentId !== undefined) fields.paymentId = input.paymentId;
         }
-        await editDb.update(sheetSignups)
-          .set(fields)
-          .where(and(
-            eq(sheetSignups.email, targetEmail),
-            eq(sheetSignups.dateOfTraining, input.sessionDate),
-            eq(sheetSignups.pool, input.sessionPool),
-          ));
+        // Find by email+pool, then filter by normalised date in JS to handle mixed formats
+        const isoInputDate = toIsoDate(input.sessionDate);
+        const candidateRows = await editDb.select().from(sheetSignups)
+          .where(and(eq(sheetSignups.email, targetEmail), eq(sheetSignups.pool, input.sessionPool)));
+        const targetIds = candidateRows
+          .filter(r => toIsoDate(r.dateOfTraining ?? "") === isoInputDate)
+          .map(r => r.id);
+        for (const tid of targetIds) {
+          await editDb.update(sheetSignups).set(fields).where(eq(sheetSignups.id, tid));
+        }
         clearSessionsCache();
         return { success: true };
       }),
@@ -540,11 +559,16 @@ export const appRouter = router({
         const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const deleteDb = await db.getDb();
         if (!deleteDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        await deleteDb.delete(sheetSignups).where(and(
-          eq(sheetSignups.email, targetEmail),
-          eq(sheetSignups.dateOfTraining, input.sessionDate),
-          eq(sheetSignups.pool, input.sessionPool),
-        ));
+        // Find by email+pool, then filter by normalised date in JS to handle mixed formats
+        const isoDelDate = toIsoDate(input.sessionDate);
+        const delCandidates = await deleteDb.select().from(sheetSignups)
+          .where(and(eq(sheetSignups.email, targetEmail), eq(sheetSignups.pool, input.sessionPool)));
+        const delIds = delCandidates
+          .filter(r => toIsoDate(r.dateOfTraining ?? "") === isoDelDate)
+          .map(r => r.id);
+        for (const did of delIds) {
+          await deleteDb.delete(sheetSignups).where(eq(sheetSignups.id, did));
+        }
         clearSessionsCache();
         return { success: true };
       }),
@@ -881,18 +905,20 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
       }
       const sessions = await getSessions();
-      // Compute revenue live from sign-ups (sum of actualFees per session)
+      // Compute revenue live from sign-ups (sum of actualFees per session).
+      // Normalise dateOfTraining to YYYY-MM-DD in JS to handle mixed date formats
+      // (Sheets stores M/D/YYYY, app stores YYYY-MM-DD).
       const sessDb = await db.getDb();
       let revenueMap: Record<string, number> = {};
       if (sessDb) {
         const rows = await sessDb.select({
           dateOfTraining: sheetSignups.dateOfTraining,
           pool: sheetSignups.pool,
-          revenue: sql<number>`SUM(${sheetSignups.actualFees})`,
-        }).from(sheetSignups).groupBy(sheetSignups.dateOfTraining, sheetSignups.pool);
+          actualFees: sheetSignups.actualFees,
+        }).from(sheetSignups);
         for (const r of rows) {
-          const key = `${r.dateOfTraining}__${r.pool}`;
-          revenueMap[key] = Number(r.revenue ?? 0);
+          const key = `${toIsoDate(r.dateOfTraining ?? "")}__${(r.pool ?? "").trim()}`;
+          revenueMap[key] = (revenueMap[key] ?? 0) + Number(r.actualFees ?? 0);
         }
       }
       return [...sessions].sort((a, b) => {
@@ -901,7 +927,7 @@ export const appRouter = router({
         return dB - dA;
       }).map(s => ({
         ...s,
-        revenue: revenueMap[`${s.trainingDate}__${s.pool}`] ?? 0,
+        revenue: revenueMap[`${toIsoDate(s.trainingDate)}__${(s.pool ?? "").trim()}`] ?? 0,
       }));
     }),
 
@@ -915,8 +941,14 @@ export const appRouter = router({
         if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         const [session] = await sessDb.select().from(sheetSessions).where(eq(sheetSessions.rowId, input.rowId));
         if (!session) return [];
-        const signups = await sessDb.select().from(sheetSignups).where(
-          and(eq(sheetSignups.dateOfTraining, session.trainingDate), eq(sheetSignups.pool, session.pool ?? ""))
+        const isoDate = toIsoDate(session.trainingDate ?? "");
+        const poolNorm = (session.pool ?? "").trim();
+        // Fetch by pool first (indexed), then filter by normalised date in JS to
+        // handle mixed date formats (YYYY-MM-DD vs M/D/YYYY).
+        const allForPool = await sessDb.select().from(sheetSignups)
+          .where(eq(sheetSignups.pool, poolNorm));
+        const signups = allForPool.filter(s =>
+          toIsoDate(s.dateOfTraining ?? "") === isoDate
         );
         return signups;
       }),
@@ -979,8 +1011,12 @@ export const appRouter = router({
         if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
 
         // Get all sign-ups for this session with a positive fee
-        const signups = await sessDb.select().from(sheetSignups).where(
-          and(eq(sheetSignups.dateOfTraining, session.trainingDate), eq(sheetSignups.pool, session.pool ?? ""))
+        const isoDateRO = toIsoDate(session.trainingDate ?? "");
+        const poolNormRO = (session.pool ?? "").trim();
+        const allForPoolRO = await sessDb.select().from(sheetSignups)
+          .where(eq(sheetSignups.pool, poolNormRO));
+        const signups = allForPoolRO.filter(s =>
+          toIsoDate(s.dateOfTraining ?? "") === isoDateRO
         );
         const eligible = signups.filter(s => (s.actualFees ?? 0) > 0 && s.activity !== "Rain Off Refund");
 

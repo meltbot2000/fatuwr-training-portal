@@ -143,6 +143,28 @@ function parseNumber(val: string): number {
   return isNaN(num) ? 0 : num;
 }
 
+/**
+ * Normalise any date string to YYYY-MM-DD for consistent DB storage.
+ * Handles M/D/YYYY (Google Sheets), DD/MM/YYYY, and ISO formats.
+ */
+function toIsoDate(raw: string): string {
+  if (!raw || raw === "NA") return raw;
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  // M/D/YYYY or MM/DD/YYYY (Google Sheets default)
+  const mdyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mdyMatch) {
+    const [, m, d, y] = mdyMatch;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  // Fallback: let JS parse and reformat
+  const date = new Date(raw);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().slice(0, 10);
+  }
+  return raw;
+}
+
 // ─── Sheets API (primary) ─────────────────────────────────────────────────────
 
 // User-facing fallback timeout (keep snappy; DB is the primary path)
@@ -346,8 +368,8 @@ export async function fetchSheetsSignups(): Promise<SignUpRow[]> {
       email: (row[1] || "").toLowerCase().trim(),
       paymentId: row[2] || "",
       dateTimeOfSignUp: row[3] || "",
-      pool: row[4] || "",
-      dateOfTraining: row[5] || "",
+      pool: (row[4] || "").trim(),
+      dateOfTraining: toIsoDate(row[5] || ""),
       activity: row[6] || "",
       activityValue: row[7] || "",
       baseFee: parseNumber(row[8] || "0"),
