@@ -698,6 +698,14 @@ export default function Admin() {
     onError: (err) => toast.error(err.message || "Failed to update sign-up."),
   });
 
+  const deleteUserMutation = trpc.admin.deleteUser.useMutation({
+    onSuccess: async () => {
+      toast.success("User deleted.");
+      await utils.admin.allUsers.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete user."),
+  });
+
   const deleteSignupMutation = trpc.admin.deleteSignup.useMutation({
     onSuccess: async () => {
       toast.success("Sign-up deleted.");
@@ -902,6 +910,36 @@ export default function Admin() {
                         {u.memberStatus || "Non-Member"}
                       </Badge>
                       {!canEdit && <Lock className="w-3 h-3 text-muted-foreground" />}
+                      {isAdmin && displayEmail && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              onClick={e => e.stopPropagation()}
+                              className="ml-1 p-1 rounded hover:bg-destructive/20 transition-colors"
+                              aria-label="Delete user"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-destructive/70 hover:text-destructive" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete user?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove <strong>{u.name || displayEmail}</strong> ({displayEmail}) from the app. Their sign-up history and payment records will remain. This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-white hover:bg-destructive/90"
+                                onClick={() => deleteUserMutation.mutate({ email: displayEmail })}
+                              >
+                                Delete user
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                   <p className="text-xs text-white/60">{displayEmail || "(no email)"}</p>

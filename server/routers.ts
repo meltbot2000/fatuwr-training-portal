@@ -22,7 +22,7 @@ import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
 import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc } from "drizzle-orm";
-import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos } from "../drizzle/schema";
+import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos, users, otpCodes } from "../drizzle/schema";
 
 /**
  * Normalise any date string to YYYY-MM-DD so SQL-stored dates and Sheets-sourced
@@ -847,6 +847,27 @@ export const appRouter = router({
             ...(input.trialStartDate !== undefined && { trialStartDate: input.trialStartDate }),
             ...(input.trialEndDate !== undefined && { trialEndDate: input.trialEndDate }),
           });
+        }
+        return { success: true };
+      }),
+
+    deleteUser: protectedProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const emailNorm = input.email.toLowerCase().trim();
+        const delDb = await db.getDb();
+        if (!delDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        // Remove from sheet_users (profile/member data)
+        await delDb.delete(sheetUsers).where(eq(sheetUsers.email, emailNorm));
+        // Remove from auth users table (login access)
+        const authUser = await db.getUserByEmail(emailNorm);
+        if (authUser) {
+          await delDb.delete(users).where(eq(users.id, authUser.id));
+          // Clean up any outstanding OTP codes
+          await delDb.delete(otpCodes).where(eq(otpCodes.email, emailNorm));
         }
         return { success: true };
       }),
