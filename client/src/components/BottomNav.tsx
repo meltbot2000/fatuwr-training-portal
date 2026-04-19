@@ -9,10 +9,10 @@ export default function BottomNav() {
   const isAdmin = clubRole === "Admin";
 
   const tabs = [
-    { label: "Training",      Icon: CalendarPlus,     path: "/",              exact: true  },
-    { label: "Announcements", Icon: Megaphone,         path: "/home",          exact: true  },
-    { label: "Payments",      Icon: CircleDollarSign,  path: "/payments",      exact: false },
-    { label: "Fun Stuff",     Icon: Sparkles,          path: "/fun-resources", exact: false },
+    { label: "Trainings", Icon: CalendarPlus,    path: "/",              exact: true  },
+    { label: "Info",      Icon: Megaphone,        path: "/home",          exact: true  },
+    { label: "Payments",  Icon: CircleDollarSign, path: "/payments",      exact: false },
+    { label: "More",      Icon: Sparkles,         path: "/fun-resources", exact: false },
     ...(isAdmin ? [{ label: "Admin", Icon: ShieldCheck, path: "/admin", exact: false }] : []),
   ] as const;
 
@@ -41,17 +41,28 @@ export default function BottomNav() {
             <button
               key={tab.label}
               onClick={() => navigate(tab.path)}
-              style={{ minHeight: 80, paddingTop: 10 }}
-              className="flex-1 flex flex-col items-center justify-start relative"
+              style={{ minHeight: 84, paddingTop: 10, paddingBottom: 8 }}
+              className="flex-1 flex flex-col items-center justify-start gap-1 relative"
               aria-label={tab.label}
             >
               {active && (
                 <span className="absolute top-0 inset-x-3 h-0.5 rounded-b bg-[#2196F3]" />
               )}
               <tab.Icon
-                className={`w-[26px] h-[26px] ${active ? "text-[#2196F3]" : "text-[#888888]"}`}
+                style={{ width: 22, height: 22, color: active ? "#2196F3" : "#888888", flexShrink: 0 }}
                 strokeWidth={1.8}
               />
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: active ? "#2196F3" : "#888888",
+                  lineHeight: 1,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {tab.label}
+              </span>
             </button>
           );
         })}
