@@ -23,7 +23,7 @@ function SessionCardSkeleton() {
 }
 
 export default function Sessions() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { data: sessions, isLoading, error } = trpc.sessions.list.useQuery();
 
   const memberStatus: string = (user as any)?.memberStatus || "Non-Member";
@@ -51,7 +51,7 @@ export default function Sessions() {
       <AppHeader title="Training Sessions" />
 
       <main className="mx-auto max-w-[480px] px-4 py-4 pb-8">
-        {!isAuthenticated && (
+        {!authLoading && !isAuthenticated && (
           <div className="mb-4 px-4 py-3 rounded-xl bg-[#1E1E1E] border border-[#2C2C2C]">
             <p className="text-[16px] text-[#888888]">
               <Link href="/login" className="font-semibold text-[#2196F3] underline">Sign in</Link>
@@ -61,7 +61,7 @@ export default function Sessions() {
         )}
 
         {/* Non-member membership nudge */}
-        {isNonMember && (
+        {!authLoading && isNonMember && (
           <div className="mb-4 space-y-2">
             <div className="px-4 py-3.5 rounded-xl bg-[#1A2A3A]">
               <p className="text-[14px] text-white leading-snug">
@@ -78,7 +78,7 @@ export default function Sessions() {
         )}
 
         {/* Trial expiry warning (within 14 days) */}
-        {trialEndDisplay && (
+        {!authLoading && trialEndDisplay && (
           <div className="mb-4 px-4 py-3.5 rounded-xl bg-[#2A2A2A]">
             <p className="text-[14px] text-white leading-snug">
               Your Trial Membership ends on {trialEndDisplay} — go to the{" "}
