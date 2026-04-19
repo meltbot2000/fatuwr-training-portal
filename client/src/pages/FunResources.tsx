@@ -1,18 +1,25 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import AppHeader from "@/components/AppHeader";
-import { Copy, Users, ShieldCheck, UserPlus, ShoppingBag, Video, BookOpen } from "lucide-react";
+import { Copy, Users, ShieldCheck, UserPlus, ShoppingBag, Video, BookOpen, Waves } from "lucide-react";
 import { toast } from "sonner";
 
 const APP_URL = "https://fatuwr.up.railway.app";
 
 const SECTIONS = [
   {
+    label: "New to the Club",
+    sub: "Beginner's guide to FATUWR",
+    href: "/newbie",
+    Icon: Waves,
+    gradient: "linear-gradient(135deg, #1565C0 0%, #1E88E5 100%)",
+  },
+  {
     label: "Membership",
     sub: "Fees, trials & renewals",
     href: "/membership",
     Icon: Users,
-    gradient: "linear-gradient(135deg, #1565C0 0%, #1E88E5 100%)",
+    gradient: "linear-gradient(135deg, #0D47A1 0%, #1976D2 100%)",
   },
   {
     label: "Club Policies",
@@ -51,6 +58,8 @@ const SECTIONS = [
   },
 ] as const;
 
+const CARD_HEIGHT = 80;
+
 export default function FunResources() {
   const [copied, setCopied] = useState(false);
 
@@ -69,35 +78,38 @@ export default function FunResources() {
     <div className="min-h-screen bg-[#111111] pb-32">
       <AppHeader title="More" showBack={false} />
 
-      <main className="mx-auto max-w-[480px] px-4 pt-5 space-y-3">
+      <main className="mx-auto max-w-[480px] px-4 pt-5 space-y-2.5">
 
-        {/* Section cards — 2-column grid */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {SECTIONS.map(({ label, sub, href, Icon, gradient }) => (
-            <Link key={href} href={href}>
+        {/* Section cards — full width, equal height */}
+        {SECTIONS.map(({ label, sub, href, Icon, gradient }) => (
+          <Link key={href} href={href}>
+            <div
+              className="relative overflow-hidden rounded-2xl cursor-pointer active:opacity-75 transition-opacity"
+              style={{ background: gradient, height: CARD_HEIGHT }}
+            >
+              {/* Decorative circle */}
               <div
-                className="relative overflow-hidden rounded-2xl cursor-pointer active:opacity-80 transition-opacity"
-                style={{ background: gradient, minHeight: 88 }}
-              >
-                {/* Decorative circle */}
-                <div
-                  className="absolute -bottom-4 -right-4 rounded-full opacity-20"
-                  style={{ width: 72, height: 72, background: "white" }}
-                />
-                <div className="relative px-3.5 pt-3.5 pb-3">
-                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center mb-2">
-                    <Icon className="w-4 h-4 text-white" strokeWidth={2} />
-                  </div>
-                  <p className="text-[14px] font-semibold text-white leading-tight">{label}</p>
-                  <p className="text-[11px] text-white/70 mt-0.5 leading-snug">{sub}</p>
+                className="absolute rounded-full opacity-15"
+                style={{ width: 110, height: 110, background: "white", bottom: -28, right: -20 }}
+              />
+              {/* Content */}
+              <div className="relative flex items-center gap-4 px-4 h-full">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Icon className="w-5 h-5 text-white" strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {/* fs-header: 17px/600 */}
+                  <p className="text-[17px] font-semibold text-white leading-tight">{label}</p>
+                  {/* fs-meta: 13px/400 */}
+                  <p className="text-[13px] text-white/70 mt-0.5">{sub}</p>
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          </Link>
+        ))}
 
         {/* Share app */}
-        <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4">
+        <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 mt-1">
           <p className="text-[13px] text-[#888888] mb-2">Share the app</p>
           <div className="flex items-center justify-between gap-3">
             <span className="text-[14px] text-white truncate">{APP_URL}</span>
