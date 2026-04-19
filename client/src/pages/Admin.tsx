@@ -770,8 +770,19 @@ export default function Admin() {
     };
   }, [sessions]);
 
-  const filteredSessions = useMemo(() => {
-    if (!sessions) return sessions;
+  const isSessionsFiltered = !!(
+    sessionSearch ||
+    sessionMonthFilter !== "All" ||
+    sessionPoolFilter !== "All" ||
+    sessionDayFilter !== "All" ||
+    sessionStatusFilter !== "All"
+  );
+
+  // Returns the filtered + sorted flat list (used when filters are active)
+  // and the three named groups (used when no filters are active).
+  const { filteredSessions, sessionGroups } = useMemo(() => {
+    if (!sessions) return { filteredSessions: sessions, sessionGroups: null };
+
     let result = sessions;
     if (sessionSearch) {
       const q = sessionSearch.toLowerCase();
@@ -793,20 +804,25 @@ export default function Admin() {
     if (sessionStatusFilter === "Open") result = result.filter(s => !s.isClosed || s.isClosed.trim() === "");
     else if (sessionStatusFilter === "Closed") result = result.filter(s => s.isClosed && s.isClosed.trim() !== "");
 
-    // ── Custom ordering ───────────────────────────────────────────
-    // Top: past 2 (most-recent first) + upcoming 6 (earliest first)
-    // Then: all remaining sessions sorted chronologically Jan → Dec
     const dateMs = (s: typeof result[number]) => new Date(s.trainingDate).getTime() || 0;
-    const past = result.filter(s => isPastSession(s)).sort((a, b) => dateMs(b) - dateMs(a));
+    const past     = result.filter(s =>  isPastSession(s)).sort((a, b) => dateMs(b) - dateMs(a));
     const upcoming = result.filter(s => !isPastSession(s)).sort((a, b) => dateMs(a) - dateMs(b));
 
-    const pinned = [...past.slice(0, 2), ...upcoming.slice(0, 6)];
-    const pinnedSet = new Set(pinned.map(s => s.rowId));
-    const remainder = result
-      .filter(s => !pinnedSet.has(s.rowId))
-      .sort((a, b) => dateMs(a) - dateMs(b));
+    const recent       = past.slice(0, 2);
+    const upcomingTop  = upcoming.slice(0, 4);
+    const pinnedSet    = new Set([...recent, ...upcomingTop].map(s => s.rowId));
+    const all          = result.filter(s => !pinnedSet.has(s.rowId)).sort((a, b) => dateMs(a) - dateMs(b));
 
-    return [...pinned, ...remainder];
+    const flat = [...recent, ...upcomingTop, ...all];
+
+    return {
+      filteredSessions: flat,
+      sessionGroups: [
+        { label: "Recent",   items: recent },
+        { label: "Upcoming", items: upcomingTop },
+        { label: "All",      items: all },
+      ].filter(g => g.items.length > 0),
+    };
   }, [sessions, sessionSearch, sessionMonthFilter, sessionPoolFilter, sessionDayFilter, sessionStatusFilter]);
 
   if (loading || !user || !isAdminOrHelper) return null;
@@ -1062,7 +1078,60 @@ export default function Admin() {
                 <p className="text-center text-sm text-white/60 py-8">No sessions found.</p>
               )}
 
-              {filteredSessions && filteredSessions.map((s) => {
+              {/* ── Grouped view (no filters active) ── */}
+              {!isSessionsFiltered && sessionGroups && sessionGroups.map(({ label, items }) => (
+                <div key={label}>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2 mt-4 first:mt-0">
+                    {label}
+                  </p>
+                  {items.map((s) => {
+                    const isClosed = s.isClosed && s.isClosed.trim().length > 0;
+                    return (
+                      <div
+                        key={s.rowId}
+                        className="rounded-lg border bg-card px-4 py-3 cursor-pointer hover:bg-white/5 active:bg-white/8 transition-colors mb-2"
+                        onClick={() => setViewingSessionRowId(s.rowId)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm text-white truncate">
+                              {s.day} — {s.trainingDate}
+                            </p>
+                            <p className="text-xs text-white/60">{s.pool} · {s.trainingTime}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingSession(s)}>
+                              <Pencil className="w-3 h-3 mr-1" />Edit
+                            </Button>
+                            {isClosed ? (
+                              <Badge variant="destructive" className="text-xs">Closed</Badge>
+                            ) : (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10" disabled={closeSessionMutation.isPending}>Close</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Close session?</AlertDialogTitle>
+                                    <AlertDialogDescription>This will prevent new sign-ups for {s.trainingDate} at {s.pool}. This cannot be undone here.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={() => closeSessionMutation.mutate({ rowId: s.rowId })}>Close session</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* ── Flat view (filters active) ── */}
+              {isSessionsFiltered && filteredSessions && filteredSessions.map((s) => {
                 const isClosed = s.isClosed && s.isClosed.trim().length > 0;
                 return (
                   <div
@@ -1128,6 +1197,7 @@ export default function Admin() {
                   </div>
                 );
               })}
+
             </TabsContent>
           )}
 
