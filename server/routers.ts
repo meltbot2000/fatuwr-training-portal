@@ -1400,6 +1400,42 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  resources: router({
+    list: publicProcedure.query(async () => {
+      // Fetch the "Resources" tab directly from Google Sheets.
+      // Column B = title (index 1), Column C = url (index 2).
+      // Rows are 1-indexed in Sheets; array index = row - 1.
+      const RESOURCES_TAB = "Resources";
+      // Row numbers (1-indexed) for each group
+      const RESOURCE_ROWS   = [6, 7, 17, 15, 16];
+      const USEFUL_LINK_ROWS = [9, 8, 11, 5];
+
+      let rawRows: string[][] = [];
+      try {
+        // Use the same fetchSheetRange helper via a dynamic import workaround —
+        // we export it indirectly by calling googleSheets.getResources below
+        const { fetchResourcesTab } = await import("./googleSheets");
+        rawRows = await fetchResourcesTab();
+      } catch (e) {
+        console.error("[resources.list] Failed to fetch Resources tab:", e);
+      }
+
+      function pickRow(rowNum: number): { title: string; url: string } | null {
+        const row = rawRows[rowNum - 1];
+        if (!row) return null;
+        const title = (row[1] ?? "").trim();
+        const url   = (row[2] ?? "").trim();
+        if (!title && !url) return null;
+        return { title, url };
+      }
+
+      const resources = RESOURCE_ROWS.map(pickRow).filter(Boolean) as { title: string; url: string }[];
+      const usefulLinks = USEFUL_LINK_ROWS.map(pickRow).filter(Boolean) as { title: string; url: string }[];
+
+      return { resources, usefulLinks };
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

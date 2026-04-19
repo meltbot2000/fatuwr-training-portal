@@ -663,3 +663,12 @@ export function convertDriveUrl(url: string): string {
   if (match2) return `https://drive.google.com/thumbnail?id=${match2[1]}&sz=w800`;
   return url;
 }
+
+
+/**
+ * Fetches all rows from the "Resources" tab in the Google Sheet.
+ * Returns raw string[][] — callers pick the rows they need.
+ */
+export async function fetchResourcesTab(): Promise<string[][]> {
+  return fetchSheetRange("Resources");
+}
