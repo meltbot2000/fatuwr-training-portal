@@ -14,7 +14,21 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
   const [, navigate] = useLocation();
 
   return (
-    <header className="sticky top-0 z-50 bg-[#1E1E1E] text-white" style={{ borderBottom: "1px solid #2C2C2C" }}>
+    <>
+    {/* Spacer — same height as the fixed header so content doesn't hide behind it */}
+    <div style={{ height: "calc(56px + env(safe-area-inset-top, 0px))", flexShrink: 0 }} aria-hidden="true" />
+    <header
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backgroundColor: "#1E1E1E",
+        borderBottom: "1px solid #2C2C2C",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
+    >
       <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14 relative">
         <div className="flex items-center gap-2">
           {showBack && (
@@ -48,5 +62,6 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
         </div>
       </div>
     </header>
+    </>
   );
 }
