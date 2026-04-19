@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
 
 export default function Home() {
@@ -10,7 +10,7 @@ export default function Home() {
   const clubRole = (user as any)?.clubRole || "";
   const canManage = clubRole === "Admin" || clubRole === "Helper";
 
-  const { data: announcements = [], refetch } = trpc.announcements.list.useQuery();
+  const { data: announcements = [], isLoading, refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -39,7 +39,11 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-[480px] px-4 pt-5 space-y-3">
-        {announcements.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 text-[#888888] animate-spin" />
+          </div>
+        ) : announcements.length === 0 ? (
           <div className="bg-[#1E1E1E] rounded-2xl px-4 py-10 text-center mt-4">
             <p className="text-[13px] text-[#888888]">No announcements yet.</p>
           </div>

@@ -3,7 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus, GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -14,7 +14,7 @@ export default function Announcements() {
   const clubRole = (user as any)?.clubRole || "";
   const canManage = clubRole === "Admin" || clubRole === "Helper";
 
-  const { data: all = [], refetch } = trpc.announcements.list.useQuery();
+  const { data: all = [], isLoading, refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [order, setOrder] = useState<AnnType[]>([]);
@@ -76,7 +76,13 @@ export default function Announcements() {
           </div>
         )}
 
-        {list.length === 0 && (
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 text-[#888888] animate-spin" />
+          </div>
+        )}
+
+        {!isLoading && list.length === 0 && (
           <div className="bg-[#1E1E1E] rounded-2xl px-4 py-6 text-center">
             <p className="text-[13px] text-[#888888]">No announcements yet.</p>
           </div>
