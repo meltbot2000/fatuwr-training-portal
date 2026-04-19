@@ -16,7 +16,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-[#2196F3]">
+      <header className="sticky top-0 z-50 bg-[#1E1E1E]" style={{ borderBottom: "1px solid #2C2C2C" }}>
         <div className="mx-auto max-w-[480px] relative flex items-center justify-center px-4 h-14">
           <span className="text-[17px] font-semibold text-white">Announcements</span>
           <div className="absolute right-3 flex items-center gap-1">

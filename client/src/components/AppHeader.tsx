@@ -14,7 +14,7 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
   const [, navigate] = useLocation();
 
   return (
-    <header className="sticky top-0 z-50 bg-[#2196F3] text-white shadow-md">
+    <header className="sticky top-0 z-50 bg-[#1E1E1E] text-white" style={{ borderBottom: "1px solid #2C2C2C" }}>
       <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14 relative">
         <div className="flex items-center gap-2">
           {showBack && (
