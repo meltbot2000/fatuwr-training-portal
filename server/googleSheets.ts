@@ -472,16 +472,34 @@ export async function getSessions(): Promise<SessionRow[]> {
 
 export async function getUpcomingSessions(): Promise<SessionRow[]> {
   const sessions = await getSessions();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // compare date only so today's sessions always show
+  const now = Date.now();
 
   return sessions.filter(session => {
     const sessionDate = parseSessionDate(session.trainingDate);
     if (!sessionDate) return false;
-    const sessionDay = new Date(sessionDate);
-    sessionDay.setHours(0, 0, 0, 0);
-    // Include any session on or after today (closed or open)
-    return sessionDay >= today;
+
+    // Build the session's start datetime by parsing trainingTime (e.g. "7:30 PM – 9:30 PM")
+    let startHour = 0;
+    let startMin  = 0;
+    if (session.trainingTime) {
+      const startStr = session.trainingTime.split(/[–\-]/)[0].trim();
+      const m = startStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+      if (m) {
+        let h = parseInt(m[1], 10);
+        const mins = parseInt(m[2], 10);
+        const ampm = (m[3] || "").toLowerCase();
+        if (ampm === "pm" && h < 12) h += 12;
+        if (ampm === "am" && h === 12) h = 0;
+        startHour = h;
+        startMin  = mins;
+      }
+    }
+    const sessionStart = new Date(sessionDate);
+    sessionStart.setHours(startHour, startMin, 0, 0);
+
+    // Hide session once it is more than 1 hour past its start time
+    const cutoff = sessionStart.getTime() + 60 * 60 * 1000;
+    return now < cutoff;
   }).sort((a, b) => {
     const dateA = parseSessionDate(a.trainingDate);
     const dateB = parseSessionDate(b.trainingDate);

@@ -2,6 +2,25 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+/**
+ * If a sheetUser has memberStatus "Trial" but their trialEndDate is already in
+ * the past, treat them as "Non-Member" so the expiry job doesn't have to run
+ * first and cause a brief incorrect state on login.
+ */
+function resolveSheetMemberStatus(memberStatus: string, trialEndDate: string): string {
+  if (memberStatus !== "Trial") return memberStatus;
+  if (!trialEndDate || trialEndDate === "NA" || trialEndDate === "N/A") return memberStatus;
+  // Parse DD/MM/YYYY or YYYY-MM-DD or M/D/YYYY
+  let end: Date | null = null;
+  const ddmm = trialEndDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmm) { const [, d, m, y] = ddmm.map(Number); end = new Date(y, m - 1, d); }
+  else { const mdy = trialEndDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (mdy) { const [, m, d, y] = mdy.map(Number); end = new Date(y, m - 1, d); } }
+  if (!end) { const iso = new Date(trialEndDate); if (!isNaN(iso.getTime())) end = iso; }
+  if (!end) return memberStatus;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return end < today ? "Non-Member" : memberStatus;
+}
+
 // ─── OTP rate limiter (in-memory) ────────────────────────────────────────────
 // sendOtp: max 1 send per email per 60 s
 // verifyOtp: max 5 failed attempts per email per 10 min, then locked
@@ -301,7 +320,7 @@ export const appRouter = router({
             email,
             name,
             loginMethod: "email",
-            memberStatus: sheetUser?.memberStatus || "Non-Member",
+            memberStatus: resolveSheetMemberStatus(sheetUser?.memberStatus || "Non-Member", sheetUser?.trialEndDate ?? ""),
             paymentId,
             clubRole: sheetUser?.clubRole ?? "",
             trialStartDate: sheetUser?.trialStartDate ?? "",
@@ -322,7 +341,7 @@ export const appRouter = router({
           await db.upsertUser({
             openId: user.openId,
             lastSignedIn: new Date(),
-            memberStatus: sheetUser.memberStatus || "Non-Member",
+            memberStatus: resolveSheetMemberStatus(sheetUser.memberStatus || "Non-Member", sheetUser.trialEndDate ?? ""),
             clubRole: sheetUser.clubRole ?? "",
             paymentId: sheetUser.paymentId || user.paymentId || "",
             trialStartDate: normalizeToddmmyyyy(sheetUser.trialStartDate ?? ""),
