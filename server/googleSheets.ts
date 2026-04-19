@@ -633,19 +633,21 @@ export async function getAllSignupsByEmail(
 
   return allSignups.filter(s => {
     const rowEmail = (s.email || "").toLowerCase().trim();
-    const activity = s.activity || "";
     const rowPayRef = (s.paymentId || "").toLowerCase().trim();
 
-    const matchByEmail = rowEmail === normalizedEmail;
-    const matchByRef = Boolean(
-      membershipFeeRefs &&
-      membershipFeeRefs.size > 0 &&
-      !rowEmail &&
-      activity === "Membership Fee" &&
-      rowPayRef &&
-      membershipFeeRefs.has(rowPayRef),
-    );
-    return matchByEmail || matchByRef;
+    // If the row has a paymentId, ownership is determined by paymentId only.
+    // This covers admin-created sign-ups for other users (admin's email on the row,
+    // but the correct person's paymentId) and all historical Sheets rows.
+    if (rowPayRef) {
+      return Boolean(
+        membershipFeeRefs &&
+        membershipFeeRefs.size > 0 &&
+        membershipFeeRefs.has(rowPayRef),
+      );
+    }
+
+    // No paymentId on the row — fall back to email match.
+    return rowEmail === normalizedEmail;
   }).map(s => ({
     ...s,
     email: s.email || normalizedEmail,

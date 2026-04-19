@@ -197,7 +197,7 @@ export default function SessionDetail() {
               <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
                 Sign-ups closed
               </button>
-            ) : sessionStarted && !mySignup ? (
+            ) : sessionStarted && !mySignup && !isAdminUser ? (
               <button disabled className="w-full h-[48px] rounded-full bg-white/6 text-white/25 text-[15px] font-medium cursor-default">
                 Session in progress
               </button>

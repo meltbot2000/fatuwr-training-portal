@@ -8,7 +8,6 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
-import { getLatestOtp } from "../db";
 import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus } from "../sync";
 import { seedMerchIfEmpty } from "../merchSeed";
 import { startDailyBackup } from "../backup";
@@ -60,18 +59,6 @@ async function startServer() {
     const devSecret = process.env.DEV_SECRET;
     if (!devSecret || req.query.secret !== devSecret) { res.status(403).json({ error: "Forbidden" }); return; }
     res.json({ headers: req.headers });
-  });
-
-  // OTP retrieval endpoint for automated testing — protected by DEV_SECRET env var
-  // Usage: GET /api/dev/otp?email=x@y.com&secret=YOUR_DEV_SECRET
-  app.get("/api/dev/otp", async (req, res) => {
-    const devSecret = process.env.DEV_SECRET;
-    if (!devSecret) { res.status(404).json({ error: "Not found" }); return; }
-    if (req.query.secret !== devSecret) { res.status(403).json({ error: "Forbidden" }); return; }
-    const email = (req.query.email as string) || "";
-    if (!email) { res.status(400).json({ error: "Provide ?email=" }); return; }
-    const code = await getLatestOtp(email.toLowerCase().trim());
-    res.json({ code });
   });
 
   // Sheets → DB sync webhook (called by GAS after each write)

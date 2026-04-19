@@ -847,6 +847,8 @@ export default function Admin() {
     { enabled: !!viewingSessionRowId }
   );
 
+  const [addingAttendee, setAddingAttendee] = useState(false);
+
   const editSignupMutation = trpc.admin.editSignup.useMutation({
     onSuccess: async () => {
       toast.success("Sign-up updated.");
@@ -855,6 +857,16 @@ export default function Admin() {
       await utils.admin.allSessions.invalidate();
     },
     onError: (err) => toast.error(err.message || "Failed to update sign-up."),
+  });
+
+  const addSignupMutation = trpc.admin.addSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Attendee added.");
+      setAddingAttendee(false);
+      await utils.admin.sessionAttendees.invalidate({ rowId: viewingSessionRowId ?? "" });
+      await utils.admin.allSessions.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to add attendee."),
   });
 
   const deleteUserMutation = trpc.admin.deleteUser.useMutation({
@@ -1532,15 +1544,32 @@ export default function Admin() {
       )}
 
       {/* ── Session Attendees Sheet ───────────────────────────────────── */}
-      <Sheet open={!!viewingSessionRowId} onOpenChange={(v) => { if (!v) { setViewingSessionRowId(null); setEditingAttendeeId(null); } }}>
+      <Sheet open={!!viewingSessionRowId} onOpenChange={(v) => { if (!v) { setViewingSessionRowId(null); setEditingAttendeeId(null); setAddingAttendee(false); } }}>
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8 px-0">
           <SheetHeader className="px-4 pb-2">
-            <SheetTitle className="text-[15px] font-medium text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#2196F3]" />
-              Attendees
+            <SheetTitle className="text-[15px] font-medium text-white flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#2196F3]" />
+                Attendees
+              </span>
+              <button
+                onClick={() => { setAddingAttendee(true); setEditingAttendeeId(null); }}
+                className="flex items-center gap-1 text-[13px] text-[#2196F3] font-medium pr-1"
+              >
+                <Plus className="w-4 h-4" />
+                Add
+              </button>
             </SheetTitle>
           </SheetHeader>
           <div className="pb-8">
+            {/* ── Add attendee form ── */}
+            {addingAttendee && (
+              <AdminAddAttendee
+                onSave={(fields) => addSignupMutation.mutate({ rowId: viewingSessionRowId!, ...fields })}
+                onCancel={() => setAddingAttendee(false)}
+                isSaving={addSignupMutation.isPending}
+              />
+            )}
             {attendeesLoading && (
               <div className="space-y-2 px-4">
                 {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-[#1E1E1E] animate-pulse" />)}
@@ -1606,12 +1635,93 @@ export default function Admin() {
   );
 }
 
+// ─── Admin Add Attendee inline component ─────────────────────────────────────
+
+function AdminAddAttendee({
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  onSave: (fields: { name: string; email: string; paymentId: string; activity: string; actualFees: number; memberOnTrainingDate: string }) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    paymentId: "",
+    activity: "Regular Training",
+    actualFees: "",
+    memberOnTrainingDate: "Non-Member",
+  });
+  const set = (f: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [f]: e.target.value }));
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast.error("Name is required."); return; }
+    if (!form.paymentId.trim()) { toast.error("Payment ID is required."); return; }
+    if (!form.activity.trim()) { toast.error("Activity is required."); return; }
+    onSave({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      paymentId: form.paymentId.trim(),
+      activity: form.activity.trim(),
+      actualFees: parseFloat(form.actualFees) || 0,
+      memberOnTrainingDate: form.memberOnTrainingDate.trim() || "Non-Member",
+    });
+  };
+
+  return (
+    <div className="mx-4 mb-4">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2196F3] mb-2">New attendee</p>
+      <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
+        {[
+          { label: "Name *",       field: "name"               as const },
+          { label: "Payment ID *", field: "paymentId"          as const },
+          { label: "Email",        field: "email"              as const },
+          { label: "Activity *",   field: "activity"           as const },
+          { label: "Actual fee",   field: "actualFees"         as const, type: "number" },
+          { label: "Member status",field: "memberOnTrainingDate" as const },
+        ].map(({ label, field, type }) => (
+          <div key={field} className="flex items-center gap-3 px-4 min-h-[48px]">
+            <span className="text-[14px] text-[#888888] w-28 shrink-0">{label}</span>
+            <input
+              type={type ?? "text"}
+              value={form[field]}
+              onChange={set(field)}
+              step={type === "number" ? "0.01" : undefined}
+              placeholder={field === "memberOnTrainingDate" ? "Non-Member" : ""}
+              className={`flex-1 bg-transparent text-[14px] text-white outline-none py-2 placeholder:text-white/25${field === "paymentId" ? " font-mono" : ""}`}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex-1 h-[44px] rounded-full bg-[#2196F3] text-white font-medium text-[14px] disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+          {isSaving ? "Adding…" : "Add attendee"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 h-[44px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[14px]"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Admin Edit Attendee inline component ─────────────────────────────────────
 
 type AttendeeRow = {
   id: number;
   name: string | null;
   email: string | null;
+  paymentId: string | null;
   activity: string | null;
   activityValue: string | null;
   baseFee: number | null;
@@ -1627,7 +1737,7 @@ function AdminEditAttendee({
   isDeleting,
 }: {
   attendee: AttendeeRow;
-  onSave: (u: { name?: string; email?: string; activity?: string; activityValue?: string; baseFee?: number; actualFees?: number; memberOnTrainingDate?: string }) => void;
+  onSave: (u: { name?: string; email?: string; paymentId?: string; activity?: string; activityValue?: string; baseFee?: number; actualFees?: number; memberOnTrainingDate?: string }) => void;
   onDelete: () => void;
   isSaving: boolean;
   isDeleting: boolean;
@@ -1635,6 +1745,7 @@ function AdminEditAttendee({
   const [form, setForm] = useState({
     name: attendee.name ?? "",
     email: attendee.email ?? "",
+    paymentId: attendee.paymentId ?? "",
     activity: attendee.activity ?? "",
     activityValue: attendee.activityValue ?? "",
     baseFee: String(attendee.baseFee ?? 0),
@@ -1650,6 +1761,7 @@ function AdminEditAttendee({
         {[
           { label: "Name",         field: "name"               as const },
           { label: "Email",        field: "email"              as const },
+          { label: "Payment ID",   field: "paymentId"          as const },
           { label: "Activity",     field: "activity"           as const },
           { label: "Activity val", field: "activityValue"      as const },
           { label: "Base fee",     field: "baseFee"            as const, type: "number" },
@@ -1663,7 +1775,7 @@ function AdminEditAttendee({
               value={form[field]}
               onChange={set(field)}
               step={type === "number" ? "0.01" : undefined}
-              className="flex-1 bg-transparent text-[14px] text-white outline-none py-2"
+              className={`flex-1 bg-transparent text-[14px] text-white outline-none py-2${field === "paymentId" ? " font-mono" : ""}`}
             />
           </div>
         ))}
@@ -1674,6 +1786,7 @@ function AdminEditAttendee({
           onClick={() => onSave({
             name: form.name,
             email: form.email,
+            paymentId: form.paymentId,
             activity: form.activity,
             activityValue: form.activityValue,
             baseFee: parseFloat(form.baseFee) || 0,

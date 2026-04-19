@@ -1,6 +1,52 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+
+// ─── OTP rate limiter (in-memory) ────────────────────────────────────────────
+// sendOtp: max 1 send per email per 60 s
+// verifyOtp: max 5 failed attempts per email per 10 min, then locked
+interface SendBucket { lastSent: number }
+interface VerifyBucket { attempts: number; windowStart: number; locked: boolean }
+const otpSendMap   = new Map<string, SendBucket>();
+const otpVerifyMap = new Map<string, VerifyBucket>();
+const SEND_COOLDOWN_MS    = 60_000;         // 60 s between sends
+const VERIFY_WINDOW_MS    = 10 * 60_000;    // 10-minute window
+const VERIFY_MAX_ATTEMPTS = 5;
+
+function checkSendRateLimit(email: string): void {
+  const now = Date.now();
+  const bucket = otpSendMap.get(email);
+  if (bucket && now - bucket.lastSent < SEND_COOLDOWN_MS) {
+    const secsLeft = Math.ceil((SEND_COOLDOWN_MS - (now - bucket.lastSent)) / 1000);
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Please wait ${secsLeft}s before requesting another code.` });
+  }
+  otpSendMap.set(email, { lastSent: now });
+}
+
+function recordVerifyAttempt(email: string, success: boolean): void {
+  const now = Date.now();
+  let bucket = otpVerifyMap.get(email);
+  if (!bucket || now - bucket.windowStart > VERIFY_WINDOW_MS) {
+    bucket = { attempts: 0, windowStart: now, locked: false };
+  }
+  if (success) { otpVerifyMap.delete(email); return; }
+  bucket.attempts += 1;
+  if (bucket.attempts >= VERIFY_MAX_ATTEMPTS) bucket.locked = true;
+  otpVerifyMap.set(email, bucket);
+}
+
+function checkVerifyRateLimit(email: string): void {
+  const now = Date.now();
+  const bucket = otpVerifyMap.get(email);
+  if (!bucket) return;
+  // Reset window if expired
+  if (now - bucket.windowStart > VERIFY_WINDOW_MS) { otpVerifyMap.delete(email); return; }
+  if (bucket.locked) {
+    const minsLeft = Math.ceil((VERIFY_WINDOW_MS - (now - bucket.windowStart)) / 60_000);
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Too many failed attempts. Try again in ${minsLeft} minute(s).` });
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -99,30 +145,41 @@ async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typ
   const payments = allPayments ?? await getPayments();
   const normUserPayId = (userPaymentId || "").toLowerCase().trim();
 
-  // Pass 1: direct email match
-  const byEmail = payments.filter(p => p.email === email);
-  // Collect the user's known payment refs from pass-1 rows; seed with own paymentId
-  const myRefs = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()).filter(Boolean));
+  // Seed the user's known paymentId refs with their own ID.
+  // Then expand by collecting any paymentIds found on email-matched rows
+  // (handles cases where the user has multiple ref variants).
+  const myRefs = new Set<string>();
   if (normUserPayId) myRefs.add(normUserPayId);
+  payments
+    .filter(p => (p.email || "").toLowerCase().trim() === email)
+    .map(p => (p.paymentId || "").toLowerCase().trim())
+    .filter(Boolean)
+    .forEach(id => myRefs.add(id));
 
-  // Pass 2: rows whose col F paymentId ref is in the user's known refs
-  // (includes carry-over rows with no email, and rows where GAS matched the ID but not the email)
-  const alreadyFound = new Set(byEmail.map(p => p.paymentId.toLowerCase().trim()));
-  const byRef = payments.filter(p => {
-    if (alreadyFound.has(p.paymentId.toLowerCase().trim())) return false; // avoid dups
-    return p.paymentId && myRefs.has(p.paymentId.toLowerCase().trim());
+  const result = payments.filter(p => {
+    const rowPayId  = (p.paymentId  || "").toLowerCase().trim();
+    const rowEmail  = (p.email      || "").toLowerCase().trim();
+
+    // If the row has a paymentId, ownership is determined by paymentId alone.
+    // This catches credits/year-start entries that have no email but do have a paymentId.
+    if (rowPayId) return myRefs.has(rowPayId);
+
+    // No paymentId — fall back to email match.
+    if (rowEmail) return rowEmail === email;
+
+    // Neither email nor paymentId: try extracting paymentId from reference text (col E).
+    if (p.reference && normUserPayId) {
+      return extractPaymentIdFromReference(p.reference) === normUserPayId;
+    }
+
+    return false;
   });
 
-  // Pass 3: GAS lookup failed entirely (col F and G both empty) — extract paymentId from col E reference text
-  const byRefText = normUserPayId
-    ? payments.filter(p => {
-        if (p.email || p.paymentId) return false;
-        if (!p.reference) return false;
-        return extractPaymentIdFromReference(p.reference) === normUserPayId;
-      })
-    : [];
+  // Rebuild myPaymentRefs from all matched rows so callers can use it for sign-up matching.
+  const myPaymentRefs = new Set(result.map(p => (p.paymentId || "").toLowerCase().trim()).filter(Boolean));
+  if (normUserPayId) myPaymentRefs.add(normUserPayId);
 
-  return { myPayments: [...byEmail, ...byRef, ...byRefText], myPaymentRefs: myRefs };
+  return { myPayments: result, myPaymentRefs };
 }
 
 function generatePaymentId(name: string, existingIds: Set<string>): string {
@@ -181,6 +238,7 @@ export const appRouter = router({
       .input(z.object({ email: z.string().email() }))
       .mutation(async ({ input }) => {
         const { email } = input;
+        checkSendRateLimit(email.toLowerCase().trim());
         const code = generateOtp();
         // Truncate to second precision — MySQL TIMESTAMP doesn't support milliseconds
         const expiresAt = new Date(Math.floor((Date.now() + 10 * 60 * 1000) / 1000) * 1000);
@@ -198,13 +256,16 @@ export const appRouter = router({
         const email = input.email.toLowerCase().trim();
         const { code } = input;
 
+        checkVerifyRateLimit(email);
         const isValid = await db.verifyOtp(email, code);
         if (!isValid) {
+          recordVerifyAttempt(email, false);
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Invalid or expired code. Please try again.",
           });
         }
+        recordVerifyAttempt(email, true);
 
         let user = await db.getUserByEmail(email);
         let isNewUser = false;
@@ -457,13 +518,18 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
+        const isAdmin = (user as any).clubRole === "Admin";
         const existingSignups = await getSignUpsForSession(input.sessionDate, input.sessionPool);
-        const isDuplicate = existingSignups.some(
-          su => su.email.toLowerCase().trim() === (user.email || "").toLowerCase().trim()
-        );
 
-        if (isDuplicate) {
-          throw new TRPCError({ code: "CONFLICT", message: "You are already signed up for this session." });
+        // Admins add sign-ups on behalf of others — skip duplicate check so they can
+        // add multiple attendees for the same session (each will get correct paymentId via edit).
+        if (!isAdmin) {
+          const isDuplicate = existingSignups.some(
+            su => su.email.toLowerCase().trim() === (user.email || "").toLowerCase().trim()
+          );
+          if (isDuplicate) {
+            throw new TRPCError({ code: "CONFLICT", message: "You are already signed up for this session." });
+          }
         }
 
         const signupDb = await db.getDb();
@@ -926,23 +992,29 @@ export const appRouter = router({
         const emailNorm = input.email.toLowerCase().trim();
         const pidNorm   = (input.paymentId || "").toLowerCase().trim();
 
-        // Payments: match by email (col G) or paymentId (col F)
-        let payments: typeof sheetPayments.$inferSelect[] = [];
-        if (pidNorm) {
-          const { or } = await import("drizzle-orm");
-          payments = await actDb.select().from(sheetPayments)
-            .where(or(eq(sheetPayments.email, emailNorm), eq(sheetPayments.paymentId, pidNorm)));
-        } else {
-          payments = await actDb.select().from(sheetPayments)
-            .where(eq(sheetPayments.email, emailNorm));
-        }
-        payments = [...payments].sort((a, b) =>
+        // Payments: paymentId-primary (same rule as sign-ups).
+        // If a row has a paymentId, match by paymentId; otherwise fall back to email.
+        // Fetch all and filter in JS to apply the same logic as getMyPayments.
+        const { or } = await import("drizzle-orm");
+        const allPmts = await actDb.select().from(sheetPayments);
+        const payments = [...allPmts].filter(p => {
+          const rowPayId = (p.paymentId || "").toLowerCase().trim();
+          const rowEmail = (p.email     || "").toLowerCase().trim();
+          if (rowPayId) return pidNorm ? rowPayId === pidNorm : rowEmail === emailNorm;
+          return rowEmail === emailNorm;
+        }).sort((a, b) =>
           (new Date(b.date ?? "").getTime() || 0) - (new Date(a.date ?? "").getTime() || 0)
         );
 
-        // Signups: match by email
-        const signups = await actDb.select().from(sheetSignups)
-          .where(eq(sheetSignups.email, emailNorm));
+        // Signups: paymentId-primary — if a row has a paymentId, match by paymentId;
+        // otherwise fall back to email. Covers admin-created sign-ups and imported rows.
+        const allSups = await actDb.select().from(sheetSignups);
+        const signups = [...allSups].filter(s => {
+          const rowPayId = (s.paymentId || "").toLowerCase().trim();
+          const rowEmail = (s.email     || "").toLowerCase().trim();
+          if (rowPayId) return pidNorm ? rowPayId === pidNorm : rowEmail === emailNorm;
+          return rowEmail === emailNorm;
+        });
         const signupsSorted = [...signups].sort((a, b) =>
           (new Date(b.dateOfTraining ?? "").getTime() || 0) - (new Date(a.dateOfTraining ?? "").getTime() || 0)
         );
@@ -1009,6 +1081,7 @@ export const appRouter = router({
         id: z.number(),
         name: z.string().optional(),
         email: z.string().optional(),
+        paymentId: z.string().optional(),
         activity: z.string().optional(),
         activityValue: z.string().optional(),
         baseFee: z.number().optional(),
@@ -1025,6 +1098,7 @@ export const appRouter = router({
         const updates: Record<string, unknown> = {};
         if (fields.name !== undefined) updates.name = fields.name;
         if (fields.email !== undefined) updates.email = fields.email.toLowerCase().trim();
+        if (fields.paymentId !== undefined) updates.paymentId = fields.paymentId.toLowerCase().trim();
         if (fields.activity !== undefined) updates.activity = fields.activity;
         if (fields.activityValue !== undefined) updates.activityValue = fields.activityValue;
         if (fields.baseFee !== undefined) updates.baseFee = fields.baseFee;
@@ -1032,6 +1106,41 @@ export const appRouter = router({
         if (fields.memberOnTrainingDate !== undefined) updates.memberOnTrainingDate = fields.memberOnTrainingDate;
         if (Object.keys(updates).length === 0) return { success: true };
         await sessDb.update(sheetSignups).set(updates).where(eq(sheetSignups.id, id));
+        return { success: true };
+      }),
+
+    addSignup: protectedProcedure
+      .input(z.object({
+        rowId: z.string(),              // identifies which session
+        name: z.string().min(1),
+        email: z.string().default(""),
+        paymentId: z.string().min(1),
+        activity: z.string().min(1),
+        actualFees: z.number(),
+        memberOnTrainingDate: z.string().default("Non-Member"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const sessDb = await db.getDb();
+        if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const [session] = await sessDb.select().from(sheetSessions).where(eq(sheetSessions.rowId, input.rowId));
+        if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+        const isoDate = toIsoDate(session.trainingDate ?? "");
+        await sessDb.insert(sheetSignups).values({
+          name: input.name.trim(),
+          email: input.email.toLowerCase().trim(),
+          paymentId: input.paymentId.toLowerCase().trim(),
+          dateTimeOfSignUp: new Date().toISOString(),
+          pool: session.pool ?? "",
+          dateOfTraining: isoDate,
+          activity: input.activity,
+          activityValue: "",
+          baseFee: input.actualFees,
+          actualFees: input.actualFees,
+          memberOnTrainingDate: input.memberOnTrainingDate,
+        });
         return { success: true };
       }),
 

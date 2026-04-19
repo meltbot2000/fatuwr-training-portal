@@ -1,14 +1,11 @@
+import crypto from "crypto";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { ENV } from "./_core/env";
 
 export function generateOtp(): string {
-  const digits = "0123456789";
-  let otp = "";
-  for (let i = 0; i < 6; i++) {
-    otp += digits[Math.floor(Math.random() * 10)];
-  }
-  return otp;
+  // crypto.randomInt is cryptographically secure (CSPRNG)
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
 function buildOtpHtml(code: string): string {
