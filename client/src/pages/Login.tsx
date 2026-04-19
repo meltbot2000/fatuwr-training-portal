@@ -6,7 +6,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Loader2, Mail, ShieldCheck, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-const RESEND_COOLDOWN = 30;
+const RESEND_COOLDOWN = 60;
 
 export default function Login() {
   const [step, setStep] = useState<"email" | "otp" | "profile">("email");

@@ -908,9 +908,9 @@ export default function Admin() {
     const q = search.toLowerCase().trim();
     if (!q) return result;
     return result.filter(u =>
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.userEmail.toLowerCase().includes(q)
+      (u.name  || "").toLowerCase().includes(q) ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.userEmail || "").toLowerCase().includes(q)
     );
   }, [users, search, statusFilter]);
 
