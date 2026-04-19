@@ -107,7 +107,7 @@ export default function AnnouncementSheet({ open, onOpenChange, existing, onDone
               placeholder="Optional"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={3}
+              rows={12}
               className="flex-1 bg-transparent border-0 p-0 text-[14px] text-white resize-none outline-none placeholder:text-white/30"
             />
           </div>
