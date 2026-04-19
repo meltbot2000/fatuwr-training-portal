@@ -24,7 +24,7 @@ export default function Home() {
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
         <div className="mx-auto max-w-[480px] relative flex items-center justify-center px-4 h-14">
-          <span className="text-[17px] font-semibold text-white">Info</span>
+          <span className="text-[18px] font-bold text-white">Info</span>
           <div className="absolute right-3 flex items-center gap-1">
             {canManage && (
               <button
