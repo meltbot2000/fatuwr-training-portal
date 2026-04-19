@@ -230,8 +230,10 @@ export default function SessionDetail() {
                       onClick={() => { if (tappable) { setEditingSignup(su); setEditSheetOpen(true); } }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-left ${tappable ? "hover:bg-white/4 active:bg-white/6" : "cursor-default"}`}
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold ${isMe ? "bg-[#2196F3] text-white" : "bg-white/8 text-white/50"}`}>
-                        {getInitials(su.name) || "?"}
+                      <div className={`w-9 h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold ${isMe ? "bg-[#2196F3] text-white" : "bg-white/8 text-white/50"}`}>
+                        {(su as any).image
+                          ? <img src={(su as any).image} alt={su.name} className="w-full h-full object-cover" />
+                          : (getInitials(su.name) || "?")}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[15px] font-medium text-white truncate">
