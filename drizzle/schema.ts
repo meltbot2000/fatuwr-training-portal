@@ -138,3 +138,14 @@ export const merchItems = mysqlTable("merch_items", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type MerchItem = typeof merchItems.$inferSelect;
+
+export const videos = mysqlTable("videos", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  url: text("url").notNull(),
+  postedBy: varchar("postedBy", { length: 255 }).notNull(),
+  postedDate: varchar("postedDate", { length: 32 }).notNull(), // YYYY-MM-DD
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Video = typeof videos.$inferSelect;
+export type InsertVideo = typeof videos.$inferInsert;

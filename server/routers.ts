@@ -22,7 +22,7 @@ import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
 import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc } from "drizzle-orm";
-import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems } from "../drizzle/schema";
+import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos } from "../drizzle/schema";
 
 /**
  * Normalise any date string to YYYY-MM-DD so SQL-stored dates and Sheets-sourced
@@ -1397,6 +1397,45 @@ export const appRouter = router({
         const mDb = await db.getDb();
         if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await mDb.delete(merchItems).where(eq(merchItems.id, input.id));
+        return { success: true };
+      }),
+  }),
+
+  videos: router({
+    list: publicProcedure.query(async () => {
+      const vDb = await db.getDb();
+      if (!vDb) return [];
+      const rows = await vDb.select().from(videos).orderBy(sql`${videos.createdAt} DESC`);
+      return rows;
+    }),
+
+    add: protectedProcedure
+      .input(z.object({
+        title: z.string().min(1).max(255),
+        url: z.string().url(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const vDb = await db.getDb();
+        if (!vDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const postedBy = (ctx.user as any).name || (ctx.user as any).email || "Unknown";
+        const postedDate = new Date().toISOString().slice(0, 10);
+        await vDb.insert(videos).values({
+          title: input.title,
+          url: input.url,
+          postedBy,
+          postedDate,
+        });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const role = (ctx.user as any).clubRole;
+        if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
+        const vDb = await db.getDb();
+        if (!vDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await vDb.delete(videos).where(eq(videos.id, input.id));
         return { success: true };
       }),
   }),
