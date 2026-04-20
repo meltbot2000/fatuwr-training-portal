@@ -1315,7 +1315,7 @@ export default function Admin() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
                             <p className="font-medium text-sm text-white truncate">
-                              {s.day} — {s.trainingDate}
+                              {s.day} — {formatDisplayDate(s.trainingDate)}
                             </p>
                             <p className="text-xs text-white/60">{s.pool} · {s.trainingTime}</p>
                           </div>
@@ -1362,7 +1362,7 @@ export default function Admin() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-sm text-white truncate">
-                          {s.day} — {s.trainingDate}
+                          {s.day} — {formatDisplayDate(s.trainingDate)}
                         </p>
                         <p className="text-xs text-white/60">{s.pool} · {s.trainingTime}</p>
                       </div>
@@ -1479,7 +1479,7 @@ export default function Admin() {
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-[14px] text-white truncate">
-                                  {s.trainingDate}
+                                  {formatDisplayDate(s.trainingDate)}
                                   {isRainOff && (
                                     <span className="ml-2 text-[11px] font-medium text-[#F5C518] bg-[#3D3500] px-1.5 py-0.5 rounded">
                                       Rain
