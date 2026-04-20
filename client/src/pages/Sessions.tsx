@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Calendar, AlertTriangle, Star } from "lucide-react";
+import { Calendar, AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
 import { parseAnyDate } from "@/lib/dateUtils";
 
@@ -62,19 +62,17 @@ export default function Sessions() {
 
         {/* Non-member membership nudge */}
         {!authLoading && isNonMember && (
-          <div className="mb-4 space-y-2">
-            <div className="px-4 py-3.5 rounded-xl bg-[#1A2A3A]">
-              <p className="text-[14px] text-white leading-snug">
-                You're currently not a member — click the button below to find out how to become a Trial or Annual Member
+          <Link href="/membership">
+            <div className="mb-4 px-3 py-[10px] rounded-[10px] cursor-pointer" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>
+              <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
+                <span className="text-white font-medium">Not a member yet?</span>
+                {" "}
+                <span style={{ color: "#888888" }}>Save on training fees with a Trial or Annual membership.</span>
+                {" "}
+                <span className="text-[#2196F3] font-medium whitespace-nowrap">Join ›</span>
               </p>
             </div>
-            <Link href="/membership">
-              <div className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] flex items-center justify-center gap-2 cursor-pointer">
-                <Star className="w-4 h-4" />
-                How to become a Member
-              </div>
-            </Link>
-          </div>
+          </Link>
         )}
 
         {/* Trial expiry warning (within 14 days) */}
