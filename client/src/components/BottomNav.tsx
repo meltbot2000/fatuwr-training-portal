@@ -92,8 +92,8 @@ export default function BottomNav() {
             <button
               key={tab.label}
               onClick={() => navigate(tab.path)}
-              className="flex-1 flex flex-col items-center justify-center relative"
-              style={{ gap: 4 }}
+              className="flex-1 flex flex-col items-center justify-start relative"
+              style={{ gap: 4, paddingTop: 15 }}
               aria-label={tab.label}
             >
               {/* Active indicator — top edge, 28×3px, rounded bottom corners */}
