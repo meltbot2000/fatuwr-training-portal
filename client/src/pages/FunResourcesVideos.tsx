@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Plus, Loader2, Play, X } from "lucide-react";
 import { toast } from "sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 // ── Thumbnail helpers ─────────────────────────────────────────────────────────
 
@@ -51,66 +52,56 @@ function AddVideoSheet({
     onError: (e) => toast.error(e.message || "Failed to add video"),
   });
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
-      onClick={() => onOpenChange(false)}
-    >
-      <div
-        className="w-full max-w-[480px] bg-[#1E1E1E] rounded-t-2xl flex flex-col"
-        style={{ maxHeight: "90dvh" }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Fixed header */}
-        <div className="px-4 pt-4 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-2" />
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-[17px] font-semibold text-white">Add video</p>
-            <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-full hover:bg-white/10">
-              <X className="w-4 h-4 text-[#888888]" />
-            </button>
-          </div>
-        </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] flex flex-col bg-[#2A2A2A] border-t-0 px-0 pb-0">
+        <SheetHeader className="pt-4 pb-3 px-4 shrink-0">
+          <SheetTitle className="text-[15px] font-medium text-white">Add video</SheetTitle>
+        </SheetHeader>
 
-        {/* Scrollable content */}
         <div className="overflow-y-auto flex-1 min-h-0 px-4 pb-8 space-y-3">
-          <div className="space-y-2.5">
-            <div>
-              <label className="text-[13px] text-[#888888] block mb-1">Title</label>
+          <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
+            <div className="flex items-center gap-3 px-4 min-h-[48px]">
+              <span className="text-[14px] text-[#888888] w-16 shrink-0">Title</span>
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="e.g. FATUWR vs NUSAC highlights"
-                className="w-full bg-[#2C2C2C] rounded-xl px-3 py-2.5 text-[14px] text-white placeholder-[#555] outline-none focus:ring-1 focus:ring-[#2196F3]"
+                className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
               />
             </div>
-            <div>
-              <label className="text-[13px] text-[#888888] block mb-1">URL</label>
+            <div className="flex items-center gap-3 px-4 min-h-[48px]">
+              <span className="text-[14px] text-[#888888] w-16 shrink-0">URL</span>
               <input
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="https://youtube.com/watch?v=..."
-                className="w-full bg-[#2C2C2C] rounded-xl px-3 py-2.5 text-[14px] text-white placeholder-[#555] outline-none focus:ring-1 focus:ring-[#2196F3]"
+                className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
                 inputMode="url"
                 autoCapitalize="none"
               />
             </div>
           </div>
 
-          <button
-            onClick={() => addMutation.mutate({ title: title.trim(), url: url.trim() })}
-            disabled={!title.trim() || !url.trim() || addMutation.isPending}
-            className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2 mt-1"
-          >
-            {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            Add video
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => addMutation.mutate({ title: title.trim(), url: url.trim() })}
+              disabled={!title.trim() || !url.trim() || addMutation.isPending}
+              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {addMutation.isPending ? "Adding…" : "Add video"}
+            </button>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="w-full h-[48px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[15px]"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
