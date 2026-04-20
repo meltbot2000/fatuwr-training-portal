@@ -7,6 +7,15 @@ import AnnouncementSheet from "@/components/AnnouncementSheet";
 import { Pencil, Trash2, Megaphone } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
+/** Wrap bare URLs in <a> tags, leaving already-linked URLs untouched. */
+function autoLink(html: string): string {
+  // Match http(s):// URLs not already inside an href="..." attribute
+  return html.replace(
+    /(?<!href=["'])(?<!src=["'])(https?:\/\/[^\s<>"']+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+}
+
 export default function AnnouncementDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
@@ -71,7 +80,7 @@ export default function AnnouncementDetail() {
         {/* Content — supports basic HTML (bold, italic, headings, links, lists) */}
         {ann.content && (
           <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 rich-content"
-            dangerouslySetInnerHTML={{ __html: ann.content }}
+            dangerouslySetInnerHTML={{ __html: autoLink(ann.content) }}
           />
         )}
 
