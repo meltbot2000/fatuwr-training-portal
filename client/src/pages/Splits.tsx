@@ -85,7 +85,7 @@ export default function Splits() {
       toast.info("No sign-ups yet.");
       return;
     }
-    copyToClipboard(allNames.join(", "), `${allNames.length} names`);
+    copyToClipboard(allNames.join("\n"), `${allNames.length} names`);
   };
 
   const handleCopySection = (activity: Activity, names: string[]) => {
@@ -93,7 +93,7 @@ export default function Splits() {
       toast.info("No names in this section.");
       return;
     }
-    copyToClipboard(names.join(", "), `${names.length} name${names.length !== 1 ? "s" : ""}`);
+    copyToClipboard(names.join("\n"), `${names.length} name${names.length !== 1 ? "s" : ""}`);
   };
 
   return (
@@ -154,7 +154,7 @@ export default function Splits() {
         {uncategorised.length > 0 && (
           <div className="rounded-lg border overflow-hidden">
             <button
-              onClick={() => copyToClipboard(uncategorised.join(", "), `${uncategorised.length} names`)}
+              onClick={() => copyToClipboard(uncategorised.join("\n"), `${uncategorised.length} names`)}
               className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-muted hover:bg-muted/80 transition-colors"
             >
               <span className="font-semibold text-sm text-foreground">

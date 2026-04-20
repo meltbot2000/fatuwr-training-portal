@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -73,6 +73,16 @@ export default function EditSignupSheet({
   const [memberStatus, setMemberStatus] = useState(signup.memberOnTrainingDate || "Non-Member");
   const [paymentId, setPaymentId] = useState(signup.paymentId || "");
   const [actualFee, setActualFee] = useState(signup.actualFees?.toString() ?? "");
+
+  // Reset all fields when the sheet opens or the signup changes (different user)
+  useEffect(() => {
+    if (!open) return;
+    setActivity((ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity);
+    setName(signup.name);
+    setMemberStatus(signup.memberOnTrainingDate || "Non-Member");
+    setPaymentId(signup.paymentId || "");
+    setActualFee(signup.actualFees?.toString() ?? "");
+  }, [open, signup.email]);
 
   const utils = trpc.useUtils();
   const refreshMutation = trpc.sessions.refresh.useMutation();
@@ -200,7 +210,7 @@ export default function EditSignupSheet({
                     key={a}
                     onClick={() => {
                       setActivity(a);
-                      if (!isAdmin) setActualFee(fee.toString());
+                      setActualFee(fee.toString());
                     }}
                     className={`rounded-full border-[1.5px] px-[14px] py-[6px] transition-all flex flex-col items-start ${
                       activity === a

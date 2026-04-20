@@ -38,7 +38,7 @@ export default function FunResourcesPolicies() {
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
       <AppHeader title="Club Policies" showBack backPath="/fun-resources" />
-      <main className="mx-auto max-w-[480px] px-4 pt-5 pb-8">
+      <main className="mx-auto max-w-[480px] px-4 pt-5 pb-32">
         <div
           className="bg-[#1E1E1E] rounded-2xl px-4 py-5 rich-content"
           dangerouslySetInnerHTML={{ __html: CONTENT }}

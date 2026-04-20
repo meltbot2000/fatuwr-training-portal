@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>FATUWR — Non-member banner variants</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #111111;
+    --bg-card: #1E1E1E;
+    --primary: #2196F3;
+    --text: #FFFFFF;
+    --text-2: #888888;
+    --divider: #2C2C2C;
+    --warn-bg: #3D3500;
+    --warn-text: #F5C518;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #1a1a1a;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #fff;
+  }
+  .head { text-align: center; padding: 32px 20px 12px; }
+  .head h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .head p { font-size: 13px; color: #aaa; max-width: 620px; margin: 0 auto; line-height: 1.5; }
+
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 40px 28px;
+    padding: 30px 20px 80px;
+    max-width: 1900px;
+    margin: 0 auto;
+  }
+
+  .cell {
+    width: 320px;
+    flex: 0 0 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .label {
+    font-size: 12px; color: #888; letter-spacing: 0.06em;
+    text-transform: uppercase; font-weight: 500;
+    margin-bottom: 12px; text-align: center;
+  }
+  .label .rec {
+    color: #4CAF50; font-size: 10px; margin-left: 6px; letter-spacing: 0.08em;
+  }
+  .caption {
+    font-size: 12px; color: #aaa; text-align: center; line-height: 1.5;
+    margin-top: 12px; width: 100%;
+  }
+  .caption code { font-size: 11px; background: #000; padding: 1px 4px; border-radius: 3px; color: #bbb; }
+
+  /* ---- phone chrome ---- */
+  .phone {
+    width: 320px;
+    flex: 0 0 320px;
+    height: 600px;
+    min-height: 600px;
+    max-height: 600px;
+    background: var(--bg-base);
+    border-radius: 36px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    display: flex;
+    flex-direction: column;
+    contain: layout size;
+  }
+  .topbar {
+    flex: 0 0 48px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--divider);
+    position: relative;
+  }
+  .topbar .title {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 600;
+  }
+  .topbar .avatar {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 600;
+  }
+  .scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nav {
+    flex: 0 0 52px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--divider);
+    display: flex;
+  }
+  .nav-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--text-2);
+    font-size: 10px;
+  }
+  .nav-item.active { color: var(--primary); }
+  .nav-item .ico { font-size: 14px; line-height: 1; }
+
+  /* session card */
+  .sc {
+    flex: 0 0 auto;
+    background: var(--bg-card);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .sc-img {
+    height: 100px;
+    background:
+      linear-gradient(180deg, rgba(26,48,64,0) 50%, rgba(11,52,80,0.8) 100%),
+      linear-gradient(135deg, #1e5f8c 0%, #0b3450 100%);
+    position: relative;
+  }
+  .sc-img::after {
+    content: '';
+    position: absolute; inset: 55% 10% 10% 10%;
+    background: linear-gradient(180deg, #1a4a6b, #0b3450);
+    border-radius: 3px;
+    box-shadow: inset 0 -8px 0 rgba(255,255,255,0.03);
+  }
+  .sc-body { padding: 10px 14px 12px; }
+  .sc-day {
+    color: var(--primary);
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 2px;
+  }
+  .sc-date { color: #fff; font-size: 13px; margin-bottom: 1px; }
+  .sc-meta { color: var(--text-2); font-size: 12px; }
+
+  /* ---- ORIGINAL ---- */
+  .orig-banner {
+    flex: 0 0 auto;
+    background: #1e2a36;
+    padding: 14px 16px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .orig-btn {
+    flex: 0 0 42px;
+    background: var(--primary);
+    color: #fff;
+    border: 0;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  /* ---- V1 ---- */
+  .v1-banner {
+    flex: 0 0 auto;
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    display: flex;
+    gap: 10px;
+  }
+  .v1-banner .ic { flex: 0 0 16px; margin-top: 1px; }
+  .v1-banner .bd { flex: 1 1 auto; }
+  .v1-banner .lk {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    margin-top: 4px;
+    display: inline-block;
+  }
+
+  /* ---- V2 ---- */
+  .v2-pill {
+    flex: 0 0 auto;
+    background: var(--bg-card);
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .v2-pill .dot {
+    flex: 0 0 8px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--warn-text);
+    box-shadow: 0 0 0 3px rgba(245,197,24,0.15);
+  }
+  .v2-pill .t { flex: 1 1 auto; font-size: 12px; color: #fff; line-height: 1.4; }
+  .v2-pill .t small { color: var(--text-2); display: block; margin-top: 1px; font-size: 11px; }
+  .v2-pill .chev { color: var(--text-2); font-size: 14px; }
+
+  /* ---- V3 ---- */
+  .v3-card {
+    flex: 0 0 auto;
+    background: var(--bg-card);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .v3-hero {
+    height: 90px;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(33,150,243,0.35), transparent 60%),
+      radial-gradient(circle at 80% 70%, rgba(33,150,243,0.2), transparent 60%),
+      linear-gradient(135deg, #0f2940, #0a1a2a);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .v3-body { padding: 14px; }
+  .v3-eyebrow {
+    color: var(--primary);
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .v3-title { color: #fff; font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .v3-sub { color: var(--text-2); font-size: 12px; line-height: 1.4; }
+  .v3-link {
+    margin-top: 10px;
+    color: var(--primary);
+    font-size: 13px; font-weight: 500;
+  }
+
+  /* ---- V4 ---- */
+  .v4-strip {
+    flex: 0 0 auto;
+    background: rgba(33,150,243,0.08);
+    border: 1px solid rgba(33,150,243,0.22);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .v4-strip .bd { flex: 1 1 auto; font-size: 12px; color: #fff; line-height: 1.45; }
+  .v4-strip .bd b { font-weight: 500; }
+  .v4-strip .bd em { color: var(--text-2); font-style: normal; }
+  .v4-strip .cta { color: var(--primary); font-weight: 500; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Non-member banner — design options</h1>
+  <p>The original banner + full-width CTA duplicate the same message and push session cards below the fold. Four alternatives that fit the app's existing visual language.</p>
+</div>
+
+<div class="grid">
+
+  <!-- ORIGINAL -->
+  <div class="cell">
+    <div class="label">Original</div>
+    <div class="phone">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="orig-banner">You're currently not a member — click the button below to find out how to become a Trial or Annual Member</div>
+        <button class="orig-btn">★ How to become a Member</button>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">TUESDAY</div><div class="sc-date">21 April 2026, 7:45 PM</div><div class="sc-meta">MGS · 0 signed up</div></div></div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><div class="ico">📅</div><div>Trainings</div></div>
+        <div class="nav-item"><div class="ico">📣</div><div>Info</div></div>
+        <div class="nav-item"><div class="ico">$</div><div>Payments</div></div>
+        <div class="nav-item"><div class="ico">⋯</div><div>More</div></div>
+      </div>
+    </div>
+    <div class="caption">Banner + CTA say the same thing twice. Takes ~160px before any session appears.</div>
+  </div>
+
+  <!-- V1 -->
+  <div class="cell">
+    <div class="label">V1 · System warning banner</div>
+    <div class="phone">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v1-banner">
+          <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#F5C518" stroke-width="1.8"/><path d="M12 8v5" stroke="#F5C518" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F5C518"/></svg>
+          <div class="bd">
+            You're not a member yet. Sign-ups are limited to Trial and Annual Members.
+            <div class="lk">See how to join →</div>
+          </div>
+        </div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">TUESDAY</div><div class="sc-date">21 April 2026, 7:45 PM</div><div class="sc-meta">MGS · 0 signed up</div></div></div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><div class="ico">📅</div><div>Trainings</div></div>
+        <div class="nav-item"><div class="ico">📣</div><div>Info</div></div>
+        <div class="nav-item"><div class="ico">$</div><div>Payments</div></div>
+        <div class="nav-item"><div class="ico">⋯</div><div>More</div></div>
+      </div>
+    </div>
+    <div class="caption">Uses the system's existing warning-banner token (<code>--warning-bg</code> / <code>--warning-text</code>). Text link replaces the redundant CTA.</div>
+  </div>
+
+  <!-- V2 -->
+  <div class="cell">
+    <div class="label">V2 · Status pill</div>
+    <div class="phone">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v2-pill">
+          <div class="dot"></div>
+          <div class="t">Not a member<small>Tap to learn how to join</small></div>
+          <div class="chev">›</div>
+        </div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">TUESDAY</div><div class="sc-date">21 April 2026, 7:45 PM</div><div class="sc-meta">MGS · 0 signed up</div></div></div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><div class="ico">📅</div><div>Trainings</div></div>
+        <div class="nav-item"><div class="ico">📣</div><div>Info</div></div>
+        <div class="nav-item"><div class="ico">$</div><div>Payments</div></div>
+        <div class="nav-item"><div class="ico">⋯</div><div>More</div></div>
+      </div>
+    </div>
+    <div class="caption">Low-key status indicator. Smallest footprint; doesn't compete with session photography.</div>
+  </div>
+
+  <!-- V3 -->
+  <div class="cell">
+    <div class="label">V3 · Membership hero card</div>
+    <div class="phone">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v3-card">
+          <div class="v3-hero">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l2.8 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17l-6.1 3.3 1.6-6.8L2.3 8.9l6.9-.6L12 2z" fill="#2196F3" fill-opacity="0.9"/>
+            </svg>
+          </div>
+          <div class="v3-body">
+            <div class="v3-eyebrow">MEMBERSHIP</div>
+            <div class="v3-title">Become a Member</div>
+            <div class="v3-sub">Sign-ups are limited to Trial and Annual Members.</div>
+            <div class="v3-link">Get started →</div>
+          </div>
+        </div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><div class="ico">📅</div><div>Trainings</div></div>
+        <div class="nav-item"><div class="ico">📣</div><div>Info</div></div>
+        <div class="nav-item"><div class="ico">$</div><div>Payments</div></div>
+        <div class="nav-item"><div class="ico">⋯</div><div>More</div></div>
+      </div>
+    </div>
+    <div class="caption">Same card rhythm as sessions — feels native. But steals hero treatment that should belong to sessions.</div>
+  </div>
+
+  <!-- V4 -->
+  <div class="cell">
+    <div class="label">V4 · Compact accent strip <span class="rec">★ RECOMMENDED</span></div>
+    <div class="phone">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v4-strip">
+          <div class="bd"><b>Not a member yet?</b> <em>Save on training fees with a Trial or Annual membership.</em> <span class="cta">Join ›</span></div>
+        </div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">TUESDAY</div><div class="sc-date">21 April 2026, 7:45 PM</div><div class="sc-meta">MGS · 0 signed up</div></div></div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active"><div class="ico">📅</div><div>Trainings</div></div>
+        <div class="nav-item"><div class="ico">📣</div><div>Info</div></div>
+        <div class="nav-item"><div class="ico">$</div><div>Payments</div></div>
+        <div class="nav-item"><div class="ico">⋯</div><div>More</div></div>
+      </div>
+    </div>
+    <div class="caption">Subtle blue tint uses the accent without shouting. One row, inline CTA, sessions visible immediately.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

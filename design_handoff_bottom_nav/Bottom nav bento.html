@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>FATUWR — Bottom nav (Set 1 + bento More + top bar)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #111111;
+    --bg-card: #1E1E1E;
+    --primary: #2196F3;
+    --text-2: #888888;
+    --divider: #2C2C2C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #1a1a1a;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #fff;
+    min-height: 100vh;
+  }
+  .head { text-align: center; padding: 32px 20px 8px; }
+  .head h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .head p { font-size: 12px; color: #aaa; max-width: 560px; margin: 0 auto; line-height: 1.5; }
+
+  .sizes {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 40px 28px;
+    padding: 28px 16px 80px;
+  }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .size-label {
+    font-size: 11px; color: #888; letter-spacing: 0.06em;
+    text-transform: uppercase; font-weight: 500;
+  }
+  .tap-label {
+    font-size: 11px; color: #aaa;
+    margin-top: 8px;
+  }
+  .tap-label a { color: var(--primary); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+  .phone {
+    background: var(--bg-base);
+    border-radius: 36px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    display: flex; flex-direction: column;
+    flex: 0 0 auto;
+  }
+  .phone.se    { width: 320px; height: 580px; }
+  .phone.std   { width: 375px; height: 640px; }
+  .phone.plus  { width: 430px; height: 720px; }
+
+  .topbar {
+    flex: 0 0 48px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--divider);
+    position: relative;
+  }
+  .topbar .title {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 600;
+  }
+  .topbar .avatar {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 600;
+  }
+  .scroll {
+    flex: 1 1 0; min-height: 0; overflow: hidden;
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .sc { flex: 0 0 auto; background: var(--bg-card); border-radius: 14px; overflow: hidden; }
+  .sc-img { height: 100px; background: linear-gradient(135deg, #1e5f8c 0%, #0b3450 100%); }
+  .sc-body { padding: 10px 14px 12px; }
+  .sc-day { color: var(--primary); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+  .sc-date { color: #fff; font-size: 13px; margin-bottom: 1px; }
+  .sc-meta { color: var(--text-2); font-size: 12px; }
+
+  .v4 {
+    flex: 0 0 auto;
+    background: rgba(33,150,243,0.08);
+    border: 1px solid rgba(33,150,243,0.22);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px; line-height: 1.45;
+  }
+  .v4 b { font-weight: 500; }
+  .v4 em { color: var(--text-2); font-style: normal; }
+  .v4 .cta { color: var(--primary); font-weight: 500; white-space: nowrap; }
+
+  /* --- Nav: Set 1 outlined + bento More + top indicator (Set 5 treatment) --- */
+  .nav {
+    flex: 0 0 72px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--divider);
+    display: flex;
+  }
+  .nav-item {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+    color: var(--text-2);
+    padding: 0 2px;
+    position: relative;
+    cursor: pointer;
+  }
+  .nav-item.active { color: var(--primary); }
+  /* top indicator bar — Set 5 treatment */
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 28px; height: 3px;
+    background: var(--primary);
+    border-radius: 0 0 4px 4px;
+  }
+  .nav-item .lbl {
+    font-size: 11px; font-weight: 500;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .nav-item.active .lbl { font-weight: 600; }
+  .nav-item svg { display: block; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Bottom nav — Set 1 icons + bento "More" + top indicator bar</h1>
+  <p>Outlined icons throughout, with a 2×2 bento grid for More. Active tab shows a short blue bar at the top edge. Click any tab to preview its active state.</p>
+</div>
+
+<div class="sizes">
+
+  <!-- 320 -->
+  <div class="cell">
+    <div class="size-label">320 · iPhone SE</div>
+    <div class="phone se">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v4"><b>Not a member yet?</b> <em>Save on training fees with a Trial or Annual membership.</em> <span class="cta">Join ›</span></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+      </div>
+      <div class="nav" data-nav>
+        <div class="nav-item active" data-tab="t">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+          <div class="lbl">Trainings</div>
+        </div>
+        <div class="nav-item" data-tab="i">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 10v4l14 6V4L4 10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 14v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Info</div>
+        </div>
+        <div class="nav-item" data-tab="p">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M15 9a3 3 0 00-3-1.5c-1.7 0-3 1-3 2.3 0 1.3 1.2 1.9 3 2.2 1.8.3 3 .9 3 2.2 0 1.3-1.3 2.3-3 2.3a3 3 0 01-3-1.5M12 6v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Payments</div>
+        </div>
+        <div class="nav-item" data-tab="m">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <div class="lbl">More</div>
+        </div>
+        <div class="nav-item" data-tab="a">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="lbl">Admin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 375 -->
+  <div class="cell">
+    <div class="size-label">375 · Standard</div>
+    <div class="phone std">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v4"><b>Not a member yet?</b> <em>Save on training fees with a Trial or Annual membership.</em> <span class="cta">Join ›</span></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+      </div>
+      <div class="nav" data-nav>
+        <div class="nav-item" data-tab="t">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+          <div class="lbl">Trainings</div>
+        </div>
+        <div class="nav-item" data-tab="i">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 10v4l14 6V4L4 10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 14v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Info</div>
+        </div>
+        <div class="nav-item" data-tab="p">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M15 9a3 3 0 00-3-1.5c-1.7 0-3 1-3 2.3 0 1.3 1.2 1.9 3 2.2 1.8.3 3 .9 3 2.2 0 1.3-1.3 2.3-3 2.3a3 3 0 01-3-1.5M12 6v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Payments</div>
+        </div>
+        <div class="nav-item active" data-tab="m">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <div class="lbl">More</div>
+        </div>
+        <div class="nav-item" data-tab="a">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="lbl">Admin</div>
+        </div>
+      </div>
+    </div>
+    <div class="tap-label">More tab shown as active ← (bento grid + top bar)</div>
+  </div>
+
+  <!-- 430 -->
+  <div class="cell">
+    <div class="size-label">430 · Pro Max</div>
+    <div class="phone plus">
+      <div class="topbar"><div class="title">Training Sessions</div><div class="avatar">F</div></div>
+      <div class="scroll">
+        <div class="v4"><b>Not a member yet?</b> <em>Save on training fees with a Trial or Annual membership.</em> <span class="cta">Join ›</span></div>
+        <div class="sc"><div class="sc-img"></div><div class="sc-body"><div class="sc-day">SUNDAY</div><div class="sc-date">19 April 2026, 5:00 PM</div><div class="sc-meta">CCAB · 36 signed up</div></div></div>
+      </div>
+      <div class="nav" data-nav>
+        <div class="nav-item active" data-tab="t">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+          <div class="lbl">Trainings</div>
+        </div>
+        <div class="nav-item" data-tab="i">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 10v4l14 6V4L4 10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 14v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Info</div>
+        </div>
+        <div class="nav-item" data-tab="p">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M15 9a3 3 0 00-3-1.5c-1.7 0-3 1-3 2.3 0 1.3 1.2 1.9 3 2.2 1.8.3 3 .9 3 2.2 0 1.3-1.3 2.3-3 2.3a3 3 0 01-3-1.5M12 6v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div class="lbl">Payments</div>
+        </div>
+        <div class="nav-item" data-tab="m">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <div class="lbl">More</div>
+        </div>
+        <div class="nav-item" data-tab="a">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="lbl">Admin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // make each nav clickable to preview active state
+  document.querySelectorAll('[data-nav]').forEach(nav => {
+    nav.addEventListener('click', e => {
+      const item = e.target.closest('.nav-item');
+      if (!item) return;
+      nav.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
