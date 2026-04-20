@@ -50,7 +50,7 @@ export default function Sessions() {
     <div className="min-h-screen bg-[#111111]">
       <AppHeader title="Training Sessions" />
 
-      <main className="mx-auto max-w-[480px] px-4 py-4 pb-8">
+      <main className="mx-auto max-w-[480px] px-4 py-4 pb-32">
         {!authLoading && !isAuthenticated && (
           <Link href="/login">
             <div className="mb-4 px-3 py-[10px] rounded-[10px] cursor-pointer" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>

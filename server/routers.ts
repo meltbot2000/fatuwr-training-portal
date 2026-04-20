@@ -459,13 +459,14 @@ export const appRouter = router({
           .from(sheetSignups)
           .groupBy(sheetSignups.dateOfTraining, sheetSignups.pool);
         for (const row of counts) {
-          signupCounts[`${row.dateOfTraining}|${row.pool}`] = Number(row.count);
+          const key = `${toIsoDate(row.dateOfTraining ?? "")}|${(row.pool ?? "").trim()}`;
+          signupCounts[key] = (signupCounts[key] ?? 0) + Number(row.count);
         }
       }
       return sessions.map(s => ({
         ...s,
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
-        signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${s.pool}`] ?? 0,
+        signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${(s.pool ?? "").trim()}`] ?? 0,
       }));
     }),
 
