@@ -60,7 +60,7 @@ function AddVideoSheet({
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="w-full max-w-[480px] bg-[#1E1E1E] rounded-t-2xl px-4 pt-4 pb-8 space-y-3"
+        className="w-full max-w-[480px] bg-[#1E1E1E] rounded-t-2xl px-4 pt-4 pb-8 space-y-3 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}
