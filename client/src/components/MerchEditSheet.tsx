@@ -135,13 +135,14 @@ export default function MerchEditSheet({ open, onOpenChange, existing, onDone }:
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t-0 px-4 pb-8">
-        <SheetHeader className="pt-4 pb-3">
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] flex flex-col bg-[#2A2A2A] border-t-0 px-0 pb-0">
+        <SheetHeader className="pt-4 pb-3 px-4 shrink-0">
           <SheetTitle className="text-[15px] font-medium text-white">
             {isEdit ? "Edit item" : "Add item"}
           </SheetTitle>
         </SheetHeader>
 
+        <div className="overflow-y-auto flex-1 px-4 pb-8">
         <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C] mb-4">
           {[
             { label: "Name *",          val: name,          set: setName,          ph: "Item name" },
@@ -206,6 +207,7 @@ export default function MerchEditSheet({ open, onOpenChange, existing, onDone }:
             Cancel
           </button>
         </div>
+        </div>{/* end scrollable */}
       </SheetContent>
     </Sheet>
   );
