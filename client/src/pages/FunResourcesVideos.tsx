@@ -76,7 +76,7 @@ function AddVideoSheet({
         </div>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto px-4 pb-8 space-y-3">
+        <div className="overflow-y-auto flex-1 min-h-0 px-4 pb-8 space-y-3">
           <div className="space-y-2.5">
             <div>
               <label className="text-[13px] text-[#888888] block mb-1">Title</label>
