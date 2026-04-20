@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
-import { Pencil, Megaphone } from "lucide-react";
+import { Pencil, Trash2, Megaphone } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,7 +17,13 @@ export default function AnnouncementDetail() {
     { enabled: !!id }
   );
 
+  const [, navigate] = useLocation();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const deleteMutation = trpc.announcements.delete.useMutation({
+    onSuccess: () => navigate("/home"),
+  });
 
   if (isLoading) {
     return (
@@ -73,13 +80,20 @@ export default function AnnouncementDetail() {
           {new Date(ann.createdAt).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" })}
         </p>
 
-        {/* Edit button — admin/helper only */}
+        {/* Edit + Delete buttons — admin/helper only */}
         {canManage && (
-          <button onClick={() => setEditOpen(true)}
-            className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] flex items-center justify-center gap-2">
-            <Pencil className="w-4 h-4" />
-            Edit
-          </button>
+          <div className="flex gap-3">
+            <button onClick={() => setEditOpen(true)}
+              className="flex-1 h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] flex items-center justify-center gap-2">
+              <Pencil className="w-4 h-4" />
+              Edit
+            </button>
+            <button onClick={() => setDeleteOpen(true)}
+              className="h-[48px] px-5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 font-medium text-[15px] flex items-center justify-center gap-2">
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          </div>
         )}
 
       </main>
@@ -92,6 +106,26 @@ export default function AnnouncementDetail() {
           onDone={() => { refetch(); setEditOpen(false); }}
         />
       )}
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete announcement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{ann.title || "This announcement"}" will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={() => deleteMutation.mutate({ id: ann.id })}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
