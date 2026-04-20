@@ -239,7 +239,7 @@ export default function Membership() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <AppHeader title="Membership" />
+      <AppHeader title="Membership" showBack backPath="/" />
 
       <main className="mx-auto max-w-[480px] px-4 py-4 space-y-4">
 
