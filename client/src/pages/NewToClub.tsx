@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import { useSearch } from "wouter";
 
 const sections = [
   {
@@ -59,9 +60,11 @@ const sections = [
 ];
 
 export default function NewToClub() {
+  const search = useSearch();
+  const backPath = new URLSearchParams(search).get("back") || "/";
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
-      <AppHeader title="New to the Club?" showBack backPath="/" />
+      <AppHeader title="New to the Club?" showBack backPath={backPath} />
 
       <main className="mx-auto max-w-[480px] px-4 pt-6 pb-8 space-y-4">
 

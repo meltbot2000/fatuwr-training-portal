@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearch } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
@@ -191,6 +192,8 @@ function MembershipSignupBlock({ paymentId, onConfirm, isPending, succeeded, hea
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Membership() {
+  const search = useSearch();
+  const backPath = new URLSearchParams(search).get("back") || "/";
   const { user, loading } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
   const utils = trpc.useUtils();
   const [trialSuccess, setTrialSuccess] = useState(false);
@@ -221,7 +224,7 @@ export default function Membership() {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-background pb-32">
-        <AppHeader title="Membership" showBack backPath="/" />
+        <AppHeader title="Membership" showBack backPath={backPath} />
       </div>
     );
   }

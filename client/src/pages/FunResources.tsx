@@ -218,7 +218,7 @@ const SECTIONS = [
     eyebrow: "MEMBERSHIP",
     title: "Membership",
     subtitle: "Become a member and save on training fees",
-    href: "/membership",
+    href: "/membership?back=/fun-resources",
     Art: ArtPoolDeck,
   },
   {
@@ -250,7 +250,7 @@ const SECTIONS = [
     eyebrow: "GETTING STARTED",
     title: "New to the Club",
     subtitle: "Beginner's guide to FATUWR",
-    href: "/newbie",
+    href: "/newbie?back=/fun-resources",
     Art: ArtBeginner,
   },
   {
