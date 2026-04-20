@@ -9,11 +9,21 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 /** Wrap bare URLs in <a> tags, leaving already-linked URLs untouched. */
 function autoLink(html: string): string {
-  // Match http(s):// URLs not already inside an href="..." attribute
   return html.replace(
     /(?<!href=["'])(?<!src=["'])(https?:\/\/[^\s<>"']+)/g,
     '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
   );
+}
+
+/**
+ * Prepare announcement content for rendering.
+ * - If it already contains block-level HTML tags, treat as HTML and just auto-link.
+ * - Otherwise treat as plain text: convert newlines → <br> then auto-link.
+ */
+function renderContent(raw: string): string {
+  const hasBlockHtml = /<(p|h[1-6]|ul|ol|li|br|div|blockquote)\b/i.test(raw);
+  const html = hasBlockHtml ? raw : raw.replace(/\n/g, "<br>");
+  return autoLink(html);
 }
 
 export default function AnnouncementDetail() {
@@ -80,7 +90,7 @@ export default function AnnouncementDetail() {
         {/* Content — supports basic HTML (bold, italic, headings, links, lists) */}
         {ann.content && (
           <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 rich-content"
-            dangerouslySetInnerHTML={{ __html: autoLink(ann.content) }}
+            dangerouslySetInnerHTML={{ __html: renderContent(ann.content) }}
           />
         )}
 
