@@ -1,6 +1,10 @@
+import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import { Copy, Check, ExternalLink } from "lucide-react";
 
-const CONTENT = `
+const FORM_URL = "https://bit.ly/fatuwr-newbie";
+
+const CONTENT_BEFORE = `
 <p>Know someone who is interested to try Underwater Rugby (UWR) with us? The Newbie Subcommittee (Gaya, Hayley, Dylia, Steph, Sophie, Charlotte, Sid, Owen, Fiona and Chong Zhi) are here to help! Read on for how to proceed.</p>
 
 <p>We regularly host formal Newcomer Trial Sessions (aka Newbie Sessions) each month alongside normal UWR trainings and we encourage newcomers to the club to come join! These Newbie Sessions are carefully planned to give a clear introduction to the sport and our club and to provide a fun and supportive environment to learn UWR for the first time!</p>
@@ -13,10 +17,12 @@ const CONTENT = `
 <p>There are up to 10 slots per session subject to available gear. Priority for fin size requested will be given in order of sign ups.</p>
 
 <h3>What do I need to do?</h3>
-<p>Please send this interest and indemnity form to your interested newcomer to fill up: <a href="https://bit.ly/fatuwr-newbie" target="_blank" rel="noopener noreferrer">https://bit.ly/fatuwr-newbie</a><br/>
+<p>Please send the interest and indemnity form below to your newcomer to fill up.<br/>
 <i>If they are below 18 years of age, please ensure their parent or guardian fills up this form on their behalf.</i></p>
 <p>Newbie Subcomm will take it from there! But do try and attend training when they come for their Newbie Session, for added moral support!</p>
+`.trim();
 
+const CONTENT_AFTER = `
 <h2>Additional Information</h2>
 
 <h3>How much does it cost?</h3>
@@ -40,14 +46,60 @@ const CONTENT = `
 `.trim();
 
 export default function FunResourcesInvite() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(FORM_URL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
       <AppHeader title="Invite a Friend" showBack backPath="/fun-resources" />
-      <main className="mx-auto max-w-[480px] px-4 pt-5 pb-8">
+      <main className="mx-auto max-w-[480px] px-4 pt-5 pb-8 space-y-3">
+
         <div
           className="bg-[#1E1E1E] rounded-2xl px-4 py-5 rich-content"
-          dangerouslySetInnerHTML={{ __html: CONTENT }}
+          dangerouslySetInnerHTML={{ __html: CONTENT_BEFORE }}
         />
+
+        {/* Form URL card */}
+        <div className="bg-[#1E1E1E] rounded-2xl px-4 py-4 space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35">
+            Interest &amp; Indemnity Form
+          </p>
+          <p className="text-[13px] text-[#888888] font-mono break-all">{FORM_URL}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCopy}
+              className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-2 text-[13px] font-medium transition-colors"
+              style={copied
+                ? { background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.3)", color: "#4CAF50" }
+                : { background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)", color: "#2196F3" }
+              }
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+            <a
+              href={FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 h-[44px] rounded-full bg-[#2196F3] text-white text-[13px] font-medium flex items-center justify-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open form
+            </a>
+          </div>
+        </div>
+
+        <div
+          className="bg-[#1E1E1E] rounded-2xl px-4 py-5 rich-content"
+          dangerouslySetInnerHTML={{ __html: CONTENT_AFTER }}
+        />
+
       </main>
     </div>
   );
