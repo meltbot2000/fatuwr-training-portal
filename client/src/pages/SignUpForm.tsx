@@ -189,9 +189,13 @@ export default function SignUpForm() {
 
         {/* Non-member savings nudge */}
         {membershipOnDate === "Non-Member" && !isFreeActivity && (
-          <div className="bg-[#3D3500] rounded-xl px-4 py-3.5">
-            <p className="text-[13px] text-[#F5C518] leading-snug">
-              Save ${Math.max(0, calculateFee({ ...session! }, "Non-Member", activity) - calculateFee({ ...session! }, "Member", activity)).toFixed(0)} on regular training sessions by signing up for Trial or Annual Membership
+          <div className="px-3 py-[10px] rounded-[10px]" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>
+            <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
+              <span className="text-white font-medium">Not a member yet?</span>
+              {" "}
+              <span style={{ color: "#888888" }}>Save ${Math.max(0, calculateFee({ ...session! }, "Non-Member", activity) - calculateFee({ ...session! }, "Member", activity)).toFixed(0)} per session with a Trial or Annual membership.</span>
+              {" "}
+              <span className="text-[#2196F3] font-medium whitespace-nowrap">Join ›</span>
             </p>
           </div>
         )}

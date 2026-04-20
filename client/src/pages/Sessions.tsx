@@ -52,12 +52,17 @@ export default function Sessions() {
 
       <main className="mx-auto max-w-[480px] px-4 py-4 pb-8">
         {!authLoading && !isAuthenticated && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-[#1E1E1E] border border-[#2C2C2C]">
-            <p className="text-[16px] text-[#888888]">
-              <Link href="/login" className="font-semibold text-[#2196F3] underline">Sign in</Link>
-              {" "}to register for sessions and view your fees.
-            </p>
-          </div>
+          <Link href="/login">
+            <div className="mb-4 px-3 py-[10px] rounded-[10px] cursor-pointer" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>
+              <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
+                <span className="text-white font-medium">Not signed in.</span>
+                {" "}
+                <span style={{ color: "#888888" }}>Sign in to register for sessions and view your fees.</span>
+                {" "}
+                <span className="text-[#2196F3] font-medium whitespace-nowrap">Sign in ›</span>
+              </p>
+            </div>
+          </Link>
         )}
 
         {/* Non-member membership nudge */}
@@ -77,13 +82,17 @@ export default function Sessions() {
 
         {/* Trial expiry warning (within 14 days) */}
         {!authLoading && trialEndDisplay && (
-          <div className="mb-4 px-4 py-3.5 rounded-xl bg-[#2A2A2A]">
-            <p className="text-[14px] text-white leading-snug">
-              Your Trial Membership ends on {trialEndDisplay} — go to the{" "}
-              <Link href="/membership" className="text-[#2196F3] underline">Membership tab</Link>{" "}
-              to sign up for annual membership
-            </p>
-          </div>
+          <Link href="/membership">
+            <div className="mb-4 px-3 py-[10px] rounded-[10px] cursor-pointer" style={{ background: "rgba(245,197,24,0.08)", border: "1px solid rgba(245,197,24,0.22)" }}>
+              <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
+                <span style={{ color: "#F5C518" }} className="font-medium">Trial ends {trialEndDisplay}.</span>
+                {" "}
+                <span style={{ color: "#888888" }}>Sign up for annual membership to keep your member rate.</span>
+                {" "}
+                <span style={{ color: "#F5C518" }} className="font-medium whitespace-nowrap">Renew ›</span>
+              </p>
+            </div>
+          </Link>
         )}
 
         {isLoading && (
