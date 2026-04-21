@@ -86,7 +86,7 @@ import {
 import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
 import { nanoid } from "nanoid";
-import { eq, and, sql, max, asc } from "drizzle-orm";
+import { eq, and, sql, max, asc, or } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos, users, otpCodes } from "../drizzle/schema";
 
 /**
@@ -743,9 +743,10 @@ export const appRouter = router({
         if (!email) throw new Error("No email");
         const photoDb = await db.getDb();
         if (!photoDb) throw new Error("DB unavailable");
+        // Match by either email column — some users' login email is in userEmail, not email
         await photoDb.update(sheetUsers)
           .set({ image: input.image || null })
-          .where(eq(sheetUsers.email, email));
+          .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
         return { ok: true };
       }),
   }),

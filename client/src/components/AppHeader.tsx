@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 
@@ -12,6 +13,11 @@ interface AppHeaderProps {
 export default function AppHeader({ title = "FATUWR", showBack = false, backPath = "/", rightAction }: AppHeaderProps) {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: profile } = trpc.profile.get.useQuery(undefined, {
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000, // cache for 5 min — no need to re-fetch on every nav
+  });
+  const avatarImage = profile?.image || "";
 
   return (
     <>
@@ -50,8 +56,11 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
           {rightAction}
           {isAuthenticated ? (
             <Link href="/profile" className="flex items-center gap-2 hover:bg-white/10 rounded-full p-1.5 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
-                {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+              <div className="w-8 h-8 rounded-full bg-white/20 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
+                {avatarImage
+                  ? <img src={avatarImage} alt="Profile" className="w-full h-full object-cover" />
+                  : (user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U")
+                }
               </div>
             </Link>
           ) : (

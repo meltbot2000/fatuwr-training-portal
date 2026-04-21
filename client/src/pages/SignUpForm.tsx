@@ -3,7 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getMembershipOnTrainingDate, calculateFee } from "@/lib/feeUtils";
 import AppHeader from "@/components/AppHeader";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -136,7 +136,7 @@ export default function SignUpForm() {
     <div className="min-h-screen bg-[#111111]">
       <AppHeader title="Sign up" showBack backPath={`/session/${rowId}`} />
 
-      <main className="mx-auto max-w-[480px] px-4 py-4 pb-10 space-y-3">
+      <main className="mx-auto max-w-[480px] px-4 py-4 space-y-3" style={{ paddingBottom: "calc(8rem + env(safe-area-inset-bottom, 0px))" }}>
 
         {/* Session summary */}
         <div className="bg-[#1E1E1E] rounded-xl px-4 py-3.5">
@@ -189,15 +189,17 @@ export default function SignUpForm() {
 
         {/* Non-member savings nudge */}
         {membershipOnDate === "Non-Member" && !isFreeActivity && (
-          <div className="px-3 py-[10px] rounded-[10px]" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>
-            <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
-              <span className="text-white font-medium">Not a member yet?</span>
-              {" "}
-              <span style={{ color: "#888888" }}>Save ${Math.max(0, calculateFee({ ...session! }, "Non-Member", activity) - calculateFee({ ...session! }, "Member", activity)).toFixed(0)} per session with a Trial or Annual membership.</span>
-              {" "}
-              <span className="text-[#2196F3] font-medium whitespace-nowrap">Join ›</span>
-            </p>
-          </div>
+          <Link href={`/membership?back=/signup/${rowId}`}>
+            <div className="px-3 py-[10px] rounded-[10px] cursor-pointer" style={{ background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.22)" }}>
+              <p style={{ fontSize: "12px", lineHeight: "1.45" }}>
+                <span className="text-white font-medium">Not a member yet?</span>
+                {" "}
+                <span style={{ color: "#888888" }}>Save ${Math.max(0, calculateFee({ ...session! }, "Non-Member", activity) - calculateFee({ ...session! }, "Member", activity)).toFixed(0)} per session with a Trial or Annual membership.</span>
+                {" "}
+                <span className="text-[#2196F3] font-medium whitespace-nowrap">Join ›</span>
+              </p>
+            </div>
+          </Link>
         )}
 
         {/* Activity chips */}
