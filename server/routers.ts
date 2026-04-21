@@ -844,11 +844,12 @@ export const appRouter = router({
         return `${dd}/${mm}/${d.getFullYear()}`;
       };
 
-      // Update sheet_users (DB-primary)
+      // Update sheet_users — match by either email column
+      const trialEmail = (user.email ?? "").toLowerCase().trim();
       if (trialDb) {
         await trialDb.update(sheetUsers)
           .set({ memberStatus: "Trial", trialStartDate: fmt(today), trialEndDate: fmt(trialEnd) })
-          .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+          .where(or(eq(sheetUsers.email, trialEmail), eq(sheetUsers.userEmail, trialEmail)));
       }
 
       await db.upsertUser({
@@ -864,18 +865,48 @@ export const appRouter = router({
 
     signupMember: protectedProcedure.mutation(async ({ ctx }) => {
       const user = ctx.user;
+      const email = (user.email ?? "").toLowerCase().trim();
 
-      // Update sheet_users (DB-primary)
+      // Pro-rated annual fee: $80 full year, reduced by completed months
+      const ANNUAL_FEE = 80;
+      const monthIndex = new Date().getMonth(); // 0 = Jan … 11 = Dec
+      const membershipFee = Math.round((ANNUAL_FEE * (12 - monthIndex)) / 12);
+
+      const today = new Date();
+      const fmt = (d: Date) => {
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        return `${dd}/${mm}/${d.getFullYear()}`;
+      };
+      const todayStr = fmt(today);
+
       const memberDb = await db.getDb();
       if (memberDb) {
+        // Record the membership fee as a payment obligation in Training Sign-ups
+        await memberDb.insert(sheetSignups).values({
+          name: user.name ?? "",
+          email,
+          paymentId: (user.paymentId ?? "").toLowerCase().trim(),
+          dateTimeOfSignUp: new Date().toISOString(),
+          pool: "",
+          dateOfTraining: todayStr,
+          activity: "Membership Fee",
+          activityValue: "",
+          baseFee: membershipFee,
+          actualFees: membershipFee,
+          memberOnTrainingDate: "",
+        });
+
+        // Update sheet_users — match by either email column
         await memberDb.update(sheetUsers)
-          .set({ memberStatus: "Member" })
-          .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+          .set({ memberStatus: "Member", membershipStartDate: todayStr })
+          .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
       }
 
       await db.upsertUser({
         openId: user.openId,
         memberStatus: "Member",
+        membershipStartDate: todayStr,
       });
 
       const updated = await db.getUserByOpenId(user.openId);
