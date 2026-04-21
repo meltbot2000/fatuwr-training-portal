@@ -39,6 +39,7 @@ type Props = {
   sessionPool: string;
   session: FeeSession;
   signup: {
+    id: number | null; // DB row primary key — used for exact-row targeting
     name: string;
     email: string;
     activity: string;
@@ -115,7 +116,12 @@ export default function EditSignupSheet({
   const isPending = editMutation.isPending || deleteMutation.isPending || refreshMutation.isPending;
 
   const handleSave = () => {
+    if (signup.id == null) {
+      toast.error("Cannot edit: this sign-up has no row ID. Please refresh and try again.");
+      return;
+    }
     editMutation.mutate({
+      rowId: signup.id,
       sessionDate,
       sessionPool,
       activity,
@@ -131,9 +137,12 @@ export default function EditSignupSheet({
   };
 
   const handleDelete = () => {
+    if (signup.id == null) {
+      toast.error("Cannot delete: this sign-up has no row ID. Please refresh and try again.");
+      return;
+    }
     deleteMutation.mutate({
-      sessionDate,
-      sessionPool,
+      rowId: signup.id,
       ...(isAdmin ? { targetEmail: signup.email } : {}),
     });
   };

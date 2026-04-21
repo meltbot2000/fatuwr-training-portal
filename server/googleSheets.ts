@@ -95,6 +95,7 @@ export interface PaymentRow {
 }
 
 export interface SignUpRow {
+  id?: number; // DB row ID — present when read from DB, absent for Sheets-fallback rows
   name: string;
   email: string;
   paymentId: string;
@@ -425,6 +426,7 @@ function dbPaymentToPaymentRow(r: any): PaymentRow {
 
 function dbSignupToSignupRow(r: any): SignUpRow {
   return {
+    id: r.id,
     name: r.name ?? "",
     email: r.email ?? "",
     paymentId: r.paymentId ?? "",

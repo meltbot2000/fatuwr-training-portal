@@ -505,6 +505,7 @@ export const appRouter = router({
           revenue,
           pnl,
           signups: signups.map(su => ({
+            id: su.id ?? null,
             name: su.name,
             email: su.email,
             activity: su.activity,
@@ -577,12 +578,13 @@ export const appRouter = router({
 
     edit: protectedProcedure
       .input(z.object({
-        sessionDate: z.string(),
-        sessionPool: z.string(),
+        rowId: z.number(), // DB primary key — exact row to update, no ambiguity
+        sessionDate: z.string(), // used only for debt guard (non-admin)
+        sessionPool: z.string(), // used only for debt guard (non-admin)
         activity: z.string(),
         baseFee: z.number(),
         actualFee: z.number(),
-        // Admin-only: edit another user's sign-up
+        // Admin-only fields
         targetEmail: z.string().optional(),
         name: z.string().optional(),
         memberOnTrainingDate: z.string().optional(),
@@ -591,15 +593,23 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
         const isAdmin = (user as any).clubRole === "Admin";
-        // Only admins may target another user's row
         if (input.targetEmail && !isAdmin) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
-        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const editDb = await db.getDb();
         if (!editDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-        // Debt guard: non-admins cannot change activity if it would push their balance over $50
+        // Verify the row belongs to the expected user (safety check)
+        const [existingRow] = await editDb.select().from(sheetSignups).where(eq(sheetSignups.id, input.rowId));
+        if (!existingRow) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Sign-up row not found." });
+        }
+        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
+        if (existingRow.email?.toLowerCase().trim() !== targetEmail) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Row does not belong to the expected user." });
+        }
+
+        // Debt guard for non-admins
         if (!isAdmin) {
           const userEmail = (user.email || "").toLowerCase().trim();
           const userPaymentId = (user.paymentId || "").trim();
@@ -609,11 +619,7 @@ export const appRouter = router({
           const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
           const totalPaid = myPmts.reduce((sum, p) => sum + p.amount, 0);
           const currentDebt = Math.max(0, totalFees - totalPaid);
-          // Find the old fee for this specific signup to compute the delta
-          const oldSignup = mySignups.find(
-            s => toIsoDate(s.dateOfTraining ?? "") === toIsoDate(input.sessionDate) && s.pool === input.sessionPool
-          );
-          const oldFee = oldSignup?.actualFees ?? 0;
+          const oldFee = existingRow.actualFees ?? 0;
           const projectedDebt = currentDebt - oldFee + input.actualFee;
           if (projectedDebt > 50) {
             throw new TRPCError({
@@ -633,24 +639,15 @@ export const appRouter = router({
           if (input.memberOnTrainingDate !== undefined) fields.memberOnTrainingDate = input.memberOnTrainingDate;
           if (input.paymentId !== undefined) fields.paymentId = input.paymentId;
         }
-        // Find by email+pool, then filter by normalised date in JS to handle mixed formats
-        const isoInputDate = toIsoDate(input.sessionDate);
-        const candidateRows = await editDb.select().from(sheetSignups)
-          .where(and(eq(sheetSignups.email, targetEmail), eq(sheetSignups.pool, input.sessionPool)));
-        const targetIds = candidateRows
-          .filter(r => toIsoDate(r.dateOfTraining ?? "") === isoInputDate)
-          .map(r => r.id);
-        for (const tid of targetIds) {
-          await editDb.update(sheetSignups).set(fields).where(eq(sheetSignups.id, tid));
-        }
+        // Update exactly one row by its primary key — no ambiguity possible
+        await editDb.update(sheetSignups).set(fields).where(eq(sheetSignups.id, input.rowId));
         clearSessionsCache();
         return { success: true };
       }),
 
     delete: protectedProcedure
       .input(z.object({
-        sessionDate: z.string(),
-        sessionPool: z.string(),
+        rowId: z.number(), // DB primary key — exact row to delete
         targetEmail: z.string().optional(), // admin only
       }))
       .mutation(async ({ input, ctx }) => {
@@ -659,19 +656,19 @@ export const appRouter = router({
         if (input.targetEmail && !isAdmin) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
-        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
         const deleteDb = await db.getDb();
         if (!deleteDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        // Find by email+pool, then filter by normalised date in JS to handle mixed formats
-        const isoDelDate = toIsoDate(input.sessionDate);
-        const delCandidates = await deleteDb.select().from(sheetSignups)
-          .where(and(eq(sheetSignups.email, targetEmail), eq(sheetSignups.pool, input.sessionPool)));
-        const delIds = delCandidates
-          .filter(r => toIsoDate(r.dateOfTraining ?? "") === isoDelDate)
-          .map(r => r.id);
-        for (const did of delIds) {
-          await deleteDb.delete(sheetSignups).where(eq(sheetSignups.id, did));
+        // Verify the row belongs to the expected user (safety check)
+        const [existingRow] = await deleteDb.select().from(sheetSignups).where(eq(sheetSignups.id, input.rowId));
+        if (!existingRow) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Sign-up row not found." });
         }
+        const targetEmail = (input.targetEmail ?? user.email ?? "").toLowerCase().trim();
+        if (existingRow.email?.toLowerCase().trim() !== targetEmail) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Row does not belong to the expected user." });
+        }
+        // Delete exactly one row by its primary key
+        await deleteDb.delete(sheetSignups).where(eq(sheetSignups.id, input.rowId));
         clearSessionsCache();
         return { success: true };
       }),

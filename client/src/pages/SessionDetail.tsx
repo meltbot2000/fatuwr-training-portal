@@ -48,6 +48,7 @@ export default function SessionDetail() {
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editingSignup, setEditingSignup] = useState<{
+    id: number | null;
     name: string;
     email: string;
     activity: string;
