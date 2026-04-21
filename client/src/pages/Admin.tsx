@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRight, Trash2, KeyRound, ChevronDown } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRight, ChevronLeft, Trash2, KeyRound, ChevronDown } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
@@ -113,6 +113,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
   const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
   const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
+  const [editingSignupId, setEditingSignupId] = useState<number | null>(null);
 
   useEffect(() => {
     setName(user.name || "");
@@ -131,6 +132,15 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
     { enabled: open }
   );
 
+  const editSignupMut = trpc.admin.editSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Sign-up updated.");
+      setEditingSignupId(null);
+      await activityQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "Failed to update sign-up."),
+  });
+
   const mutation = trpc.admin.updateUserStatus.useMutation({
     onSuccess: async () => {
       toast.success("User updated.");
@@ -148,21 +158,29 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
 
   // Balance summary
   const totalPaid    = payments.reduce((s, p) => s + (p.amount ?? 0), 0);
-  const totalCharged = signups
-    .filter(s => !["Trial Membership", "Membership Fee"].includes(s.activity ?? ""))
-    .reduce((s, sg) => s + (sg.actualFees ?? 0), 0);
+  const totalCharged = signups.reduce((s, sg) => s + (sg.actualFees ?? 0), 0);
   const balance = totalPaid - totalCharged; // positive = credit, negative = owes
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto">
-          <SheetHeader className="mb-2">
-            <SheetTitle className="text-navy">{user.name || user.email}</SheetTitle>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
-          </SheetHeader>
+        <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+          {/* Full-screen header */}
+          <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+            <button
+              onClick={() => { setEditingSignupId(null); onOpenChange(false); }}
+              className="p-1 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-semibold text-white truncate">{user.name || user.email}</p>
+              <p className="text-[12px] text-[#888888] truncate">{user.email}</p>
+            </div>
+          </div>
 
-          <Tabs defaultValue="profile" className="mt-3">
+          <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4">
+          <Tabs defaultValue="profile">
             <TabsList className="w-full mb-4">
               <TabsTrigger value="profile" className="flex-1">Profile</TabsTrigger>
               <TabsTrigger value="payments" className="flex-1">
@@ -313,35 +331,83 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
 
             {/* ── Sign-ups tab ─────────────────────────────── */}
             <TabsContent value="signups" className="space-y-3">
-              <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between text-sm">
-                <span className="text-white/60">{signups.length} sign-up{signups.length !== 1 ? "s" : ""}</span>
-                <span className="font-semibold text-white">Total charged: ${totalCharged.toFixed(2)}</span>
-              </div>
-
-              {activityQuery.isLoading ? (
-                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
-              ) : signups.length === 0 ? (
-                <p className="text-sm text-white/60 text-center py-6">No sign-ups found.</p>
-              ) : (
-                <div className="space-y-2">
-                  {signups.map((s, idx) => (
-                    <div key={idx} className="rounded-lg border bg-card px-3 py-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-white">{s.dateOfTraining || "—"}</span>
-                        <span className="text-sm font-semibold">${(s.actualFees ?? 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs text-white/60">{s.activity || "—"}{s.pool ? ` · ${s.pool}` : ""}</span>
-                        {s.memberOnTrainingDate && (
-                          <span className="text-xs text-white/60">{s.memberOnTrainingDate}</span>
-                        )}
-                      </div>
+              {editingSignupId != null ? (
+                /* Inline edit view */
+                (() => {
+                  const su = signups.find(s => s.id === editingSignupId);
+                  if (!su) return null;
+                  const attendeeRow = {
+                    id: su.id,
+                    name: su.name ?? null,
+                    email: su.email ?? null,
+                    paymentId: su.paymentId ?? null,
+                    activity: su.activity ?? null,
+                    activityValue: su.activityValue ?? null,
+                    baseFee: su.baseFee ?? null,
+                    actualFees: su.actualFees ?? null,
+                    memberOnTrainingDate: su.memberOnTrainingDate ?? null,
+                  };
+                  return (
+                    <div>
+                      <button
+                        onClick={() => setEditingSignupId(null)}
+                        className="flex items-center gap-1 text-[13px] text-[#2196F3] mb-3"
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Back to sign-ups
+                      </button>
+                      <p className="text-[11px] text-[#888888] mb-2">{su.dateOfTraining} · {su.pool}</p>
+                      <AdminEditAttendee
+                        attendee={attendeeRow}
+                        onSave={(updates) => editSignupMut.mutate({ id: su.id, ...updates })}
+                        onDelete={() => { /* deletion not shown here — use session attendees */ }}
+                        isSaving={editSignupMut.isPending}
+                        isDeleting={false}
+                        hideDelete
+                      />
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
+              ) : (
+                <>
+                  <div className="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between text-sm">
+                    <span className="text-white/60">{signups.length} sign-up{signups.length !== 1 ? "s" : ""}</span>
+                    <span className="font-semibold text-white">Total charged: ${totalCharged.toFixed(2)}</span>
+                  </div>
+
+                  {activityQuery.isLoading ? (
+                    <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
+                  ) : signups.length === 0 ? (
+                    <p className="text-sm text-white/60 text-center py-6">No sign-ups found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {signups.map((s, idx) => (
+                        <button
+                          key={s.id ?? idx}
+                          onClick={() => s.id != null ? setEditingSignupId(s.id) : undefined}
+                          className="w-full text-left rounded-lg border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-white">{s.dateOfTraining || "—"}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">${(s.actualFees ?? 0).toFixed(2)}</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-white/30" />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <span className="text-xs text-white/60">{s.activity || "—"}{s.pool ? ` · ${s.pool}` : ""}</span>
+                            {s.memberOnTrainingDate && (
+                              <span className="text-xs text-white/60">{s.memberOnTrainingDate}</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -392,10 +458,15 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Edit payment</SheetTitle>
-        </SheetHeader>
+      <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+        {/* Full-screen header */}
+        <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+          <button onClick={() => onOpenChange(false)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </button>
+          <p className="text-[15px] font-semibold text-white">Edit payment</p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4">
 
         <div className="space-y-1 mb-5">
           <p className="text-xs text-muted-foreground font-mono truncate">{payment.reference || "(no reference)"}</p>
@@ -465,6 +536,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+        </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -537,10 +609,14 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle className="text-navy">Add session</SheetTitle>
-        </SheetHeader>
+      <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+        <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+          <button onClick={() => onOpenChange(false)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </button>
+          <p className="text-[15px] font-semibold text-white">Add session</p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4">
 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -620,6 +696,7 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+        </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -1545,23 +1622,28 @@ export default function Admin() {
 
       {/* ── Session Attendees Sheet ───────────────────────────────────── */}
       <Sheet open={!!viewingSessionRowId} onOpenChange={(v) => { if (!v) { setViewingSessionRowId(null); setEditingAttendeeId(null); setAddingAttendee(false); } }}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8 px-0">
-          <SheetHeader className="px-4 pb-2">
-            <SheetTitle className="text-[15px] font-medium text-white flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#2196F3]" />
-                Attendees
-              </span>
-              <button
-                onClick={() => { setAddingAttendee(true); setEditingAttendeeId(null); }}
-                className="flex items-center gap-1 text-[13px] text-[#2196F3] font-medium pr-1"
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </button>
-            </SheetTitle>
-          </SheetHeader>
-          <div className="pb-8">
+        <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+          {/* Full-screen header */}
+          <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+            <button
+              onClick={() => { setViewingSessionRowId(null); setEditingAttendeeId(null); setAddingAttendee(false); }}
+              className="p-1 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" />
+            </button>
+            <span className="flex items-center gap-2 flex-1">
+              <Users className="w-4 h-4 text-[#2196F3]" />
+              <span className="text-[15px] font-semibold text-white">Attendees</span>
+            </span>
+            <button
+              onClick={() => { setAddingAttendee(true); setEditingAttendeeId(null); }}
+              className="flex items-center gap-1 text-[13px] text-[#2196F3] font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto pb-8">
             {/* ── Add attendee form ── */}
             {addingAttendee && (
               <AdminAddAttendee
@@ -1616,10 +1698,18 @@ export default function Admin() {
 
       {/* ── Edit Attendee Sheet ───────────────────────────────────────── */}
       <Sheet open={!!editingAttendee} onOpenChange={(v) => { if (!v) setEditingAttendeeId(null); }}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] overflow-y-auto bg-[#2A2A2A] border-t border-white/8 px-0">
-          <SheetHeader className="px-4 pb-2">
-            <SheetTitle className="text-[15px] font-medium text-white">Edit sign-up</SheetTitle>
-          </SheetHeader>
+        <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+          {/* Full-screen header */}
+          <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+            <button
+              onClick={() => setEditingAttendeeId(null)}
+              className="p-1 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" />
+            </button>
+            <p className="text-[15px] font-semibold text-white">Edit sign-up</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
           {editingAttendee && (
             <AdminEditAttendee
               attendee={editingAttendee}
@@ -1629,6 +1719,7 @@ export default function Admin() {
               isDeleting={deleteSignupMutation.isPending}
             />
           )}
+          </div>
         </SheetContent>
       </Sheet>
     </div>
@@ -1735,12 +1826,14 @@ function AdminEditAttendee({
   onDelete,
   isSaving,
   isDeleting,
+  hideDelete = false,
 }: {
   attendee: AttendeeRow;
   onSave: (u: { name?: string; email?: string; paymentId?: string; activity?: string; activityValue?: string; baseFee?: number; actualFees?: number; memberOnTrainingDate?: string }) => void;
   onDelete: () => void;
   isSaving: boolean;
   isDeleting: boolean;
+  hideDelete?: boolean;
 }) {
   const [form, setForm] = useState({
     name: attendee.name ?? "",
@@ -1800,7 +1893,7 @@ function AdminEditAttendee({
           {isSaving ? "Saving…" : "Save changes"}
         </button>
 
-        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        {!hideDelete && <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <button
             onClick={() => setConfirmDelete(true)}
             disabled={isDeleting}
@@ -1826,7 +1919,7 @@ function AdminEditAttendee({
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>
+        </AlertDialog>}
       </div>
     </div>
   );
