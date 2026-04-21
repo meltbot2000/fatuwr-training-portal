@@ -82,6 +82,11 @@ export default function BottomNav() {
         backgroundColor: "#1E1E1E",
         borderTop: "1px solid #2C2C2C",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        // Force GPU compositing layer — prevents nav detaching during fast
+        // momentum scroll on iOS/Android (common mobile browser quirk)
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)",
+        willChange: "transform",
       }}
     >
       <div className="mx-auto max-w-[480px] flex" style={{ height: 72 }}>
