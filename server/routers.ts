@@ -418,15 +418,16 @@ export const appRouter = router({
         // Upsert into sheet_users (DB-primary)
         const usersDb = await db.getDb();
         if (usersDb) {
+          const profileEmail = (user.email ?? "").toLowerCase().trim();
           const existing = await usersDb
             .select({ id: sheetUsers.id })
             .from(sheetUsers)
-            .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()))
+            .where(or(eq(sheetUsers.email, profileEmail), eq(sheetUsers.userEmail, profileEmail)))
             .limit(1);
           if (existing.length > 0) {
             await usersDb.update(sheetUsers)
               .set({ name, paymentId, sheetId: paymentId })
-              .where(eq(sheetUsers.email, (user.email ?? "").toLowerCase().trim()));
+              .where(or(eq(sheetUsers.email, profileEmail), eq(sheetUsers.userEmail, profileEmail)));
           } else {
             await usersDb.insert(sheetUsers).values({
               sheetId: paymentId,
@@ -954,9 +955,10 @@ export const appRouter = router({
           if (input.trialEndDate !== undefined) userFields.trialEndDate = input.trialEndDate;
           if (input.dob !== undefined) userFields.dob = input.dob;
           if (Object.keys(userFields).length > 0) {
+            const adminEmail = input.email.toLowerCase().trim();
             await adminUsersDb.update(sheetUsers)
               .set(userFields)
-              .where(eq(sheetUsers.email, input.email.toLowerCase().trim()));
+              .where(or(eq(sheetUsers.email, adminEmail), eq(sheetUsers.userEmail, adminEmail)));
           }
         }
 
@@ -1006,7 +1008,7 @@ export const appRouter = router({
         const delDb = await db.getDb();
         if (!delDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         // Remove from sheet_users (profile/member data)
-        await delDb.delete(sheetUsers).where(eq(sheetUsers.email, emailNorm));
+        await delDb.delete(sheetUsers).where(or(eq(sheetUsers.email, emailNorm), eq(sheetUsers.userEmail, emailNorm)));
         // Remove from auth users table (login access)
         const authUser = await db.getUserByEmail(emailNorm);
         if (authUser) {
