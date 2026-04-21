@@ -1,17 +1,48 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, GripVertical } from "lucide-react";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
+import { toast } from "sonner";
+
+type AnnItem = { id: number; title: string | null; content?: string | null; imageUrl: string | null; position: number };
 
 export default function Home() {
   const { user } = useAuth();
   const clubRole = (user as any)?.clubRole || "";
   const canManage = clubRole === "Admin" || clubRole === "Helper";
+  const isAdmin = clubRole === "Admin";
 
   const { data: announcements = [], isLoading, refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Reorder state (Admin only)
+  const [reordering, setReordering] = useState(false);
+  const [order, setOrder] = useState<AnnItem[]>([]);
+  const dragIdx = useRef<number | null>(null);
+
+  const reorderMutation = trpc.announcements.reorder.useMutation({
+    onSuccess: async () => { toast.success("Order saved."); await refetch(); setReordering(false); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const startReorder = () => { setOrder([...announcements]); setReordering(true); };
+  const saveReorder = () => reorderMutation.mutate({ orderedIds: order.map(a => a.id) });
+  const cancelReorder = () => setReordering(false);
+
+  const handleDragStart = (i: number) => { dragIdx.current = i; };
+  const handleDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (dragIdx.current === null || dragIdx.current === i) return;
+    const next = [...order];
+    const [moved] = next.splice(dragIdx.current, 1);
+    next.splice(i, 0, moved);
+    dragIdx.current = i;
+    setOrder(next);
+  };
+
+  const list: AnnItem[] = reordering ? order : announcements;
 
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
@@ -26,7 +57,32 @@ export default function Home() {
         <div className="mx-auto max-w-[480px] relative flex items-center justify-center px-4 h-14">
           <span className="text-[18px] font-bold text-white">Info</span>
           <div className="absolute right-3 flex items-center gap-1">
-            {canManage && (
+            {isAdmin && !reordering && (
+              <button
+                onClick={startReorder}
+                className="text-[13px] font-medium text-[#888888] px-2 h-8 flex items-center"
+              >
+                Reorder
+              </button>
+            )}
+            {isAdmin && reordering && (
+              <>
+                <button
+                  onClick={cancelReorder}
+                  className="text-[13px] font-medium text-[#888888] px-2 h-8 flex items-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveReorder}
+                  disabled={reorderMutation.isPending}
+                  className="text-[13px] font-medium text-[#2196F3] px-2 h-8 flex items-center"
+                >
+                  {reorderMutation.isPending ? "Saving…" : "Done"}
+                </button>
+              </>
+            )}
+            {canManage && !reordering && (
               <button
                 onClick={() => setCreateOpen(true)}
                 className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/10 transition-colors"
@@ -54,12 +110,16 @@ export default function Home() {
             <p className="text-[13px] text-[#888888]">No announcements yet.</p>
           </div>
         ) : (
-          announcements.map((ann) => (
+          list.map((ann, i) => (
             <AnnouncementCard
               key={ann.id}
               ann={ann}
               canManage={canManage}
               onRefetch={refetch}
+              reordering={reordering}
+              dragIndex={i}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
             />
           ))
         )}
@@ -76,9 +136,17 @@ export default function Home() {
   );
 }
 
-type AnnType = { id: number; title: string | null; content?: string | null; imageUrl: string | null; position: number };
-
-function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canManage: boolean; onRefetch: () => void }) {
+function AnnouncementCard({
+  ann, canManage, onRefetch, reordering, dragIndex, onDragStart, onDragOver,
+}: {
+  ann: AnnItem;
+  canManage: boolean;
+  onRefetch: () => void;
+  reordering: boolean;
+  dragIndex: number;
+  onDragStart: (i: number) => void;
+  onDragOver: (e: React.DragEvent, i: number) => void;
+}) {
   const [, navigate] = useLocation();
   const deleteMutation = trpc.announcements.delete.useMutation({
     onSuccess: () => { onRefetch(); },
@@ -86,13 +154,16 @@ function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canMana
 
   return (
     <div
-      className="bg-[#1E1E1E] rounded-2xl overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
+      draggable={reordering}
+      onDragStart={() => onDragStart(dragIndex)}
+      onDragOver={(e) => onDragOver(e, dragIndex)}
+      className="bg-[#1E1E1E] rounded-2xl overflow-hidden relative cursor-pointer active:opacity-80 transition-opacity"
       onContextMenu={(e) => {
         e.preventDefault();
-        if (!canManage) return;
+        if (!canManage || reordering) return;
         if (confirm("Delete this announcement?")) deleteMutation.mutate({ id: ann.id });
       }}
-      onClick={() => navigate(`/announcements/${ann.id}`)}
+      onClick={() => { if (!reordering) navigate(`/announcements/${ann.id}`); }}
     >
       {ann.imageUrl && (
         <img
@@ -104,6 +175,11 @@ function AnnouncementCard({ ann, canManage, onRefetch }: { ann: AnnType; canMana
       )}
       {ann.title && (
         <p className="text-[15px] font-medium text-white px-3 py-3">{ann.title}</p>
+      )}
+      {reordering && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 p-1">
+          <GripVertical className="w-5 h-5 text-[#888888]" />
+        </div>
       )}
     </div>
   );
