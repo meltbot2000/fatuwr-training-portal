@@ -12,6 +12,7 @@ export const users = mysqlTable("users", {
   clubRole: varchar("clubRole", { length: 32 }).default(""),
   trialStartDate: varchar("trialStartDate", { length: 32 }).default(""),
   trialEndDate: varchar("trialEndDate", { length: 32 }).default(""),
+  image: mediumtext("image"),  // base64 data URL for profile photo — mediumtext supports up to ~16MB
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -97,7 +98,7 @@ export const sheetUsers = mysqlTable("sheet_users", {
   name: varchar("name", { length: 256 }).default(""),
   userEmail: varchar("userEmail", { length: 320 }).default(""),
   email: varchar("email", { length: 320 }).notNull(),
-  image: text("image"),
+  image: mediumtext("image"),
   paymentId: varchar("paymentId", { length: 128 }).default(""),
   memberStatus: varchar("memberStatus", { length: 64 }).default("Non-Member"),
   clubRole: varchar("clubRole", { length: 64 }).default(""),

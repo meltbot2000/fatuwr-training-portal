@@ -16,6 +16,33 @@ const STATUS_COLOR: Record<string, string> = {
 
 const APP_URL = "https://fatuwr.up.railway.app";
 
+/** Resize and compress an image file to a JPEG data URL, max 600×600 px, quality 0.75.
+ *  Keeps file size well under 200 KB for typical photos. */
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else                { width  = Math.round((width  * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Failed to load image")); };
+    img.src = objectUrl;
+  });
+}
+
 export default function Profile() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true, redirectPath: "/login" });
@@ -33,21 +60,21 @@ export default function Profile() {
 
   const handleAvatarClick = () => fileInputRef.current?.click();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error("Photo must be under 2 MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+    if (file.size > 10 * 1024 * 1024) { toast.error("Photo must be under 10 MB"); return; }
+    try {
+      const dataUrl = await compressImage(file);
       updatePhoto.mutate({ image: dataUrl }, {
         onSuccess: () => toast.success("Photo updated"),
-        onError: () => toast.error("Failed to update photo"),
+        onError: (err) => toast.error("Failed to update photo"),
       });
-    };
-    reader.readAsDataURL(file);
-    // Reset so same file can be re-selected
-    e.target.value = "";
+    } catch {
+      toast.error("Could not process image");
+    }
   };
 
   const handleCopy = () => {

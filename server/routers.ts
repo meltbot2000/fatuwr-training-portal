@@ -708,21 +708,22 @@ export const appRouter = router({
   profile: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
-      if (user.email) {
-        const sheetUser = await findUserByEmail(user.email);
-        if (sheetUser) {
-          return {
-            id: user.id,
-            name: sheetUser.name || user.name,
-            email: user.email,
-            memberStatus: sheetUser.memberStatus || user.memberStatus || "Non-Member",
-            clubRole: sheetUser.clubRole || user.clubRole || "",
-            paymentId: sheetUser.paymentId || user.paymentId || "",
-            trialStartDate: sheetUser.trialStartDate || user.trialStartDate || "",
-            trialEndDate: sheetUser.trialEndDate || user.trialEndDate || "",
-            image: sheetUser.image || "",
-          };
-        }
+      // users.image is the primary store for profile photos (always available).
+      // sheetUsers.image is kept for legacy Glide-hosted URLs; used as fallback.
+      const sheetUser = user.email ? await findUserByEmail(user.email) : null;
+      const image = (user as any).image || sheetUser?.image || "";
+      if (sheetUser) {
+        return {
+          id: user.id,
+          name: sheetUser.name || user.name,
+          email: user.email,
+          memberStatus: sheetUser.memberStatus || user.memberStatus || "Non-Member",
+          clubRole: sheetUser.clubRole || user.clubRole || "",
+          paymentId: sheetUser.paymentId || user.paymentId || "",
+          trialStartDate: sheetUser.trialStartDate || user.trialStartDate || "",
+          trialEndDate: sheetUser.trialEndDate || user.trialEndDate || "",
+          image,
+        };
       }
       return {
         id: user.id,
@@ -733,21 +734,30 @@ export const appRouter = router({
         paymentId: user.paymentId || "",
         trialStartDate: user.trialStartDate || "",
         trialEndDate: user.trialEndDate || "",
-        image: "",
+        image,
       };
     }),
 
     updatePhoto: protectedProcedure
       .input(z.object({ image: z.string() }))  // base64 data URL or ""
       .mutation(async ({ ctx, input }) => {
-        const email = (ctx.user.email ?? "").toLowerCase().trim();
-        if (!email) throw new Error("No email");
         const photoDb = await db.getDb();
         if (!photoDb) throw new Error("DB unavailable");
-        // Match by either email column — some users' login email is in userEmail, not email
-        await photoDb.update(sheetUsers)
-          .set({ image: input.image || null })
-          .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
+        const imageVal = input.image || null;
+
+        // Primary: write to users table (every user always has a row here)
+        await photoDb.update(users)
+          .set({ image: imageVal })
+          .where(eq(users.id, ctx.user.id));
+
+        // Also update sheetUsers if a row exists (keeps legacy Glide fallback path working)
+        const email = (ctx.user.email ?? "").toLowerCase().trim();
+        if (email) {
+          await photoDb.update(sheetUsers)
+            .set({ image: imageVal })
+            .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
+        }
+
         return { ok: true };
       }),
   }),
