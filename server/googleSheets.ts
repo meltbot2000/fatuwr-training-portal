@@ -472,42 +472,79 @@ export async function getSessions(): Promise<SessionRow[]> {
   return fetchSheetsSessions();
 }
 
+/**
+ * Parse a training-date string (any format: ISO "2026-04-24", "24 April 2026", etc.)
+ * into an ISO date string "YYYY-MM-DD", or null on failure.
+ */
+function toIsoDateStr(dateStr: string): string | null {
+  if (!dateStr) return null;
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.slice(0, 10);
+  // Try native parse (handles "24 April 2026", "April 24, 2026", etc.)
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    // Use UTC components to avoid DST/TZ shift mangling the calendar date
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return null;
+}
+
+/**
+ * Build the UTC timestamp for a session start, treating the date and time as
+ * Singapore local time (UTC+8).  Returns null if the date cannot be parsed.
+ *
+ * trainingTime examples: "7:30 PM – 9:30 PM", "19:30 - 21:30", "0745-0945"
+ * When trainingTime is absent/unparseable, midnight SGT is used as the start
+ * (conservative: session stays visible all day).
+ */
+function sessionStartUTC(trainingDate: string, trainingTime: string | null | undefined): number | null {
+  const isoDate = toIsoDateStr(trainingDate);
+  if (!isoDate) return null;
+
+  let startHour = 0;
+  let startMin  = 0;
+  if (trainingTime) {
+    const startStr = trainingTime.split(/[–\-]/)[0].trim();
+    const m = startStr.match(/(\d{1,2}):?(\d{2})\s*(am|pm)?/i);
+    if (m) {
+      let h = parseInt(m[1], 10);
+      const mins = parseInt(m[2], 10);
+      const ampm = (m[3] || "").toLowerCase();
+      if (ampm === "pm" && h < 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+      startHour = h;
+      startMin  = mins;
+    }
+  }
+
+  // Build datetime string with explicit SGT offset so JS parses it correctly
+  // regardless of the server's local timezone (Railway runs in UTC).
+  const hh  = String(startHour).padStart(2, "0");
+  const mm  = String(startMin).padStart(2, "0");
+  const dt  = new Date(`${isoDate}T${hh}:${mm}:00+08:00`);
+  return isNaN(dt.getTime()) ? null : dt.getTime();
+}
+
 export async function getUpcomingSessions(): Promise<SessionRow[]> {
   const sessions = await getSessions();
   const now = Date.now();
 
-  return sessions.filter(session => {
-    const sessionDate = parseSessionDate(session.trainingDate);
-    if (!sessionDate) return false;
-
-    // Build the session's start datetime by parsing trainingTime (e.g. "7:30 PM – 9:30 PM")
-    let startHour = 0;
-    let startMin  = 0;
-    if (session.trainingTime) {
-      const startStr = session.trainingTime.split(/[–\-]/)[0].trim();
-      const m = startStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
-      if (m) {
-        let h = parseInt(m[1], 10);
-        const mins = parseInt(m[2], 10);
-        const ampm = (m[3] || "").toLowerCase();
-        if (ampm === "pm" && h < 12) h += 12;
-        if (ampm === "am" && h === 12) h = 0;
-        startHour = h;
-        startMin  = mins;
-      }
-    }
-    const sessionStart = new Date(sessionDate);
-    sessionStart.setHours(startHour, startMin, 0, 0);
-
-    // Hide session once it is more than 1 hour past its start time
-    const cutoff = sessionStart.getTime() + 60 * 60 * 1000;
-    return now < cutoff;
-  }).sort((a, b) => {
-    const dateA = parseSessionDate(a.trainingDate);
-    const dateB = parseSessionDate(b.trainingDate);
-    if (!dateA || !dateB) return 0;
-    return dateA.getTime() - dateB.getTime();
-  });
+  return sessions
+    .filter(session => {
+      const startMs = sessionStartUTC(session.trainingDate, session.trainingTime);
+      // If date can't be parsed, hide the session
+      if (startMs === null) return false;
+      // Hide once 1 hour past the session start (in SGT)
+      return now < startMs + 60 * 60 * 1000;
+    })
+    .sort((a, b) => {
+      const msA = sessionStartUTC(a.trainingDate, a.trainingTime) ?? 0;
+      const msB = sessionStartUTC(b.trainingDate, b.trainingTime) ?? 0;
+      return msA - msB;
+    });
 }
 
 function parseSessionDate(dateStr: string): Date | null {

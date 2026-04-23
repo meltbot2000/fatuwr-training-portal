@@ -485,17 +485,23 @@ export const appRouter = router({
         const revenue = signups.reduce((sum, su) => sum + (su.actualFees ?? 0), 0);
         const pnl = revenue - (session.venueCost ?? 0);
 
-        // Batch-fetch profile images for all signed-up users
-        const signupEmails = [...new Set(signups.map(su => su.email.toLowerCase().trim()).filter(Boolean))];
+        // Batch-fetch profile images for all signed-up users.
+        // Primary source: users.image (local store). Fallback: sheetUsers.image (legacy Glide URLs).
         let imageByEmail: Record<string, string> = {};
         try {
           const sessionDb = await db.getDb();
-          if (sessionDb && signupEmails.length > 0) {
-            const userRows = await sessionDb.select({ email: sheetUsers.email, userEmail: sheetUsers.userEmail, image: sheetUsers.image }).from(sheetUsers);
-            for (const u of userRows) {
+          if (sessionDb) {
+            // Seed with sheetUsers legacy images first (lower priority)
+            const sheetUserRows = await sessionDb.select({ email: sheetUsers.email, userEmail: sheetUsers.userEmail, image: sheetUsers.image }).from(sheetUsers);
+            for (const u of sheetUserRows) {
               const img = u.image || "";
-              if (u.email) imageByEmail[u.email.toLowerCase().trim()] = img;
-              if (u.userEmail) imageByEmail[u.userEmail.toLowerCase().trim()] = img;
+              if (img && u.email)     imageByEmail[u.email.toLowerCase().trim()]     = img;
+              if (img && u.userEmail) imageByEmail[u.userEmail.toLowerCase().trim()] = img;
+            }
+            // Overwrite with users.image (higher priority — locally stored photos)
+            const authUserRows = await sessionDb.select({ email: users.email, image: users.image }).from(users);
+            for (const u of authUserRows) {
+              if (u.image && u.email) imageByEmail[u.email.toLowerCase().trim()] = u.image;
             }
           }
         } catch { /* non-fatal */ }
