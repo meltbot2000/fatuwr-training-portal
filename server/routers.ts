@@ -741,23 +741,13 @@ export const appRouter = router({
     updatePhoto: protectedProcedure
       .input(z.object({ image: z.string() }))  // base64 data URL or ""
       .mutation(async ({ ctx, input }) => {
+        // Write ONLY to the users auth table — sheetUsers is a Sheets cache
+        // that gets wiped on forceSync, so it must never be used as the photo store.
         const photoDb = await db.getDb();
         if (!photoDb) throw new Error("DB unavailable");
-        const imageVal = input.image || null;
-
-        // Primary: write to users table (every user always has a row here)
         await photoDb.update(users)
-          .set({ image: imageVal })
+          .set({ image: input.image || null })
           .where(eq(users.id, ctx.user.id));
-
-        // Also update sheetUsers if a row exists (keeps legacy Glide fallback path working)
-        const email = (ctx.user.email ?? "").toLowerCase().trim();
-        if (email) {
-          await photoDb.update(sheetUsers)
-            .set({ image: imageVal })
-            .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
-        }
-
         return { ok: true };
       }),
   }),
@@ -1289,6 +1279,65 @@ export const appRouter = router({
           await forceSyncTab(input.tab as any);
         }
         return { ok: true, tab: input.tab, syncedAt: new Date().toISOString() };
+      }),
+
+    migrateGlidePhotos: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const migDb = await db.getDb();
+        if (!migDb) throw new Error("DB unavailable");
+
+        // Find all sheetUsers rows that still have a Glide (http) URL
+        const glideRows = await migDb.select({
+          email: sheetUsers.email,
+          userEmail: sheetUsers.userEmail,
+          image: sheetUsers.image,
+        }).from(sheetUsers).where(sql`image LIKE 'http%'`);
+
+        let migrated = 0, skipped = 0, failed = 0;
+        const errors: string[] = [];
+
+        for (const su of glideRows) {
+          const email = (su.email || su.userEmail || "").toLowerCase().trim();
+          if (!email || !su.image) { skipped++; continue; }
+
+          // Find matching auth user
+          const [authUser] = await migDb.select({ id: users.id, image: users.image })
+            .from(users)
+            .where(sql`LOWER(email) = ${email}`)
+            .limit(1);
+
+          if (!authUser) { skipped++; continue; }
+          if (authUser.image && !authUser.image.startsWith("http")) {
+            // Already has a locally-stored image; don't overwrite
+            skipped++;
+            continue;
+          }
+
+          // Download the Glide image server-side
+          try {
+            const resp = await fetch(su.image, {
+              signal: AbortSignal.timeout(15000),
+              headers: { "User-Agent": "Mozilla/5.0" },
+            });
+            if (!resp.ok) { failed++; errors.push(`${email}: HTTP ${resp.status}`); continue; }
+            const contentType = resp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+            const buf = await resp.arrayBuffer();
+            const b64 = Buffer.from(buf).toString("base64");
+            const dataUrl = `data:${contentType};base64,${b64}`;
+            await migDb.update(users).set({ image: dataUrl }).where(eq(users.id, authUser.id));
+            migrated++;
+          } catch (e: any) {
+            failed++;
+            errors.push(`${email}: ${e.message}`);
+          }
+        }
+
+        console.log(`[migrateGlidePhotos] migrated=${migrated} skipped=${skipped} failed=${failed}`);
+        if (errors.length) console.log("[migrateGlidePhotos] errors:", errors);
+        return { migrated, skipped, failed, total: glideRows.length, errors };
       }),
 
     addSession: protectedProcedure

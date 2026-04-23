@@ -705,6 +705,70 @@ function AddSessionSheet({ open, onOpenChange, onDone }: AddSessionSheetProps) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── MigratePhotosPanel ───────────────────────────────────────────────────────
+
+function MigratePhotosPanel() {
+  const [result, setResult] = useState<{ migrated: number; skipped: number; failed: number; total: number; errors: string[] } | null>(null);
+  const mutation = trpc.admin.migrateGlidePhotos.useMutation({
+    onSuccess: (data) => {
+      setResult(data);
+      toast.success(`Migrated ${data.migrated} photo${data.migrated !== 1 ? "s" : ""}`);
+    },
+    onError: (err) => toast.error(err.message || "Migration failed"),
+  });
+
+  return (
+    <div className="mt-2">
+      <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3">
+        <div>
+          <p className="text-[13px] font-semibold text-white">Migrate Glide photos</p>
+          <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
+            Downloads existing Glide-hosted profile photos and stores them directly on Railway. Run once before Glide is deprecated.
+          </p>
+        </div>
+        {result && (
+          <div className="rounded-lg bg-[#2a2a2a] px-3 py-2 text-[12px] space-y-0.5">
+            <p className="text-white">Total Glide URLs found: <span className="font-medium">{result.total}</span></p>
+            <p className="text-green-400">Migrated: {result.migrated}</p>
+            <p className="text-[#888888]">Skipped (already set or no match): {result.skipped}</p>
+            {result.failed > 0 && <p className="text-red-400">Failed: {result.failed}</p>}
+            {result.errors.slice(0, 5).map((e, i) => (
+              <p key={i} className="text-red-400/80 text-[11px] truncate">{e}</p>
+            ))}
+          </div>
+        )}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5 border-white/10 text-white/70"
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {mutation.isPending ? "Migrating…" : "Run migration"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Migrate Glide photos?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will download all Glide-hosted profile photos and store them in the Railway database. It may take a minute. Photos already stored locally will not be overwritten. Safe to run multiple times.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => mutation.mutate()}>
+                Yes, migrate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  );
+}
+
 const IMPORT_PIN = "1987";
 const IMPORT_TABS = ["sessions", "signups", "users", "payments"] as const;
 
@@ -1578,6 +1642,9 @@ export default function Admin() {
                   </>
                 );
               })()}
+
+              {/* Migrate Glide photos → Railway DB */}
+              <MigratePhotosPanel />
 
               {/* Spreadsheet Import — PIN-gated */}
               <SpreadsheetImportPanel forceSyncMutation={forceSyncMutation} />
