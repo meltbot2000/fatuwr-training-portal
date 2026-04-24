@@ -316,6 +316,9 @@ export const appRouter = router({
             paymentId = generatePaymentId(name, existingIds);
           }
 
+          // Carry over photo from sheetUsers if one exists (e.g. migrated from Glide/Drive)
+          const inheritedImage = sheetUser?.image && sheetUser.image.trim() ? sheetUser.image.trim() : undefined;
+
           await db.upsertUser({
             openId,
             email,
@@ -327,6 +330,7 @@ export const appRouter = router({
             trialStartDate: sheetUser?.trialStartDate ?? "",
             trialEndDate: sheetUser?.trialEndDate ?? "",
             lastSignedIn: new Date(),
+            ...(inheritedImage ? { image: inheritedImage } : {}),
           });
           user = await db.getUserByEmail(email);
 
