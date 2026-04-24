@@ -1,4 +1,4 @@
-import { double, int, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { double, index, int, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -16,7 +16,9 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
+}, (table) => ({
+  emailIdx: index("idx_users_email").on(table.email),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -28,7 +30,9 @@ export const otpCodes = mysqlTable("otp_codes", {
   expiresAt: timestamp("expiresAt", { fsp: 0 }).notNull(),
   used: int("used").default(0).notNull(),
   createdAt: timestamp("createdAt", { fsp: 0 }).defaultNow().notNull(),
-});
+}, (table) => ({
+  emailIdx: index("idx_otp_codes_email").on(table.email),
+}));
 
 export type OtpCode = typeof otpCodes.$inferSelect;
 export type InsertOtpCode = typeof otpCodes.$inferInsert;
@@ -61,7 +65,9 @@ export const sheetSessions = mysqlTable("sheet_sessions", {
   revenue: double("revenue").default(0),
   rainOff: varchar("rainOff", { length: 16 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  rowIdIdx: index("idx_sheet_sessions_row_id").on(table.rowId),
+}));
 export type SheetSession = typeof sheetSessions.$inferSelect;
 
 export const sheetPayments = mysqlTable("sheet_payments", {
@@ -72,7 +78,10 @@ export const sheetPayments = mysqlTable("sheet_payments", {
   date: varchar("date", { length: 64 }).default(""),
   email: varchar("email", { length: 320 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow(),
-});
+}, (table) => ({
+  paymentIdIdx: index("idx_sheet_payments_payment_id").on(table.paymentId),
+  emailIdx:     index("idx_sheet_payments_email").on(table.email),
+}));
 export type SheetPayment = typeof sheetPayments.$inferSelect;
 
 export const sheetSignups = mysqlTable("sheet_signups", {
@@ -89,7 +98,13 @@ export const sheetSignups = mysqlTable("sheet_signups", {
   actualFees: double("actualFees").default(0),
   memberOnTrainingDate: varchar("memberOnTrainingDate", { length: 64 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow(),
-});
+}, (table) => ({
+  // Composite index for session attendee lookups (getSignUpsForSession)
+  poolDateIdx:  index("idx_sheet_signups_pool_date").on(table.pool, table.dateOfTraining),
+  // Individual indexes for user history and payment matching
+  emailIdx:     index("idx_sheet_signups_email").on(table.email),
+  paymentIdIdx: index("idx_sheet_signups_payment_id").on(table.paymentId),
+}));
 export type SheetSignup = typeof sheetSignups.$inferSelect;
 
 export const sheetUsers = mysqlTable("sheet_users", {
@@ -107,7 +122,12 @@ export const sheetUsers = mysqlTable("sheet_users", {
   trialEndDate: varchar("trialEndDate", { length: 64 }).default(""),
   dob: varchar("dob", { length: 64 }).default(""),
   syncedAt: timestamp("syncedAt").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  // Both email columns are queried on every login, profile fetch, and membership update
+  emailIdx:     index("idx_sheet_users_email").on(table.email),
+  userEmailIdx: index("idx_sheet_users_user_email").on(table.userEmail),
+  paymentIdIdx: index("idx_sheet_users_payment_id").on(table.paymentId),
+}));
 export type SheetUser = typeof sheetUsers.$inferSelect;
 
 export const announcements = mysqlTable("announcements", {

@@ -252,7 +252,7 @@ async function expireTrialMemberships(): Promise<void> {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-const SYNC_INTERVAL_MS = 30 * 60 * 1000;      // 30 minutes (fallback only — GAS webhook is primary)
+const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;  // 6 hours (fallback only — GAS webhook is primary for real-time)
 const DAY_MS           = 24 * 60 * 60 * 1000; // 24 hours
 
 export function startBackgroundSync(): void {
@@ -270,7 +270,7 @@ export function startBackgroundSync(): void {
   setTimeout(() => expireTrialMemberships().catch(console.error), 6_000);
   setInterval(() => expireTrialMemberships().catch(console.error), DAY_MS);
 
-  console.log("[Sync] Background sync started — DB-primary: sessions, signups, users | Sheets-managed: payments (30-min fallback; GAS webhook is primary)");
+  console.log("[Sync] Background sync started — DB-primary: sessions, signups, users | Sheets-managed: payments (6h fallback; GAS webhook is primary)");
 }
 
 export function getSyncStatus() {
