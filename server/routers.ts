@@ -1323,14 +1323,14 @@ export const appRouter = router({
         for (const su of glideRows) {
           if (!su.image) { skipped++; continue; }
 
-          // Try both email columns — sheetUsers.userEmail is the login email (col C),
-          // sheetUsers.email is the PaymentID-linked email (col D). users.email is always
-          // the login email, so we must try userEmail first, then email as fallback.
+          // Try both email columns — userEmail (col C) is the login email, email (col D)
+          // is the PaymentID-linked email. users.email is always the login email.
           const candidates = [su.userEmail, su.email]
             .map(e => (e || "").toLowerCase().trim())
             .filter(e => e.length > 0);
-          if (candidates.length === 0) { skipped++; continue; }
+          const logLabel = candidates[0] || `sheetUser#${su.email}`;
 
+          // Find matching auth user (may not exist — many sheet users have never logged in)
           let authUser: { id: number; image: string | null } | undefined;
           for (const candidate of candidates) {
             const [found] = await migDb.select({ id: users.id, image: users.image })
@@ -1339,31 +1339,46 @@ export const appRouter = router({
               .limit(1);
             if (found) { authUser = found; break; }
           }
-          const email = candidates[0]; // for error logging
 
-          if (!authUser) { skipped++; continue; }
-          if (authUser.image && !authUser.image.startsWith("http")) {
-            // Already has a locally-stored image; don't overwrite
+          // Skip if auth user already has a non-Glide image (already migrated)
+          if (authUser?.image && !authUser.image.startsWith("http")) {
             skipped++;
             continue;
           }
 
-          // Download the Glide image server-side
+          // Download Glide image and upload to Drive
           try {
             const resp = await fetch(su.image, {
               signal: AbortSignal.timeout(15000),
               headers: { "User-Agent": "Mozilla/5.0" },
             });
-            if (!resp.ok) { failed++; errors.push(`${email}: HTTP ${resp.status}`); continue; }
+            if (!resp.ok) { failed++; errors.push(`${logLabel}: HTTP ${resp.status}`); continue; }
             const contentType = resp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
             const buf = await resp.arrayBuffer();
             const b64 = Buffer.from(buf).toString("base64");
             const dataUrl = `data:${contentType};base64,${b64}`;
-            await migDb.update(users).set({ image: dataUrl }).where(eq(users.id, authUser.id));
+            const driveUrl = await uploadToDrive(dataUrl, `glide_${logLabel}.jpg`);
+
+            if (authUser) {
+              // Registered user — store in users.image (primary store)
+              await migDb.update(users).set({ image: driveUrl }).where(eq(users.id, authUser.id));
+            } else {
+              // Sheet-only user (never logged in) — store in sheetUsers.image so their
+              // photo still shows in session attendee lists after Glide is deprecated.
+              // Match by email or userEmail to find the right sheetUsers row.
+              const matchEmail = candidates[0];
+              await migDb.update(sheetUsers)
+                .set({ image: driveUrl })
+                .where(
+                  candidates[1]
+                    ? sql`LOWER(email) = ${matchEmail} OR LOWER(user_email) = ${matchEmail}`
+                    : sql`LOWER(email) = ${matchEmail}`
+                );
+            }
             migrated++;
           } catch (e: any) {
             failed++;
-            errors.push(`${email}: ${e.message}`);
+            errors.push(`${logLabel}: ${e.message}`);
           }
         }
 
