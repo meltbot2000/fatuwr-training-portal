@@ -1321,14 +1321,25 @@ export const appRouter = router({
         const errors: string[] = [];
 
         for (const su of glideRows) {
-          const email = (su.email || su.userEmail || "").toLowerCase().trim();
-          if (!email || !su.image) { skipped++; continue; }
+          if (!su.image) { skipped++; continue; }
 
-          // Find matching auth user
-          const [authUser] = await migDb.select({ id: users.id, image: users.image })
-            .from(users)
-            .where(sql`LOWER(email) = ${email}`)
-            .limit(1);
+          // Try both email columns — sheetUsers.userEmail is the login email (col C),
+          // sheetUsers.email is the PaymentID-linked email (col D). users.email is always
+          // the login email, so we must try userEmail first, then email as fallback.
+          const candidates = [su.userEmail, su.email]
+            .map(e => (e || "").toLowerCase().trim())
+            .filter(e => e.length > 0);
+          if (candidates.length === 0) { skipped++; continue; }
+
+          let authUser: { id: number; image: string | null } | undefined;
+          for (const candidate of candidates) {
+            const [found] = await migDb.select({ id: users.id, image: users.image })
+              .from(users)
+              .where(sql`LOWER(email) = ${candidate}`)
+              .limit(1);
+            if (found) { authUser = found; break; }
+          }
+          const email = candidates[0]; // for error logging
 
           if (!authUser) { skipped++; continue; }
           if (authUser.image && !authUser.image.startsWith("http")) {
