@@ -458,12 +458,28 @@ function dbUserToUserRow(r: any): UserRow {
   };
 }
 
+// ─── 60-second in-process sessions cache ─────────────────────────────────────
+// Only sessions are cached — other data (payments, signups, users) is never cached here.
+// Busted by clearSessionsCache() which is called after any session mutation.
+let _sessionsCacheData: SessionRow[] | null = null;
+let _sessionsCacheExpiry = 0;
+const SESSIONS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 export async function getSessions(): Promise<SessionRow[]> {
+  // Return cached data if still fresh
+  if (_sessionsCacheData && Date.now() < _sessionsCacheExpiry) {
+    return _sessionsCacheData;
+  }
   try {
     const db = await getDb();
     if (db) {
       const rows = await db.select().from(sheetSessions);
-      if (rows.length > 0) return rows.map(dbSessionToSessionRow);
+      if (rows.length > 0) {
+        const result = rows.map(dbSessionToSessionRow);
+        _sessionsCacheData   = result;
+        _sessionsCacheExpiry = Date.now() + SESSIONS_CACHE_TTL_MS;
+        return result;
+      }
     }
   } catch (e) {
     console.warn("[Sheets] DB read failed for sessions, falling back to Sheets API:", (e as any)?.message);
@@ -606,15 +622,24 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
 }
 
 export async function getSignUpsForSession(sessionDate: string, pool: string): Promise<SignUpRow[]> {
+  const poolNorm = pool.toLowerCase().trim();
+  const isoDate  = toIsoDate(sessionDate); // normalise to YYYY-MM-DD for index hit
   try {
     const db = await getDb();
     if (db) {
+      // Use composite index idx_sheet_signups_pool_date — O(log n) instead of full scan
+      const rows = await db.select().from(sheetSignups)
+        .where(and(eq(sheetSignups.pool, poolNorm), eq(sheetSignups.dateOfTraining, isoDate)));
+      // If indexed query returns results, use them directly; otherwise fall back to full
+      // scan (handles legacy rows where pool/date casing differs or date wasn't normalised)
+      if (rows.length > 0) return rows.map(dbSignupToSignupRow);
+      // Secondary attempt: full scan (handles mixed casing / legacy date formats)
       const allSignups = await db.select().from(sheetSignups);
       if (allSignups.length > 0) {
         return allSignups
           .filter(s =>
             datesMatch(s.dateOfTraining ?? "", sessionDate) &&
-            (s.pool ?? "").toLowerCase().trim() === pool.toLowerCase().trim()
+            (s.pool ?? "").toLowerCase().trim() === poolNorm
           )
           .map(dbSignupToSignupRow);
       }
@@ -622,11 +647,11 @@ export async function getSignUpsForSession(sessionDate: string, pool: string): P
   } catch (e) {
     console.warn("[Sheets] DB read failed for getSignUpsForSession, falling back:", (e as any)?.message);
   }
-  // Fallback
+  // Fallback to Sheets API
   const rows = await fetchSheetsSignups();
   return rows.filter(s =>
     datesMatch(s.dateOfTraining, sessionDate) &&
-    s.pool.toLowerCase().trim() === pool.toLowerCase().trim()
+    s.pool.toLowerCase().trim() === poolNorm
   );
 }
 
@@ -674,11 +699,15 @@ export async function getAllSignupsByEmail(
   try {
     const db = await getDb();
     if (db) {
-      const rows = await db.select().from(sheetSignups);
+      // Use email index — avoids full table scan
+      const rows = await db.select().from(sheetSignups)
+        .where(eq(sheetSignups.email, normalizedEmail));
       if (rows.length > 0) {
         allSignups = rows.map(dbSignupToSignupRow);
       } else {
-        allSignups = await fetchSheetsSignups();
+        // No rows for this email — could be paymentId-only rows; fetch all to be safe
+        const allRows = await db.select().from(sheetSignups);
+        allSignups = allRows.length > 0 ? allRows.map(dbSignupToSignupRow) : await fetchSheetsSignups();
       }
     } else {
       allSignups = await fetchSheetsSignups();
@@ -711,10 +740,10 @@ export async function getAllSignupsByEmail(
   }));
 }
 
-/** No-op kept for backward compatibility — DB cache is now the cache layer. */
+/** Bust the 60-second in-process sessions cache. Called after any session mutation. */
 export function clearSessionsCache(): void {
-  // Intentionally empty: cache invalidation is handled by syncTab() in sync.ts,
-  // called directly from routers.ts after each mutation.
+  _sessionsCacheData   = null;
+  _sessionsCacheExpiry = 0;
 }
 
 export function convertDriveUrl(url: string): string {

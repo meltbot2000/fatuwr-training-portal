@@ -9,10 +9,16 @@ import { toast } from "sonner";
 type AnnItem = { id: number; title: string | null; content?: string | null; imageUrl: string | null; position: number };
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const clubRole = (user as any)?.clubRole || "";
   const canManage = clubRole === "Admin" || clubRole === "Helper";
   const isAdmin = clubRole === "Admin";
+
+  const { data: profile } = trpc.profile.get.useQuery(undefined, {
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  });
+  const avatarImage = profile?.image || "";
 
   const { data: announcements = [], isLoading, refetch } = trpc.announcements.list.useQuery();
   const [createOpen, setCreateOpen] = useState(false);
@@ -92,8 +98,11 @@ export default function Home() {
               </button>
             )}
             <Link href="/profile" className="flex items-center hover:bg-white/10 rounded-full p-1 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
-                {(user as any)?.name?.charAt(0)?.toUpperCase() || (user as any)?.email?.charAt(0)?.toUpperCase() || "U"}
+              <div className="w-8 h-8 rounded-full bg-white/20 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
+                {avatarImage
+                  ? <img src={avatarImage} alt="Profile" className="w-full h-full object-cover" />
+                  : ((user as any)?.name?.charAt(0)?.toUpperCase() || (user as any)?.email?.charAt(0)?.toUpperCase() || "U")
+                }
               </div>
             </Link>
           </div>

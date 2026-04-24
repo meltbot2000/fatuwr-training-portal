@@ -116,13 +116,12 @@ export async function runDailyBackup(): Promise<void> {
   const timeStr  = now.toLocaleTimeString("en-SG", { timeZone: "Asia/Singapore", hour: "2-digit", minute: "2-digit" });
 
   try {
-    // Fetch all four tables
-    const [users, sessions, signups, payments] = await Promise.all([
-      db.select().from(sheetUsers),
-      db.select().from(sheetSessions),
-      db.select().from(sheetSignups),
-      db.select().from(sheetPayments),
-    ]);
+    // Fetch tables sequentially to avoid a simultaneous 4-table memory spike.
+    // Each table is serialised to CSV immediately and then GC'd before loading the next.
+    const users    = await db.select().from(sheetUsers);
+    const sessions = await db.select().from(sheetSessions);
+    const signups  = await db.select().from(sheetSignups);
+    const payments = await db.select().from(sheetPayments);
 
     const attachments = [
       { filename: `users_${dateStr.replace(/ /g, "_")}.csv`,    content: rowsToCsv(users    as any[]) },

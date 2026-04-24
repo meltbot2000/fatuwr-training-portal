@@ -769,6 +769,69 @@ function MigratePhotosPanel() {
   );
 }
 
+// ─── MigrateImagesToDrivePanel ────────────────────────────────────────────────
+
+function MigrateImagesToDrivePanel() {
+  const [result, setResult] = useState<{ migrated: number; skipped: number; failed: number; errors: string[] } | null>(null);
+  const mutation = trpc.admin.migrateImagesToDrive.useMutation({
+    onSuccess: (data) => {
+      setResult(data);
+      toast.success(`Moved ${data.migrated} image${data.migrated !== 1 ? "s" : ""} to Drive`);
+    },
+    onError: (err) => toast.error(err.message || "Migration failed"),
+  });
+
+  return (
+    <div className="mt-2">
+      <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3">
+        <div>
+          <p className="text-[13px] font-semibold text-white">Migrate images → Google Drive</p>
+          <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
+            Uploads all base64 images (profiles, announcements, merch) to Google Drive and replaces them with URLs. Dramatically reduces DB size and Railway bandwidth. Safe to run multiple times — already-migrated images are skipped.
+          </p>
+        </div>
+        {result && (
+          <div className="rounded-lg bg-[#2a2a2a] px-3 py-2 text-[12px] space-y-0.5">
+            <p className="text-green-400">Migrated to Drive: {result.migrated}</p>
+            <p className="text-[#888888]">Skipped (already a URL): {result.skipped}</p>
+            {result.failed > 0 && <p className="text-red-400">Failed: {result.failed}</p>}
+            {result.errors.slice(0, 5).map((e, i) => (
+              <p key={i} className="text-red-400/80 text-[11px] truncate">{e}</p>
+            ))}
+          </div>
+        )}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5 border-white/10 text-white/70"
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {mutation.isPending ? "Migrating…" : "Run migration"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Migrate all images to Drive?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This uploads all base64 profile photos, announcement images, and merch photos to Google Drive. Each image adds ~0.5–1 second. The process runs in the background — this may take a few minutes for many images. Already-migrated images are skipped. Safe to run multiple times.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => mutation.mutate()}>
+                Yes, migrate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  );
+}
+
 const IMPORT_PIN = "1987";
 const IMPORT_TABS = ["sessions", "signups", "users", "payments"] as const;
 
@@ -1645,6 +1708,9 @@ export default function Admin() {
 
               {/* Migrate Glide photos → Railway DB */}
               <MigratePhotosPanel />
+
+              {/* Migrate all base64 images → Google Drive */}
+              <MigrateImagesToDrivePanel />
 
               {/* Spreadsheet Import — PIN-gated */}
               <SpreadsheetImportPanel forceSyncMutation={forceSyncMutation} />

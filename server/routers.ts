@@ -85,6 +85,7 @@ import {
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
+import { maybeUpload, replaceOldDriveFile, extractDriveFileId, deleteFromDrive, uploadToDrive, isDataUrl as isDriveDataUrl } from "./driveUpload";
 import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc, or } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos, users, otpCodes } from "../drizzle/schema";
@@ -745,14 +746,22 @@ export const appRouter = router({
     }),
 
     updatePhoto: protectedProcedure
-      .input(z.object({ image: z.string() }))  // base64 data URL or ""
+      .input(z.object({ image: z.string() }))  // base64 data URL, Drive URL, or ""
       .mutation(async ({ ctx, input }) => {
         // Write ONLY to the users auth table — sheetUsers is a Sheets cache
         // that gets wiped on forceSync, so it must never be used as the photo store.
         const photoDb = await db.getDb();
         if (!photoDb) throw new Error("DB unavailable");
+
+        // Delete old Drive file if being replaced
+        const [existing] = await photoDb.select({ image: users.image }).from(users).where(eq(users.id, ctx.user.id));
+        await replaceOldDriveFile(existing?.image);
+
+        // Upload new image to Drive if it's a base64 data URL
+        const stored = await maybeUpload(input.image, `profile_${ctx.user.id}.jpg`);
+
         await photoDb.update(users)
-          .set({ image: input.image || null })
+          .set({ image: stored })
           .where(eq(users.id, ctx.user.id));
         return { ok: true };
       }),
@@ -1049,12 +1058,15 @@ export const appRouter = router({
         const emailNorm = input.email.toLowerCase().trim();
         const pidNorm   = (input.paymentId || "").toLowerCase().trim();
 
-        // Payments: paymentId-primary (same rule as sign-ups).
-        // If a row has a paymentId, match by paymentId; otherwise fall back to email.
-        // Fetch all and filter in JS to apply the same logic as getMyPayments.
+        // Payments: use indexed WHERE clauses — fetch only rows matching email OR paymentId
+        // then apply paymentId-primary logic in JS on the smaller result set.
         const { or } = await import("drizzle-orm");
-        const allPmts = await actDb.select().from(sheetPayments);
-        const payments = [...allPmts].filter(p => {
+        const pmtRows = pidNorm
+          ? await actDb.select().from(sheetPayments)
+              .where(or(eq(sheetPayments.paymentId, pidNorm), eq(sheetPayments.email, emailNorm)))
+          : await actDb.select().from(sheetPayments)
+              .where(eq(sheetPayments.email, emailNorm));
+        const payments = pmtRows.filter(p => {
           const rowPayId = (p.paymentId || "").toLowerCase().trim();
           const rowEmail = (p.email     || "").toLowerCase().trim();
           if (rowPayId) return pidNorm ? rowPayId === pidNorm : rowEmail === emailNorm;
@@ -1063,10 +1075,13 @@ export const appRouter = router({
           (new Date(b.date ?? "").getTime() || 0) - (new Date(a.date ?? "").getTime() || 0)
         );
 
-        // Signups: paymentId-primary — if a row has a paymentId, match by paymentId;
-        // otherwise fall back to email. Covers admin-created sign-ups and imported rows.
-        const allSups = await actDb.select().from(sheetSignups);
-        const signups = [...allSups].filter(s => {
+        // Signups: use indexed WHERE — paymentId-primary logic applied after smaller fetch.
+        const supRows = pidNorm
+          ? await actDb.select().from(sheetSignups)
+              .where(or(eq(sheetSignups.paymentId, pidNorm), eq(sheetSignups.email, emailNorm)))
+          : await actDb.select().from(sheetSignups)
+              .where(eq(sheetSignups.email, emailNorm));
+        const signups = supRows.filter(s => {
           const rowPayId = (s.paymentId || "").toLowerCase().trim();
           const rowEmail = (s.email     || "").toLowerCase().trim();
           if (rowPayId) return pidNorm ? rowPayId === pidNorm : rowEmail === emailNorm;
@@ -1346,6 +1361,69 @@ export const appRouter = router({
         return { migrated, skipped, failed, total: glideRows.length, errors };
       }),
 
+    /**
+     * Migrate all existing base64 images stored in the DB to Google Drive.
+     * Covers: users.image, announcements.imageUrl, merch_items.photo1/photo2.
+     * Safe to re-run — skips rows that already have a Drive URL.
+     */
+    migrateImagesToDrive: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const migDb = await db.getDb();
+        if (!migDb) throw new Error("DB unavailable");
+
+        const isB64 = isDriveDataUrl;
+        let migrated = 0, skipped = 0, failed = 0;
+        const errors: string[] = [];
+
+        // ── Profile photos (users.image) ──────────────────────────────────────
+        const allUsers = await migDb.select({ id: users.id, email: users.email, image: users.image }).from(users);
+        for (const u of allUsers) {
+          if (!u.image || !isB64(u.image)) { skipped++; continue; }
+          try {
+            const url = await uploadToDrive(u.image, `profile_${u.id}.jpg`);
+            await migDb.update(users).set({ image: url }).where(eq(users.id, u.id));
+            migrated++;
+          } catch (e: any) { failed++; errors.push(`user ${u.email}: ${e.message}`); }
+        }
+
+        // ── Announcements (announcements.imageUrl) ────────────────────────────
+        const allAnns = await migDb.select({ id: announcements.id, imageUrl: announcements.imageUrl }).from(announcements);
+        for (const a of allAnns) {
+          if (!a.imageUrl || !isB64(a.imageUrl)) { skipped++; continue; }
+          try {
+            const url = await uploadToDrive(a.imageUrl, `announcement_${a.id}.jpg`);
+            await migDb.update(announcements).set({ imageUrl: url }).where(eq(announcements.id, a.id));
+            migrated++;
+          } catch (e: any) { failed++; errors.push(`announcement ${a.id}: ${e.message}`); }
+        }
+
+        // ── Merch photos (photo1, photo2) ─────────────────────────────────────
+        const allMerch = await migDb.select({ id: merchItems.id, photo1: merchItems.photo1, photo2: merchItems.photo2 }).from(merchItems);
+        for (const m of allMerch) {
+          if (m.photo1 && isB64(m.photo1)) {
+            try {
+              const url = await uploadToDrive(m.photo1, `merch_${m.id}_photo1.jpg`);
+              await migDb.update(merchItems).set({ photo1: url }).where(eq(merchItems.id, m.id));
+              migrated++;
+            } catch (e: any) { failed++; errors.push(`merch ${m.id} photo1: ${e.message}`); }
+          } else { skipped++; }
+          if (m.photo2 && isB64(m.photo2)) {
+            try {
+              const url = await uploadToDrive(m.photo2, `merch_${m.id}_photo2.jpg`);
+              await migDb.update(merchItems).set({ photo2: url }).where(eq(merchItems.id, m.id));
+              migrated++;
+            } catch (e: any) { failed++; errors.push(`merch ${m.id} photo2: ${e.message}`); }
+          } else { skipped++; }
+        }
+
+        console.log(`[migrateImagesToDrive] migrated=${migrated} skipped=${skipped} failed=${failed}`);
+        if (errors.length) console.log("[migrateImagesToDrive] errors:", errors);
+        return { migrated, skipped, failed, errors };
+      }),
+
     addSession: protectedProcedure
       .input(z.object({
         trainingDate: z.string(),
@@ -1525,12 +1603,14 @@ export const appRouter = router({
         if (!input.title && !input.content && !input.imageUrl) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "At least one field is required" });
         }
+        // Upload image to Drive if a base64 data URL was provided
+        const storedImageUrl = await maybeUpload(input.imageUrl, `announcement_${Date.now()}.jpg`);
         const [maxRow] = await aDb.select({ maxPos: max(announcements.position) }).from(announcements);
         const nextPos = (maxRow?.maxPos ?? 0) + 1;
         await aDb.insert(announcements).values({
           title: input.title || null,
           content: input.content || null,
-          imageUrl: input.imageUrl || null,
+          imageUrl: storedImageUrl,
           position: nextPos,
           createdBy: ctx.user.email || "",
         });
@@ -1554,7 +1634,12 @@ export const appRouter = router({
         const updates: Record<string, unknown> = {};
         if (input.title !== undefined) updates.title = input.title || null;
         if (input.content !== undefined) updates.content = input.content || null;
-        if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl || null;
+        if (input.imageUrl !== undefined) {
+          // Delete old Drive file if being replaced
+          const [existing] = await aDb.select({ imageUrl: announcements.imageUrl }).from(announcements).where(eq(announcements.id, input.id));
+          await replaceOldDriveFile(existing?.imageUrl);
+          updates.imageUrl = await maybeUpload(input.imageUrl, `announcement_${input.id}_${Date.now()}.jpg`);
+        }
         if (Object.keys(updates).length === 0) return { success: true };
         await aDb.update(announcements).set(updates).where(eq(announcements.id, input.id));
         return { success: true };
@@ -1569,6 +1654,9 @@ export const appRouter = router({
         }
         const aDb = await db.getDb();
         if (!aDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        // Delete Drive file before removing the DB row
+        const [existing] = await aDb.select({ imageUrl: announcements.imageUrl }).from(announcements).where(eq(announcements.id, input.id));
+        await replaceOldDriveFile(existing?.imageUrl);
         await aDb.delete(announcements).where(eq(announcements.id, input.id));
         return { success: true };
       }),
@@ -1626,13 +1714,19 @@ export const appRouter = router({
         if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
         const mDb = await db.getDb();
         if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Upload photos to Drive if base64 data URLs were provided
+        const ts = Date.now();
+        const [photo1Url, photo2Url] = await Promise.all([
+          maybeUpload(input.photo1, `merch_photo1_${ts}.jpg`),
+          maybeUpload(input.photo2, `merch_photo2_${ts}.jpg`),
+        ]);
         const result = await mDb.insert(merchItems).values({
           name: input.name,
           description: input.description ?? null,
           memberPrice: input.memberPrice ?? "",
           nonMemberPrice: input.nonMemberPrice ?? "",
-          photo1: input.photo1 ?? null,
-          photo2: input.photo2 ?? null,
+          photo1: photo1Url,
+          photo2: photo2Url,
           availableSizes: input.availableSizes ?? "",
           howToPurchase: input.howToPurchase ?? null,
           inventory: input.inventory ?? null,
@@ -1660,7 +1754,19 @@ export const appRouter = router({
         if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
         const mDb = await db.getDb();
         if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const { id, ...fields } = input;
+        const { id, photo1: p1In, photo2: p2In, ...rest } = input;
+        // Fetch existing photos to delete old Drive files if being replaced
+        const [existing] = await mDb.select({ photo1: merchItems.photo1, photo2: merchItems.photo2 }).from(merchItems).where(eq(merchItems.id, id));
+        const ts = Date.now();
+        const fields: Record<string, unknown> = { ...rest };
+        if (p1In !== undefined) {
+          await replaceOldDriveFile(existing?.photo1);
+          fields.photo1 = await maybeUpload(p1In, `merch_${id}_photo1_${ts}.jpg`);
+        }
+        if (p2In !== undefined) {
+          await replaceOldDriveFile(existing?.photo2);
+          fields.photo2 = await maybeUpload(p2In, `merch_${id}_photo2_${ts}.jpg`);
+        }
         await mDb.update(merchItems).set(fields).where(eq(merchItems.id, id));
         return { success: true };
       }),
@@ -1672,6 +1778,12 @@ export const appRouter = router({
         if (role !== "Admin" && role !== "Helper") throw new TRPCError({ code: "FORBIDDEN" });
         const mDb = await db.getDb();
         if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Delete Drive files before removing the DB row
+        const [existing] = await mDb.select({ photo1: merchItems.photo1, photo2: merchItems.photo2 }).from(merchItems).where(eq(merchItems.id, input.id));
+        await Promise.all([
+          replaceOldDriveFile(existing?.photo1),
+          replaceOldDriveFile(existing?.photo2),
+        ]);
         await mDb.delete(merchItems).where(eq(merchItems.id, input.id));
         return { success: true };
       }),

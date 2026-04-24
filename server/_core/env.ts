@@ -16,4 +16,5 @@ export const ENV = {
   gasUrl: process.env.GOOGLE_APPS_SCRIPT_URL ?? "",
   appsScriptSecret: process.env.APPS_SCRIPT_SECRET ?? "",
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "",
+  googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? "",
 };

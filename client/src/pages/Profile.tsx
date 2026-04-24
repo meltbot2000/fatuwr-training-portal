@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { LogOut, Camera, Copy, Check } from "lucide-react";
+import { LogOut, Camera, Copy, Check, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -121,29 +121,42 @@ export default function Profile() {
         {/* Avatar + name */}
         <div className="flex flex-col items-center gap-2 pb-2">
           {/* Clickable avatar */}
-          <button
-            onClick={handleAvatarClick}
-            className="relative w-[72px] h-[72px] rounded-full overflow-hidden focus:outline-none group"
-            aria-label="Change profile photo"
-          >
-            {displayProfile.image ? (
-              <img src={displayProfile.image} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-[#2a2a2a] flex items-center justify-center text-white text-2xl font-bold">
-                {initials}
+          <div className="relative">
+            <button
+              onClick={handleAvatarClick}
+              className="relative w-24 h-24 rounded-full overflow-hidden focus:outline-none group"
+              aria-label="Change profile photo"
+            >
+              {displayProfile.image ? (
+                <img src={displayProfile.image} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#2a2a2a] flex items-center justify-center text-white text-3xl font-bold">
+                  {initials}
+                </div>
+              )}
+              {/* Overlay on hover/focus */}
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                <Camera className="w-6 h-6 text-white" />
               </div>
+              {/* Loading indicator while uploading */}
+              {updatePhoto.isPending && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </button>
+            {/* Pen badge — always visible, signals editability */}
+            {!updatePhoto.isPending && (
+              <button
+                onClick={handleAvatarClick}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#2196F3] flex items-center justify-center shadow-md"
+                aria-hidden="true"
+                tabIndex={-1}
+              >
+                <Pencil className="w-3.5 h-3.5 text-white" />
+              </button>
             )}
-            {/* Overlay on hover */}
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
-              <Camera className="w-5 h-5 text-white" />
-            </div>
-            {/* Loading indicator while uploading */}
-            {updatePhoto.isPending && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
