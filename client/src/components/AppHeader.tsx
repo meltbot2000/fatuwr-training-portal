@@ -33,6 +33,10 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
         backgroundColor: "#1E1E1E",
         borderBottom: "1px solid #2C2C2C",
         paddingTop: "env(safe-area-inset-top, 0px)",
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
       }}
     >
       <div className="mx-auto max-w-[480px] flex items-center justify-between px-4 h-14 relative">

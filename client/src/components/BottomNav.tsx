@@ -82,11 +82,15 @@ export default function BottomNav() {
         backgroundColor: "#1E1E1E",
         borderTop: "1px solid #2C2C2C",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        // Force GPU compositing layer — prevents nav detaching during fast
-        // momentum scroll on iOS/Android (common mobile browser quirk)
+        // GPU compositing — keeps nav on its own layer during iOS momentum scroll.
+        // translateZ(0) is the compositing hint; backfaceVisibility: hidden reinforces it.
+        // willChange is intentionally OMITTED — it creates a new containing block for
+        // positioned descendants and can itself cause layout side-effects; translateZ
+        // alone is the correct minimal hint.
         transform: "translateZ(0)",
         WebkitTransform: "translateZ(0)",
-        willChange: "transform",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
       }}
     >
       <div className="mx-auto max-w-[480px] flex" style={{ height: 72 }}>
