@@ -288,12 +288,22 @@ Sessions hidden from user-facing list once `now > sessionStart + 1 hour` in SGT 
 ### sheet_users is a sync cache — never write app data to it
 `forceSync("users")` does DELETE+INSERT — any app-written data would be wiped. Profile photos must be in `users.image`, not `sheetUsers.image`.
 
-### Trial membership behaviour
-- Trial is a `memberStatus` value, not a `clubRole`. A user with `clubRole=Helper` can also be on `memberStatus=Trial`.
-- Trial gives member fee rates for sessions with a training date **before** `trialEndDate`. If the training date falls after the trial end, non-member rate is shown and a warning displayed in the sign-up form.
-- Trial cannot be taken more than once — guarded by `trialStartDate` being set (even if the trial has expired).
-- Expiry is enforced two ways: (1) server-side job runs at startup + every 24h, flips expired Trial → Non-Member in `users` table; (2) `resolveSheetMemberStatus()` on login applies the same logic client-side so a stale DB row doesn't briefly show the wrong status.
-- Trial warning banner shown on `/` (Sessions) when ≤14 days remain.
+### Trial membership — fee rate is determined by the SESSION DATE, not today's date
+
+**The most important rule:** what matters for fee calculation is whether the **training session's date** falls within the user's trial period — not whether the user is a Trial member at the moment they sign up.
+
+- A Trial member signing up for a session **on or before** `trialEndDate` → **member fee rate**
+- A Trial member signing up for a session **after** `trialEndDate` → **non-member fee rate** + warning shown in sign-up form, even though the user is still technically on Trial status today
+
+This is implemented in `getMembershipOnTrainingDate()` in `client/src/lib/feeUtils.ts`, which takes the session date as input and compares it against `trialEndDate`. The result is used for all fee calculations in the sign-up form and edit sheet.
+
+**Why this matters:** A member could sign up weeks in advance for a session that falls after their trial expires. Charging them the member rate at sign-up time would be incorrect — they should be paying non-member fees for that session.
+
+Additional trial behaviour:
+- Trial is a `memberStatus` value, independent of `clubRole`. A Helper or Admin can also be on Trial.
+- Trial cannot be taken more than once — guarded by `trialStartDate` being set (even if the trial has since expired).
+- Expiry is enforced two ways: (1) server-side job runs at startup + every 24h, flips expired Trial → Non-Member in `users` table; (2) `resolveSheetMemberStatus()` on login applies the same logic immediately so a stale DB row doesn't briefly show the wrong status after expiry.
+- Trial warning banner shown on `/` (Sessions) when ≤14 days remain until `trialEndDate`.
 
 ### 60-second sessions cache
 `getSessions()` caches results in module-level vars for 60 seconds. `clearSessionsCache()` is called after every session mutation. Do not add other tables to this cache without careful thought — payments and sign-ups must be fresh.
