@@ -623,17 +623,14 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
 
 export async function getSignUpsForSession(sessionDate: string, pool: string): Promise<SignUpRow[]> {
   const poolNorm = pool.toLowerCase().trim();
-  const isoDate  = toIsoDate(sessionDate); // normalise to YYYY-MM-DD for index hit
   try {
     const db = await getDb();
     if (db) {
-      // Use composite index idx_sheet_signups_pool_date — O(log n) instead of full scan
-      const rows = await db.select().from(sheetSignups)
-        .where(and(eq(sheetSignups.pool, poolNorm), eq(sheetSignups.dateOfTraining, isoDate)));
-      // If indexed query returns results, use them directly; otherwise fall back to full
-      // scan (handles legacy rows where pool/date casing differs or date wasn't normalised)
-      if (rows.length > 0) return rows.map(dbSignupToSignupRow);
-      // Secondary attempt: full scan (handles mixed casing / legacy date formats)
+      // Full scan with JS date normalisation — required because dateOfTraining values
+      // exist in mixed formats ("2026-04-26", "26 April 2026", "26/04/2026") across
+      // seeded and app-written rows. An exact WHERE match on a normalised date would
+      // silently drop rows stored in a different format (caused a critical sign-up
+      // display bug 2026-04-25). Correctness over index performance here.
       const allSignups = await db.select().from(sheetSignups);
       if (allSignups.length > 0) {
         return allSignups
