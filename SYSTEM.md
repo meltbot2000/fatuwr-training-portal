@@ -518,6 +518,7 @@ Until automated tests exist, run through `TESTING_CHECKLIST.md` (role-based smok
 
 | File | Notes |
 |---|---|
-| `Code_v10_2026-04-18.gs` | LIVE — 1-min cron, Maybank2 label, notifyRailway() |
+| `Code_v10_2026-04-18.gs` | Previous live version |
+| `Code_v11_2026-04-26.gs` | **DEPLOY THIS** — OAuth validity check + alert email; both labels → Maybank_Done2; appendPaymentRow in try-catch with per-thread write-ok flag |
 
 **Never edit live GAS files in place. Always create a new versioned file.**
