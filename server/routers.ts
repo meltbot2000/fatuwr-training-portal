@@ -1829,6 +1829,7 @@ export const appRouter = router({
       .input(z.object({
         title: z.string().min(1).max(255),
         url: z.string().url(),
+        notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const vDb = await db.getDb();
@@ -1838,6 +1839,7 @@ export const appRouter = router({
         await vDb.insert(videos).values({
           title: input.title,
           url: input.url,
+          notes: input.notes || null,
           postedBy,
           postedDate,
         });

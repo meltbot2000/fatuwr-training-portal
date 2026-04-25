@@ -2,9 +2,8 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Plus, Loader2, Play, X } from "lucide-react";
+import { Plus, Loader2, Play, X, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 // ── Thumbnail helpers ─────────────────────────────────────────────────────────
 
@@ -27,81 +26,99 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// ── Add Video Sheet ───────────────────────────────────────────────────────────
+// ── Add Video (full-screen) ───────────────────────────────────────────────────
 
-function AddVideoSheet({
-  open,
-  onOpenChange,
+function AddVideoScreen({
+  onClose,
   onDone,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onClose: () => void;
   onDone: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+  const [notes, setNotes] = useState("");
 
   const addMutation = trpc.videos.add.useMutation({
     onSuccess: () => {
       toast.success("Video added!");
-      setTitle("");
-      setUrl("");
-      onOpenChange(false);
       onDone();
+      onClose();
     },
     onError: (e) => toast.error(e.message || "Failed to add video"),
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92vh] flex flex-col bg-[#2A2A2A] border-t-0 px-0 pb-0">
-        <SheetHeader className="pt-4 pb-3 px-4 shrink-0">
-          <SheetTitle className="text-[15px] font-medium text-white">Add video</SheetTitle>
-        </SheetHeader>
+    <div className="fixed inset-0 z-50 bg-[#111111] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 pt-safe-top pt-4 pb-3 shrink-0">
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/10 transition-colors mr-1"
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5 text-white" />
+        </button>
+        <p className="text-[17px] font-semibold text-white">Add video</p>
+      </div>
 
-        <div className="overflow-y-auto flex-1 min-h-0 px-4 pb-8 space-y-3">
-          <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
-            <div className="flex items-center gap-3 px-4 min-h-[48px]">
-              <span className="text-[14px] text-[#888888] w-16 shrink-0">Title</span>
-              <input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="e.g. FATUWR vs NUSAC highlights"
-                className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
-              />
-            </div>
-            <div className="flex items-center gap-3 px-4 min-h-[48px]">
-              <span className="text-[14px] text-[#888888] w-16 shrink-0">URL</span>
-              <input
-                value={url}
-                onChange={e => setUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
-                className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
-                inputMode="url"
-                autoCapitalize="none"
-              />
-            </div>
+      {/* Form */}
+      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-3 pt-2">
+        {/* Title + URL */}
+        <div className="bg-[#1E1E1E] rounded-xl overflow-hidden divide-y divide-[#2C2C2C]">
+          <div className="flex items-center gap-3 px-4 min-h-[48px]">
+            <span className="text-[14px] text-[#888888] w-16 shrink-0">Title</span>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. FATUWR vs NUSAC highlights"
+              className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
+            />
           </div>
-
-          <div className="space-y-2">
-            <button
-              onClick={() => addMutation.mutate({ title: title.trim(), url: url.trim() })}
-              disabled={!title.trim() || !url.trim() || addMutation.isPending}
-              className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              {addMutation.isPending ? "Adding…" : "Add video"}
-            </button>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="w-full h-[48px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[15px]"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center gap-3 px-4 min-h-[48px]">
+            <span className="text-[14px] text-[#888888] w-16 shrink-0">URL</span>
+            <input
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              className="flex-1 bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none py-3"
+              inputMode="url"
+              autoCapitalize="none"
+            />
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        {/* Notes */}
+        <div className="bg-[#1E1E1E] rounded-xl overflow-hidden px-4 py-3">
+          <p className="text-[13px] text-[#888888] mb-1.5">Notes</p>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Optional — context, key moments, etc."
+            rows={4}
+            className="w-full bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none resize-none"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-2 pt-1">
+          <button
+            onClick={() => addMutation.mutate({ title: title.trim(), url: url.trim(), notes: notes.trim() || undefined })}
+            disabled={!title.trim() || !url.trim() || addMutation.isPending}
+            className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {addMutation.isPending ? "Adding…" : "Add video"}
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full h-[48px] rounded-full border-[1.5px] border-[#888888] text-white font-medium text-[15px]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -117,6 +134,10 @@ export default function FunResourcesVideos() {
     onSuccess: () => { toast.success("Removed."); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+
+  if (addOpen) {
+    return <AddVideoScreen onClose={() => setAddOpen(false)} onDone={refetch} />;
+  }
 
   const topBarAction = isAuthenticated ? (
     <button
@@ -154,13 +175,12 @@ export default function FunResourcesVideos() {
               href={v.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-[#1E1E1E] rounded-2xl overflow-hidden cursor-pointer hover:bg-[#252525] active:opacity-75 transition-colors"
-              style={{ minHeight: 80 }}
+              className="flex gap-3 bg-[#1E1E1E] rounded-2xl overflow-hidden cursor-pointer hover:bg-[#252525] active:opacity-75 transition-colors"
             >
               {/* Thumbnail */}
               <div
                 className="shrink-0 flex items-center justify-center bg-[#2C2C2C]"
-                style={{ width: 112, height: 80 }}
+                style={{ width: 112, minHeight: 80 }}
               >
                 {thumb ? (
                   <img
@@ -175,14 +195,15 @@ export default function FunResourcesVideos() {
 
               {/* Content */}
               <div className="flex-1 min-w-0 py-3 pr-3">
-                {/* fs-primary: 15px/500 */}
                 <p className="text-[15px] font-medium text-white leading-tight truncate">{v.title}</p>
-                {/* fs-meta: 13px/400 */}
                 <p className="text-[13px] text-[#888888] mt-0.5">{formatDate(v.postedDate)}</p>
                 <p className="text-[13px] text-[#888888] truncate">{v.postedBy}</p>
+                {v.notes && (
+                  <p className="text-[13px] text-[#888888] mt-1 line-clamp-2 whitespace-pre-line">{v.notes}</p>
+                )}
               </div>
 
-              {/* Admin delete — stop propagation so the link still works */}
+              {/* Admin delete */}
               {isAdmin && (
                 <button
                   onClick={e => {
@@ -200,8 +221,6 @@ export default function FunResourcesVideos() {
           );
         })}
       </main>
-
-      <AddVideoSheet open={addOpen} onOpenChange={setAddOpen} onDone={refetch} />
     </div>
   );
 }
