@@ -1325,58 +1325,57 @@ export const appRouter = router({
         let migrated = 0, skipped = 0, failed = 0;
         const errors: string[] = [];
 
-        for (const su of glideRows) {
-          if (!su.image) { skipped++; continue; }
+        // Pre-fetch all registered users once (avoids N per-row DB queries)
+        const allAuthUsers = await migDb.select({ id: users.id, email: users.email, image: users.image }).from(users);
+        const authByEmail = new Map(allAuthUsers.map(u => [(u.email || "").toLowerCase().trim(), u]));
 
-          // Try both email columns — userEmail (col C) is the login email, email (col D)
-          // is the PaymentID-linked email. users.email is always the login email.
-          const candidates = [su.userEmail, su.email]
-            .map(e => (e || "").toLowerCase().trim())
-            .filter(e => e.length > 0);
-          const logLabel = candidates[0] || `sheetUser#${su.email}`;
+        // Process in parallel batches of 8 — keeps total time ~10–15s (well within
+        // Railway's 30s HTTP timeout) while avoiding Drive API rate limits
+        const BATCH = 8;
+        for (let i = 0; i < glideRows.length; i += BATCH) {
+          const batch = glideRows.slice(i, i + BATCH);
+          await Promise.all(batch.map(async (su) => {
+            if (!su.image) { skipped++; return; }
 
-          // Find matching auth user (may not exist — many sheet users have never logged in)
-          let authUser: { id: number; image: string | null } | undefined;
-          for (const candidate of candidates) {
-            const [found] = await migDb.select({ id: users.id, image: users.image })
-              .from(users)
-              .where(sql`LOWER(email) = ${candidate}`)
-              .limit(1);
-            if (found) { authUser = found; break; }
-          }
+            const candidates = [su.userEmail, su.email]
+              .map(e => (e || "").toLowerCase().trim())
+              .filter(e => e.length > 0);
+            const logLabel = candidates[0] || `sheetUser#${su.id}`;
 
-          // Skip if auth user already has a non-Glide image (already migrated)
-          if (authUser?.image && !authUser.image.startsWith("http")) {
-            skipped++;
-            continue;
-          }
+            // Find matching auth user from pre-fetched map
+            const authUser = candidates.reduce<typeof allAuthUsers[0] | undefined>(
+              (found, c) => found ?? authByEmail.get(c), undefined
+            );
 
-          // Download Glide image and upload to Drive
-          try {
-            const resp = await fetch(su.image, {
-              signal: AbortSignal.timeout(15000),
-              headers: { "User-Agent": "Mozilla/5.0" },
-            });
-            if (!resp.ok) { failed++; errors.push(`${logLabel}: HTTP ${resp.status}`); continue; }
-            const contentType = resp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-            const buf = await resp.arrayBuffer();
-            const b64 = Buffer.from(buf).toString("base64");
-            const dataUrl = `data:${contentType};base64,${b64}`;
-            const driveUrl = await uploadToDrive(dataUrl, `glide_${logLabel}.jpg`);
-
-            if (authUser) {
-              // Registered user — store in users.image (primary store)
-              await migDb.update(users).set({ image: driveUrl }).where(eq(users.id, authUser.id));
-            } else {
-              // Sheet-only user (never logged in) — update by PK to avoid any
-              // email-matching ambiguity
-              await migDb.update(sheetUsers).set({ image: driveUrl }).where(eq(sheetUsers.id, su.id));
+            // Skip if registered user already has a non-Glide image
+            if (authUser?.image && !authUser.image.startsWith("http")) {
+              skipped++; return;
             }
-            migrated++;
-          } catch (e: any) {
-            failed++;
-            errors.push(`${logLabel}: ${e.message}`);
-          }
+
+            // Download Glide image and upload to Drive
+            try {
+              const resp = await fetch(su.image, {
+                signal: AbortSignal.timeout(12000),
+                headers: { "User-Agent": "Mozilla/5.0" },
+              });
+              if (!resp.ok) { failed++; errors.push(`${logLabel}: HTTP ${resp.status}`); return; }
+              const contentType = resp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+              const buf = await resp.arrayBuffer();
+              const b64 = Buffer.from(buf).toString("base64");
+              const dataUrl = `data:${contentType};base64,${b64}`;
+              const driveUrl = await uploadToDrive(dataUrl, `glide_${logLabel}.jpg`);
+
+              if (authUser) {
+                await migDb.update(users).set({ image: driveUrl }).where(eq(users.id, authUser.id));
+              } else {
+                await migDb.update(sheetUsers).set({ image: driveUrl }).where(eq(sheetUsers.id, su.id));
+              }
+              migrated++;
+            } catch (e: any) {
+              failed++;
+              errors.push(`${logLabel}: ${e.message}`);
+            }
+          }));
         }
 
         console.log(`[migrateGlidePhotos] migrated=${migrated} skipped=${skipped} failed=${failed}`);
@@ -1401,45 +1400,52 @@ export const appRouter = router({
         let migrated = 0, skipped = 0, failed = 0;
         const errors: string[] = [];
 
-        // ── Profile photos (users.image) ──────────────────────────────────────
+        // Helper: upload one item to Drive and update DB, counting results
+        const run = async (
+          imageVal: string | null | undefined,
+          filename: string,
+          save: (url: string) => Promise<void>,
+          label: string,
+        ) => {
+          if (!imageVal || !isB64(imageVal)) { skipped++; return; }
+          try {
+            const url = await uploadToDrive(imageVal, filename);
+            await save(url);
+            migrated++;
+          } catch (e: any) { failed++; errors.push(`${label}: ${e.message}`); }
+        };
+
+        // ── Profile photos (users.image) ── parallel batches of 8 ──────────────
         const allUsers = await migDb.select({ id: users.id, email: users.email, image: users.image }).from(users);
-        for (const u of allUsers) {
-          if (!u.image || !isB64(u.image)) { skipped++; continue; }
-          try {
-            const url = await uploadToDrive(u.image, `profile_${u.id}.jpg`);
-            await migDb.update(users).set({ image: url }).where(eq(users.id, u.id));
-            migrated++;
-          } catch (e: any) { failed++; errors.push(`user ${u.email}: ${e.message}`); }
+        for (let i = 0; i < allUsers.length; i += 8) {
+          await Promise.all(allUsers.slice(i, i + 8).map(u =>
+            run(u.image, `profile_${u.id}.jpg`,
+              url => migDb.update(users).set({ image: url }).where(eq(users.id, u.id)).then(() => {}),
+              `user ${u.email}`)
+          ));
         }
 
-        // ── Announcements (announcements.imageUrl) ────────────────────────────
+        // ── Announcements ── parallel batches of 8 ───────────────────────────
         const allAnns = await migDb.select({ id: announcements.id, imageUrl: announcements.imageUrl }).from(announcements);
-        for (const a of allAnns) {
-          if (!a.imageUrl || !isB64(a.imageUrl)) { skipped++; continue; }
-          try {
-            const url = await uploadToDrive(a.imageUrl, `announcement_${a.id}.jpg`);
-            await migDb.update(announcements).set({ imageUrl: url }).where(eq(announcements.id, a.id));
-            migrated++;
-          } catch (e: any) { failed++; errors.push(`announcement ${a.id}: ${e.message}`); }
+        for (let i = 0; i < allAnns.length; i += 8) {
+          await Promise.all(allAnns.slice(i, i + 8).map(a =>
+            run(a.imageUrl, `announcement_${a.id}.jpg`,
+              url => migDb.update(announcements).set({ imageUrl: url }).where(eq(announcements.id, a.id)).then(() => {}),
+              `announcement ${a.id}`)
+          ));
         }
 
-        // ── Merch photos (photo1, photo2) ─────────────────────────────────────
+        // ── Merch photos ── parallel batches of 8 ────────────────────────────
         const allMerch = await migDb.select({ id: merchItems.id, photo1: merchItems.photo1, photo2: merchItems.photo2 }).from(merchItems);
-        for (const m of allMerch) {
-          if (m.photo1 && isB64(m.photo1)) {
-            try {
-              const url = await uploadToDrive(m.photo1, `merch_${m.id}_photo1.jpg`);
-              await migDb.update(merchItems).set({ photo1: url }).where(eq(merchItems.id, m.id));
-              migrated++;
-            } catch (e: any) { failed++; errors.push(`merch ${m.id} photo1: ${e.message}`); }
-          } else { skipped++; }
-          if (m.photo2 && isB64(m.photo2)) {
-            try {
-              const url = await uploadToDrive(m.photo2, `merch_${m.id}_photo2.jpg`);
-              await migDb.update(merchItems).set({ photo2: url }).where(eq(merchItems.id, m.id));
-              migrated++;
-            } catch (e: any) { failed++; errors.push(`merch ${m.id} photo2: ${e.message}`); }
-          } else { skipped++; }
+        for (let i = 0; i < allMerch.length; i += 8) {
+          await Promise.all(allMerch.slice(i, i + 8).flatMap(m => [
+            run(m.photo1, `merch_${m.id}_photo1.jpg`,
+              url => migDb.update(merchItems).set({ photo1: url }).where(eq(merchItems.id, m.id)).then(() => {}),
+              `merch ${m.id} photo1`),
+            run(m.photo2, `merch_${m.id}_photo2.jpg`,
+              url => migDb.update(merchItems).set({ photo2: url }).where(eq(merchItems.id, m.id)).then(() => {}),
+              `merch ${m.id} photo2`),
+          ]));
         }
 
         console.log(`[migrateImagesToDrive] migrated=${migrated} skipped=${skipped} failed=${failed}`);
