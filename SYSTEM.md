@@ -134,12 +134,54 @@ Maybank email → Gmail label "Maybank2"
 User selects photo → client compresses to max 600×600 JPEG 0.75 quality (~50–150 KB)
   → base64 data URL → POST profile.updatePhoto (or announcements/merch mutation)
   → server: replaceOldDriveFile(oldUrl) → delete old R2 object
-  → uploadToDrive(base64DataUrl, filename) → PutObjectCommand to R2
+  → uploadToDrive(base64DataUrl, filename) → PutObjectCommand to R2  ← function still named uploadToDrive for API compatibility
   → return https://<r2PublicUrl>/photos/<uuid>-<filename>
   → store URL in DB column
 ```
 
-### 4.5 Session sign-up count display
+### 4.5 Trial membership sign-up
+
+```
+User taps "Sign up for Trial" on /membership (Non-Member only — blocked if trialStartDate already set)
+  → POST membership.signupTrial
+    → guard: hasTrialled (trialStartDate set) → BAD_REQUEST
+    → guard: already Trial/Member/Student → BAD_REQUEST
+    → insert sheetSignups row: activity="Trial Membership", baseFee/actualFees=$10, pool/dateOfTraining=""
+    → trialStart = today (DD/MM/YYYY), trialEnd = today + 3 months (DD/MM/YYYY)
+    → UPDATE sheet_users SET memberStatus="Trial", trialStartDate, trialEndDate
+      WHERE email = $email OR userEmail = $email
+    → upsertUser: memberStatus="Trial", trialStartDate, trialEndDate
+  → return updated user; UI refreshes membership page to show trial card
+```
+
+**Key behaviours:**
+- $10 trial fee is recorded as a sign-up row — it appears in the user's Payments page under Membership Fees and contributes to their debt
+- Dates stored as `DD/MM/YYYY` format
+- Trial cannot be taken a second time (trialStartDate guard)
+- Trial is 3 calendar months from today regardless of training schedule
+
+### 4.6 Annual membership sign-up
+
+```
+User taps "Become a Member" on /membership (any authenticated user)
+  → POST membership.signupMember
+    → pro-rated fee: $80 × (12 − currentMonthIndex) / 12, rounded to nearest dollar
+      (Jan = full $80; Dec = ~$7)
+    → insert sheetSignups row: activity="Membership Fee", baseFee/actualFees=proRatedFee,
+      dateOfTraining=today (DD/MM/YYYY), pool=""
+    → UPDATE sheet_users SET memberStatus="Member", membershipStartDate=today
+      WHERE email = $email OR userEmail = $email
+    → upsertUser: memberStatus="Member", membershipStartDate=today
+  → return updated user
+```
+
+**Key behaviours:**
+- Annual fee is pro-rated: full $80 in January, reduced by completed months through the year
+- Fee is recorded as a sign-up row (activity="Membership Fee") — visible in Payments page under Membership Fees
+- `MEMBERSHIP_ACTIVITIES = ["Membership Fee", "Trial Membership"]` — both appear under Membership Fees section in Payments, not Training Fees
+- Membership start date stored as `DD/MM/YYYY`
+
+### 4.7 Session sign-up count display
 
 ```
 Sessions list: COUNT(signups) per session using toIsoDate(trainingDate) as key
@@ -202,17 +244,31 @@ Fully DB-primary. Never touch Sheets.
 
 ---
 
-## 7. Role system
+## 7. Access model
+
+**`memberStatus` and `clubRole` are independent and concurrent.** A user always has a `memberStatus` (Non-Member / Trial / Member / Student) AND optionally a `clubRole` (empty / Helper / Admin). These are not mutually exclusive — an Admin can be a Non-Member, a Helper can be a Member, etc.
+
+### memberStatus — determines fee rate and membership UI
+
+| Status | Fee rate | Notes |
+|---|---|---|
+| Non-Member | Non-member rate | Default for new accounts; debt warnings and nudge apply |
+| Trial | Member rate | Valid until `trialEndDate`; expiry nudge shown ≤14 days before; auto-downgraded to Non-Member after expiry |
+| Member | Member rate | Annual member |
+| Student | Student rate | Managed by Admin only |
+
+### clubRole — determines administrative access
 
 | Role | Access |
 |---|---|
-| Unauthenticated | Landing screen only; can browse sessions list |
-| Non-Member | Full app; non-member fee rate; debt warnings apply |
-| Trial | Member fee rate until trialEndDate; expiry nudge ≤14 days |
-| Member | Member fee rate; no nudge |
-| Student | Student fee rate |
-| Helper | Can manage announcements + merch; cannot access Admin sessions/data tabs |
-| Admin | Full access; bypasses debt blocking and duplicate sign-up check |
+| (none) | No admin access |
+| Helper | Can **read** Admin panel (Members tab, Payments tab); can **write** announcements, merch, videos; cannot access Sessions or Data tabs; cannot edit users or payments |
+| Admin | Full admin access; bypasses debt blocking and duplicate sign-up check; can edit users, payments, sessions, run data imports |
+
+### Unauthenticated users
+- Shown the landing/welcome screen (`/login`) on first visit
+- If they navigate directly to `/` (Sessions), the sessions list **is visible** with a "Not signed in" banner — they can browse session cards but cannot sign up or view fees
+- All other authenticated routes (`/payments`, `/membership`, `/admin`, `/profile`, etc.) redirect to `/login`
 
 ---
 
@@ -232,6 +288,13 @@ Sessions hidden from user-facing list once `now > sessionStart + 1 hour` in SGT 
 
 ### sheet_users is a sync cache — never write app data to it
 `forceSync("users")` does DELETE+INSERT — any app-written data would be wiped. Profile photos must be in `users.image`, not `sheetUsers.image`.
+
+### Trial membership behaviour
+- Trial is a `memberStatus` value, not a `clubRole`. A user with `clubRole=Helper` can also be on `memberStatus=Trial`.
+- Trial gives member fee rates for sessions with a training date **before** `trialEndDate`. If the training date falls after the trial end, non-member rate is shown and a warning displayed in the sign-up form.
+- Trial cannot be taken more than once — guarded by `trialStartDate` being set (even if the trial has expired).
+- Expiry is enforced two ways: (1) server-side job runs at startup + every 24h, flips expired Trial → Non-Member in `users` table; (2) `resolveSheetMemberStatus()` on login applies the same logic client-side so a stale DB row doesn't briefly show the wrong status.
+- Trial warning banner shown on `/` (Sessions) when ≤14 days remain.
 
 ### 60-second sessions cache
 `getSessions()` caches results in module-level vars for 60 seconds. `clearSessionsCache()` is called after every session mutation. Do not add other tables to this cache without careful thought — payments and sign-ups must be fresh.
@@ -297,6 +360,9 @@ Do not include your own LIMIT clause when querying in Railway console — syntax
 
 ### Mutations that touch session data
 Always call `clearSessionsCache()` after any session mutation. Already done in all 8 handlers in `routers.ts` — verify when adding new session mutations.
+
+### When in doubt, ask first
+If a requirement is ambiguous, a behaviour is unclear, or there is a risk of making a wrong assumption that would require reverting code — **stop and ask** rather than guessing and writing code. This applies especially to: role/permission logic, financial calculations, date handling, and anything that writes to the DB. A one-line clarifying question is always cheaper than a regression.
 
 ---
 

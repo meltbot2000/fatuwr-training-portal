@@ -17,10 +17,17 @@ Last updated: 2026-04-20
 
 ## 1. Authentication & Login
 
+### TC-AUTH-00 — Landing screen
+| # | Action | Expected | Roles |
+|---|---|---|---|
+| 1 | Visit `/login` | Welcome screen shown: logo (dark blue gradient bg), "Sign in" primary button, "Create account" ghost button; no "Find out more" link | Unauthenticated |
+| 2 | Tap "Sign in" | Advances to email step | Unauthenticated |
+| 3 | Tap "Create account" | Also advances to email step (same OTP flow handles both) | Unauthenticated |
+
 ### TC-AUTH-01 — Email entry
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | Visit `/login`, leave email blank, tap Send | Inline error "Email is required" | All |
+| 1 | On email step, leave email blank, tap Send | Inline error "Email is required" | All |
 | 2 | Enter invalid email (no @), tap Send | Inline error "Please enter a valid email" | All |
 | 3 | Enter valid email, tap Send | OTP sent toast, step advances to OTP screen, 60 s countdown begins | All |
 | 4 | Tap Send again within 60 s | Server returns rate-limit error "Please wait Xs before requesting another code" | All |
@@ -57,9 +64,10 @@ Last updated: 2026-04-20
 ### TC-AUTH-06 — Navigation without auth
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | Visit `/payments` without logging in | Redirected to `/login` | Unauthenticated |
-| 2 | Visit `/membership` without logging in | Redirected to `/login` | Unauthenticated |
-| 3 | Visit `/admin` without logging in | Redirected to `/login` | Unauthenticated |
+| 1 | Visit `/` without logging in | Sessions list shown with "Not signed in" banner; no redirect | Unauthenticated |
+| 2 | Visit `/payments` without logging in | Redirected to `/login` | Unauthenticated |
+| 3 | Visit `/membership` without logging in | Redirected to `/login` | Unauthenticated |
+| 4 | Visit `/admin` without logging in | Redirected to `/login` | Unauthenticated |
 
 ---
 
@@ -73,11 +81,12 @@ Last updated: 2026-04-20
 | 3 | Session is closed (`isClosed` set) but within time window | Still appears, shows "Session closed" overlay on image | All |
 | 4 | No upcoming sessions | Empty state "No upcoming sessions" shown | All |
 
-### TC-SESS-02 — Unauthenticated banner
+### TC-SESS-02 — Unauthenticated access
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | Load `/` while not logged in | "Sign in to register for sessions" banner shown with login link | Unauthenticated |
+| 1 | Load `/` while not logged in | Sessions list visible; "Not signed in. Sign in to register…" banner shown | Unauthenticated |
 | 2 | Auth is still loading | Banner not shown (no flash of "Sign in" while loading) | All |
+| 3 | Tap "Sign in ›" in banner | Navigates to `/login` | Unauthenticated |
 
 ### TC-SESS-03 — Non-member nudge
 | # | Action | Expected | Roles |
@@ -220,26 +229,34 @@ Last updated: 2026-04-20
 ### TC-MEM-01 — Non-Member view
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | View Membership page | Trial option and Annual Member option shown | Non-Member |
-| 2 | Tap Sign up for Trial | Confirmation dialog with 3-month trial details | Non-Member |
-| 3 | Confirm trial sign-up | Member status updated to Trial; success toast | Non-Member |
+| 1 | View Membership page | Trial option and Annual Member option shown | Non-Member (never trialled) |
+| 2 | Non-Member who has already used trial | Trial option not shown (trialStartDate guard); only Annual Member option | Non-Member (ex-trial) |
+| 3 | Tap Sign up for Trial | Confirmation dialog with 3-month trial details and $10 fee | Non-Member |
+| 4 | Confirm trial sign-up | memberStatus → Trial; $10 "Trial Membership" row inserted in sign-ups; trialStart/End dates set (DD/MM/YYYY, 3 months from today) | Non-Member |
+| 5 | After sign-up, revisit Membership page | Trial card shown with start/end dates | (now Trial) |
+| 6 | Tap Annual Member option | Confirmation dialog showing pro-rated fee (80 × (12 − monthIndex) / 12, rounded) | Non-Member |
+| 7 | Confirm annual sign-up | memberStatus → Member; Membership Fee row inserted; membershipStartDate set | Non-Member |
 
-### TC-MEM-02 — Trial view
+### TC-MEM-02 — Trial memberStatus view
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | View Membership page as Trial | Trial membership card showing start/end dates | Trial |
-| 2 | Annual member option shows pro-rated fee based on current month | Fee = 80 × (12 − currentMonthIndex) / 12, rounded | Trial |
-| 3 | Confirm annual membership sign-up | Status updated to Member | Trial |
+| 1 | View Membership page | Trial card showing start/end dates (formatted as "16 January 2026") | Trial |
+| 2 | Annual member option present | Shows pro-rated fee for current month | Trial |
+| 3 | Confirm annual upgrade | Status → Member; Membership Fee row created for pro-rated amount | Trial |
+| 4 | Trial fee session: session date after trialEndDate | Non-member fee shown + warning in sign-up form | Trial |
+| 5 | Trial fee session: session date before trialEndDate | Member fee shown | Trial |
+| 6 | Trial expiry warning on Sessions list | Warning banner with end date shown when ≤14 days remain | Trial |
+| 7 | Day after trialEndDate | User treated as Non-Member (expiry job + resolveSheetMemberStatus) | Trial (expired) |
 
 ### TC-MEM-03 — Member view
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | View Membership page as Member | Annual membership card showing start date; no sign-up options | Member |
+| 1 | View Membership page as Member | Annual membership card showing start date; no sign-up options shown | Member |
 
 ### TC-MEM-04 — Student view
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | View Membership page as Student | Student membership shown | Student |
+| 1 | View Membership page as Student | Student membership shown; managed by Admin only | Student |
 
 ---
 
@@ -346,8 +363,9 @@ Last updated: 2026-04-20
 | 4 | Search for non-existent name | Empty results (no crash) | Admin, Helper |
 | 5 | Filter by status chip (Member, Trial, etc.) | Only matching users shown with count | Admin, Helper |
 | 6 | Tap user card | EditUserSheet opens | Admin only |
-| 7 | Tap user card as Helper | No action | Helper |
+| 7 | Tap user card as Helper | No action (read-only) | Helper |
 | 8 | Delete user (trash icon) | Confirmation dialog; user removed from sheetUsers | Admin only |
+| 9 | Delete user as Helper | Delete button not shown | Helper |
 
 ### TC-ADMIN-03 — EditUserSheet
 | # | Action | Expected | Roles |
