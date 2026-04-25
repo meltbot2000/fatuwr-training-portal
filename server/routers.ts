@@ -573,7 +573,7 @@ export const appRouter = router({
           paymentId: (user.paymentId ?? "").toLowerCase().trim(),
           dateTimeOfSignUp: new Date().toISOString(),
           pool: input.sessionPool,
-          dateOfTraining: input.sessionDate,
+          dateOfTraining: toIsoDate(input.sessionDate), // always store as YYYY-MM-DD
           activity: input.activity,
           activityValue: "",
           baseFee: input.fee,
