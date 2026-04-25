@@ -45,6 +45,11 @@ In your app service → **Variables** tab, add all of the following:
 | `GOOGLE_APPS_SCRIPT_URL` | Your deployed GAS web app URL |
 | `APPS_SCRIPT_SECRET` | Shared secret for GAS auth (set the same value in Code.gs) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Paste the **entire contents** of your service account JSON key file as a single line |
+| `CLOUDFLARE_R2_ACCOUNT_ID` | From Cloudflare dashboard |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | R2 API token key |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | R2 API token secret |
+| `CLOUDFLARE_R2_BUCKET` | R2 bucket name |
+| `CLOUDFLARE_R2_PUBLIC_URL` | R2 public base URL e.g. `https://pub-xxx.r2.dev` |
 
 > **GOOGLE_SERVICE_ACCOUNT_JSON tip:** Open the downloaded JSON file, copy all contents, and paste as one line. Railway handles newlines in values correctly.
 
