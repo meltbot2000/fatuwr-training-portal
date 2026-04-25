@@ -9,7 +9,7 @@ import { toast } from "sonner";
 const RESEND_COOLDOWN = 60;
 
 export default function Login() {
-  const [step, setStep] = useState<"email" | "otp" | "profile">("email");
+  const [step, setStep] = useState<"landing" | "email" | "otp" | "profile">("landing");
   const [email, setEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -60,7 +60,108 @@ export default function Login() {
 
   const STEP_ICONS = { email: Mail, otp: ShieldCheck, profile: UserCircle2 };
   const STEP_TITLES = { email: "Sign in", otp: "Check your email", profile: "Complete profile" };
-  const StepIcon = STEP_ICONS[step];
+  const StepIcon = step !== "landing" ? STEP_ICONS[step] : Mail;
+
+  // ── Landing screen ──────────────────────────────────────────────────────────
+  if (step === "landing") {
+    return (
+      <div
+        className="min-h-screen flex flex-col"
+        style={{
+          background: `
+            radial-gradient(circle at 18% 8%, rgba(33,150,243,0.35), transparent 45%),
+            radial-gradient(circle at 88% 18%, rgba(33,150,243,0.22), transparent 40%),
+            radial-gradient(circle at 50% 105%, rgba(33,150,243,0.28), transparent 55%),
+            linear-gradient(180deg, #0a1a2e 0%, #0a0f1a 55%, #050810 100%)
+          `,
+          fontFamily: "'Inter', system-ui, sans-serif",
+        }}
+      >
+        {/* Soft caustic overlay */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse at 60% 30%, rgba(147,197,253,0.12), transparent 50%),
+              radial-gradient(ellipse at 20% 80%, rgba(33,150,243,0.10), transparent 55%)
+            `,
+            filter: "blur(20px)",
+          }}
+        />
+
+        {/* Hero */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center px-6 relative z-10">
+          {/* Logo circle — 144px × 0.8 = ~115px */}
+          <div
+            className="relative flex items-center justify-center rounded-full bg-white"
+            style={{
+              width: 115,
+              height: 115,
+              boxShadow: "0 10px 40px rgba(33,150,243,0.4), 0 0 0 1px rgba(33,150,243,0.15)",
+            }}
+          >
+            {/* Pulsing halo behind circle */}
+            <div
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                inset: "-18%",
+                background: "radial-gradient(circle, rgba(33,150,243,0.5) 0%, transparent 65%)",
+                filter: "blur(10px)",
+                animation: "fatuwr-pulse 3.6s ease-in-out infinite",
+                zIndex: -1,
+              }}
+            />
+            <img
+              src="/logo.jpg"
+              alt="FATUWR Singapore"
+              className="relative"
+              style={{ width: "82%", height: "82%", objectFit: "contain" }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-[26px] font-bold text-white leading-tight tracking-tight" style={{ maxWidth: 260 }}>
+              Welcome to the FATUWR App
+            </h1>
+            <p className="text-[13px] text-white/68 leading-relaxed" style={{ maxWidth: 260 }}>
+              Save the app to your homescreen as a webapp for added convenience!
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="relative z-10 flex flex-col gap-2.5 px-6 pb-10">
+          <button
+            onClick={() => setStep("email")}
+            className="w-full h-12 rounded-full bg-[#2196F3] text-white font-semibold text-[15px] flex items-center justify-center"
+            style={{ boxShadow: "0 10px 30px rgba(33,150,243,0.45), 0 2px 0 rgba(255,255,255,0.08) inset" }}
+          >
+            Sign in
+          </button>
+          <button
+            onClick={() => setStep("email")}
+            className="w-full h-12 rounded-full text-white font-medium text-[15px] flex items-center justify-center"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1.5px solid rgba(255,255,255,0.18)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+            }}
+          >
+            Create account
+          </button>
+        </div>
+
+        {/* Pulse keyframe injected inline */}
+        <style>{`
+          @keyframes fatuwr-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.08); opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
