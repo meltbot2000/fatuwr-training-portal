@@ -1316,6 +1316,7 @@ export const appRouter = router({
 
         // Find all sheetUsers rows that still have a Glide (http) URL
         const glideRows = await migDb.select({
+          id: sheetUsers.id,
           email: sheetUsers.email,
           userEmail: sheetUsers.userEmail,
           image: sheetUsers.image,
@@ -1367,17 +1368,9 @@ export const appRouter = router({
               // Registered user — store in users.image (primary store)
               await migDb.update(users).set({ image: driveUrl }).where(eq(users.id, authUser.id));
             } else {
-              // Sheet-only user (never logged in) — store in sheetUsers.image so their
-              // photo still shows in session attendee lists after Glide is deprecated.
-              // Match by email or userEmail to find the right sheetUsers row.
-              const matchEmail = candidates[0];
-              await migDb.update(sheetUsers)
-                .set({ image: driveUrl })
-                .where(
-                  candidates[1]
-                    ? sql`LOWER(email) = ${matchEmail} OR LOWER(user_email) = ${matchEmail}`
-                    : sql`LOWER(email) = ${matchEmail}`
-                );
+              // Sheet-only user (never logged in) — update by PK to avoid any
+              // email-matching ambiguity
+              await migDb.update(sheetUsers).set({ image: driveUrl }).where(eq(sheetUsers.id, su.id));
             }
             migrated++;
           } catch (e: any) {
