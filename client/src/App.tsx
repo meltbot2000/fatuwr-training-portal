@@ -31,8 +31,13 @@ const NO_NAV_PATHS = ["/login"];
 
 function AppShell() {
   const [location] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const showNav = isAuthenticated && !NO_NAV_PATHS.includes(location);
+
+  // Redirect unauthenticated users to landing/login screen for all app routes
+  if (!loading && !isAuthenticated && location !== "/login") {
+    return <Redirect to="/login" />;
+  }
 
   return (
     <>

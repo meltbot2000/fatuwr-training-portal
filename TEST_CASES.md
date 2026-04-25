@@ -64,10 +64,7 @@ Last updated: 2026-04-20
 ### TC-AUTH-06 — Navigation without auth
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | Visit `/` without logging in | Sessions list shown with "Not signed in" banner; no redirect | Unauthenticated |
-| 2 | Visit `/payments` without logging in | Redirected to `/login` | Unauthenticated |
-| 3 | Visit `/membership` without logging in | Redirected to `/login` | Unauthenticated |
-| 4 | Visit `/admin` without logging in | Redirected to `/login` | Unauthenticated |
+| 1 | Visit any route (`/`, `/payments`, `/membership`, `/admin`, etc.) without logging in | Redirected to `/login` welcome screen | Unauthenticated |
 
 ---
 
@@ -84,9 +81,8 @@ Last updated: 2026-04-20
 ### TC-SESS-02 — Unauthenticated access
 | # | Action | Expected | Roles |
 |---|---|---|---|
-| 1 | Load `/` while not logged in | Sessions list visible; "Not signed in. Sign in to register…" banner shown | Unauthenticated |
-| 2 | Auth is still loading | Banner not shown (no flash of "Sign in" while loading) | All |
-| 3 | Tap "Sign in ›" in banner | Navigates to `/login` | Unauthenticated |
+| 1 | Load `/` while not logged in | Redirected to `/login` (welcome landing screen) | Unauthenticated |
+| 2 | Load any app route while not logged in | Redirected to `/login` | Unauthenticated |
 
 ### TC-SESS-03 — Non-member nudge
 | # | Action | Expected | Roles |

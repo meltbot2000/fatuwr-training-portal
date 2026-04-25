@@ -266,9 +266,8 @@ Fully DB-primary. Never touch Sheets.
 | Admin | Full admin access; bypasses debt blocking and duplicate sign-up check; can edit users, payments, sessions, run data imports |
 
 ### Unauthenticated users
-- Shown the landing/welcome screen (`/login`) on first visit
-- If they navigate directly to `/` (Sessions), the sessions list **is visible** with a "Not signed in" banner — they can browse session cards but cannot sign up or view fees
-- All other authenticated routes (`/payments`, `/membership`, `/admin`, `/profile`, etc.) redirect to `/login`
+- All routes redirect to `/login` (the welcome/landing screen) when not authenticated
+- The welcome screen shows the logo, "Sign in" and "Create account" buttons — no app content is accessible before login
 
 ---
 

@@ -91,16 +91,9 @@ export default function Login() {
 
         {/* Hero */}
         <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center px-6 relative z-10">
-          {/* Logo circle — 144px × 0.8 = ~115px */}
-          <div
-            className="relative flex items-center justify-center rounded-full bg-white"
-            style={{
-              width: 115,
-              height: 115,
-              boxShadow: "0 10px 40px rgba(33,150,243,0.4), 0 0 0 1px rgba(33,150,243,0.15)",
-            }}
-          >
-            {/* Pulsing halo behind circle */}
+          {/* Logo — outer wrapper holds halo; inner circle clips the image */}
+          <div className="relative flex items-center justify-center" style={{ width: 115, height: 115 }}>
+            {/* Pulsing halo — outside the clipping circle */}
             <div
               className="absolute rounded-full pointer-events-none"
               style={{
@@ -108,15 +101,25 @@ export default function Login() {
                 background: "radial-gradient(circle, rgba(33,150,243,0.5) 0%, transparent 65%)",
                 filter: "blur(10px)",
                 animation: "fatuwr-pulse 3.6s ease-in-out infinite",
-                zIndex: -1,
+                zIndex: 0,
               }}
             />
-            <img
-              src="/logo.jpg"
-              alt="FATUWR Singapore"
-              className="relative"
-              style={{ width: "82%", height: "82%", objectFit: "contain" }}
-            />
+            {/* White circle — clips image to circle */}
+            <div
+              className="relative rounded-full bg-white overflow-hidden flex items-center justify-center"
+              style={{
+                width: 115,
+                height: 115,
+                boxShadow: "0 10px 40px rgba(33,150,243,0.4), 0 0 0 1px rgba(33,150,243,0.15)",
+                zIndex: 1,
+              }}
+            >
+              <img
+                src="/logo.jpg"
+                alt="FATUWR Singapore"
+                style={{ width: "82%", height: "82%", objectFit: "contain" }}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
