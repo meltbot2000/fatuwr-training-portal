@@ -85,7 +85,7 @@ import {
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
-import { maybeUpload, replaceOldDriveFile, extractDriveFileId, deleteFromDrive, uploadToDrive, isDataUrl as isDriveDataUrl } from "./driveUpload";
+import { maybeUpload, replaceOldDriveFile, extractDriveFileId, deleteFromDrive, uploadToDrive, uploadBufferToR2, isDataUrl as isDriveDataUrl } from "./driveUpload";
 import { nanoid } from "nanoid";
 import { eq, and, sql, max, asc, or } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos, users, otpCodes } from "../drizzle/schema";
@@ -1352,7 +1352,7 @@ export const appRouter = router({
               skipped++; return;
             }
 
-            // Download Glide image and upload to Drive
+            // Download Glide image and upload directly to R2
             try {
               const resp = await fetch(su.image, {
                 signal: AbortSignal.timeout(12000),
@@ -1360,15 +1360,14 @@ export const appRouter = router({
               });
               if (!resp.ok) { failed++; errors.push(`${logLabel}: HTTP ${resp.status}`); return; }
               const contentType = resp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-              const buf = await resp.arrayBuffer();
-              const b64 = Buffer.from(buf).toString("base64");
-              const dataUrl = `data:${contentType};base64,${b64}`;
-              const driveUrl = await uploadToDrive(dataUrl, `glide_${logLabel}.jpg`);
+              const buf = Buffer.from(await resp.arrayBuffer());
+              const safeLabel = logLabel.replace(/[^a-zA-Z0-9._-]/g, "_");
+              const r2Url = await uploadBufferToR2(buf, contentType, `glide_${safeLabel}.jpg`);
 
               if (authUser) {
-                await migDb.update(users).set({ image: driveUrl }).where(eq(users.id, authUser.id));
+                await migDb.update(users).set({ image: r2Url }).where(eq(users.id, authUser.id));
               } else {
-                await migDb.update(sheetUsers).set({ image: driveUrl }).where(eq(sheetUsers.id, su.id));
+                await migDb.update(sheetUsers).set({ image: r2Url }).where(eq(sheetUsers.id, su.id));
               }
               migrated++;
             } catch (e: any) {
@@ -1384,9 +1383,9 @@ export const appRouter = router({
       }),
 
     /**
-     * Migrate all existing base64 images stored in the DB to Google Drive.
+     * Migrate all existing base64 images stored in the DB to Cloudflare R2.
      * Covers: users.image, announcements.imageUrl, merch_items.photo1/photo2.
-     * Safe to re-run — skips rows that already have a Drive URL.
+     * Safe to re-run — skips rows that already have a hosted URL.
      */
     migrateImagesToDrive: protectedProcedure
       .mutation(async ({ ctx }) => {
@@ -1448,8 +1447,8 @@ export const appRouter = router({
           ]));
         }
 
-        console.log(`[migrateImagesToDrive] migrated=${migrated} skipped=${skipped} failed=${failed}`);
-        if (errors.length) console.log("[migrateImagesToDrive] errors:", errors);
+        console.log(`[migrateImagesToR2] migrated=${migrated} skipped=${skipped} failed=${failed}`);
+        if (errors.length) console.log("[migrateImagesToR2] errors:", errors);
         return { migrated, skipped, failed, errors };
       }),
 

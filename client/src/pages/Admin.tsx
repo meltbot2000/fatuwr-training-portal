@@ -776,7 +776,7 @@ function MigrateImagesToDrivePanel() {
   const mutation = trpc.admin.migrateImagesToDrive.useMutation({
     onSuccess: (data) => {
       setResult(data);
-      toast.success(`Moved ${data.migrated} image${data.migrated !== 1 ? "s" : ""} to Drive`);
+      toast.success(`Moved ${data.migrated} image${data.migrated !== 1 ? "s" : ""} to R2`);
     },
     onError: (err) => toast.error(err.message || "Migration failed"),
   });
@@ -785,14 +785,14 @@ function MigrateImagesToDrivePanel() {
     <div className="mt-2">
       <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-3">
         <div>
-          <p className="text-[13px] font-semibold text-white">Migrate images → Google Drive</p>
+          <p className="text-[13px] font-semibold text-white">Migrate images → Cloudflare R2</p>
           <p className="text-[12px] text-[#888888] mt-0.5 leading-snug">
-            Uploads all base64 images (profiles, announcements, merch) to Google Drive and replaces them with URLs. Dramatically reduces DB size and Railway bandwidth. Safe to run multiple times — already-migrated images are skipped.
+            Uploads all base64 images (profiles, announcements, merch) to Cloudflare R2 and replaces them with URLs. Dramatically reduces DB size and Railway bandwidth. Safe to run multiple times — already-migrated images are skipped.
           </p>
         </div>
         {result && (
           <div className="rounded-lg bg-[#2a2a2a] px-3 py-2 text-[12px] space-y-0.5">
-            <p className="text-green-400">Migrated to Drive: {result.migrated}</p>
+            <p className="text-green-400">Migrated to R2: {result.migrated}</p>
             <p className="text-[#888888]">Skipped (already a URL): {result.skipped}</p>
             {result.failed > 0 && <p className="text-red-400">Failed: {result.failed}</p>}
             {result.errors.slice(0, 5).map((e, i) => (
@@ -814,9 +814,9 @@ function MigrateImagesToDrivePanel() {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Migrate all images to Drive?</AlertDialogTitle>
+              <AlertDialogTitle>Migrate all images to Cloudflare R2?</AlertDialogTitle>
               <AlertDialogDescription>
-                This uploads all base64 profile photos, announcement images, and merch photos to Google Drive. Each image adds ~0.5–1 second. The process runs in the background — this may take a few minutes for many images. Already-migrated images are skipped. Safe to run multiple times.
+                This uploads all base64 profile photos, announcement images, and merch photos to Cloudflare R2. Each image adds ~0.3–0.6 second. The process runs in batches — this may take a few minutes for many images. Already-migrated images are skipped. Safe to run multiple times.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1709,7 +1709,7 @@ export default function Admin() {
               {/* Migrate Glide photos → Railway DB */}
               <MigratePhotosPanel />
 
-              {/* Migrate all base64 images → Google Drive */}
+              {/* Migrate all base64 images → Cloudflare R2 */}
               <MigrateImagesToDrivePanel />
 
               {/* Spreadsheet Import — PIN-gated */}

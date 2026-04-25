@@ -17,4 +17,9 @@ export const ENV = {
   appsScriptSecret: process.env.APPS_SCRIPT_SECRET ?? "",
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "",
   googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? "",
+  r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID ?? "",
+  r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "",
+  r2SecretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ?? "",
+  r2Bucket: process.env.CLOUDFLARE_R2_BUCKET ?? "",
+  r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "", // e.g. https://pub-XXXX.r2.dev
 };

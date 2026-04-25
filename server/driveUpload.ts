@@ -1,42 +1,46 @@
 /**
- * Google Drive image storage.
+ * Cloudflare R2 image storage.
  *
- * All photos (profile, announcements, merch) are stored as files in a shared
- * Drive folder. The DB column stores only the public URL (~60 bytes) instead
- * of a base64 data URL (~150 KB+), making DB rows ~1000× smaller and removing
- * Railway bandwidth from every image load.
+ * All photos (profile, announcements, merch) are stored in an R2 bucket.
+ * The DB column stores only the public URL (~80 bytes) instead of a base64
+ * data URL (~150 KB+), making DB rows ~1000× smaller and removing Railway
+ * bandwidth from every image load.
  *
- * Images are served via lh3.googleusercontent.com/d/<fileId> — a direct
- * Google-served URL that works as an <img src> without any sign-in.
+ * Images are served via the R2 public bucket URL configured in CLOUDFLARE_R2_PUBLIC_URL.
  *
- * Upload latency: ~300–800 ms added to the save mutation (upload only, not reads).
+ * Upload latency: ~200–600 ms added to the save mutation (upload only, not reads).
  * Read latency: faster than before — DB rows are tiny and images load client-side
- * from Google's network, bypassing Railway entirely.
+ * from Cloudflare's network, bypassing Railway entirely.
+ *
+ * NOTE: Function names retain "Drive" prefixes for backwards-compatibility with
+ * callers in routers.ts. Internally they operate on R2.
  */
 
-import { google } from "googleapis";
-import { Readable } from "stream";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
+import { randomUUID } from "crypto";
 import { ENV } from "./_core/env";
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// ─── Client ───────────────────────────────────────────────────────────────────
 
-function getDrive() {
-  if (!ENV.googleServiceAccountJson) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
-  if (!ENV.googleDriveFolderId)       throw new Error("GOOGLE_DRIVE_FOLDER_ID is not set");
+function getR2(): S3Client {
+  if (!ENV.r2AccountId)      throw new Error("CLOUDFLARE_R2_ACCOUNT_ID is not set");
+  if (!ENV.r2AccessKeyId)    throw new Error("CLOUDFLARE_R2_ACCESS_KEY_ID is not set");
+  if (!ENV.r2SecretAccessKey) throw new Error("CLOUDFLARE_R2_SECRET_ACCESS_KEY is not set");
+  if (!ENV.r2Bucket)         throw new Error("CLOUDFLARE_R2_BUCKET is not set");
+  if (!ENV.r2PublicUrl)      throw new Error("CLOUDFLARE_R2_PUBLIC_URL is not set");
 
-  let creds: object;
-  try {
-    creds = JSON.parse(ENV.googleServiceAccountJson);
-  } catch {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
-  }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/drive"],
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: ENV.r2AccessKeyId,
+      secretAccessKey: ENV.r2SecretAccessKey,
+    },
   });
-
-  return google.drive({ version: "v3", auth });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,17 +50,28 @@ export function isDataUrl(value: string): boolean {
   return value.startsWith("data:");
 }
 
-/** Returns true if the value is already a Drive URL (already uploaded). */
+/** Returns true if the value is already a hosted URL (already uploaded). */
 export function isDriveUrl(value: string): boolean {
-  return value.includes("lh3.googleusercontent.com") || value.includes("drive.google.com");
+  // Matches R2 public URLs, legacy Google Drive / lh3 URLs, and any other https URL
+  return (
+    value.startsWith("https://") ||
+    value.startsWith("http://") ||
+    value.includes("lh3.googleusercontent.com") ||
+    value.includes("drive.google.com")
+  );
 }
 
 /**
- * Extract the Drive file ID from a Drive serving URL.
- * Handles: https://lh3.googleusercontent.com/d/<id>
- *          https://drive.google.com/file/d/<id>/view
+ * Extract the R2 object key from an R2 public URL.
+ * Returns null for non-R2 URLs (e.g. legacy Drive URLs).
  */
 export function extractDriveFileId(url: string): string | null {
+  if (!ENV.r2PublicUrl) return null;
+  const base = ENV.r2PublicUrl.replace(/\/$/, "");
+  if (url.startsWith(base + "/")) {
+    return url.slice(base.length + 1); // the object key
+  }
+  // Legacy: extract Drive file ID from lh3 / drive URLs
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   return match ? match[1] : null;
 }
@@ -64,8 +79,7 @@ export function extractDriveFileId(url: string): string | null {
 // ─── Core operations ──────────────────────────────────────────────────────────
 
 /**
- * Upload a base64 data URL to Drive and return the public serving URL.
- * The file is placed in GOOGLE_DRIVE_FOLDER_ID and made publicly readable.
+ * Upload a base64 data URL to R2 and return the public URL.
  */
 export async function uploadToDrive(
   base64DataUrl: string,
@@ -75,61 +89,83 @@ export async function uploadToDrive(
   if (!match) throw new Error("Invalid data URL format");
   const [, mimeType, base64Data] = match;
 
-  const buffer  = Buffer.from(base64Data, "base64");
-  const drive   = getDrive();
+  const buffer = Buffer.from(base64Data, "base64");
+  const r2 = getR2();
 
-  const createRes = await drive.files.create({
-    requestBody: {
-      name:    filename,
-      parents: [ENV.googleDriveFolderId],
-    },
-    media: {
-      mimeType,
-      body: Readable.from(buffer),
-    },
-    fields: "id",
-  });
+  // Use a UUID key with the original filename as a suffix for uniqueness
+  const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+  const key = `photos/${randomUUID()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
-  const fileId = createRes.data.id;
-  if (!fileId) throw new Error("Drive upload returned no file ID");
+  await r2.send(new PutObjectCommand({
+    Bucket: ENV.r2Bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType,
+  }));
 
-  // Make the file publicly readable (anyone with the link)
-  await drive.permissions.create({
-    fileId,
-    requestBody: { role: "reader", type: "anyone" },
-  });
-
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  const base = ENV.r2PublicUrl.replace(/\/$/, "");
+  return `${base}/${key}`;
 }
 
 /**
- * Delete a Drive file by its file ID.
- * Silently swallows errors (orphaned files are acceptable vs crashing a delete flow).
+ * Upload a raw Buffer (with known MIME type) to R2 and return the public URL.
+ * Used by the Glide migration which already has the buffer from fetch().
  */
-export async function deleteFromDrive(fileId: string): Promise<void> {
+export async function uploadBufferToR2(
+  buffer: Buffer,
+  mimeType: string,
+  filename: string,
+): Promise<string> {
+  const r2 = getR2();
+  const key = `photos/${randomUUID()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+
+  await r2.send(new PutObjectCommand({
+    Bucket: ENV.r2Bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType,
+  }));
+
+  const base = ENV.r2PublicUrl.replace(/\/$/, "");
+  return `${base}/${key}`;
+}
+
+/**
+ * Delete an R2 object by its key (or a legacy Drive file ID — silently skipped).
+ * Silently swallows errors to avoid crashing delete flows.
+ */
+export async function deleteFromDrive(fileIdOrKey: string): Promise<void> {
+  // Legacy Drive file IDs (short alphanumeric) can't be deleted via R2 — skip
+  if (!ENV.r2PublicUrl || !fileIdOrKey.includes("/")) {
+    console.log(`[R2] Skipping delete for legacy/unknown key: ${fileIdOrKey}`);
+    return;
+  }
   try {
-    const drive = getDrive();
-    await drive.files.delete({ fileId });
-    console.log(`[Drive] Deleted file ${fileId}`);
+    const r2 = getR2();
+    await r2.send(new DeleteObjectCommand({
+      Bucket: ENV.r2Bucket,
+      Key: fileIdOrKey,
+    }));
+    console.log(`[R2] Deleted object ${fileIdOrKey}`);
   } catch (e: any) {
-    console.warn(`[Drive] Could not delete file ${fileId}:`, e?.message);
+    console.warn(`[R2] Could not delete object ${fileIdOrKey}:`, e?.message);
   }
 }
 
 /**
- * If the old value was a Drive URL, delete the old file.
+ * If the old value was a hosted URL, delete the old object from R2.
  * Call this before overwriting a photo column with a new URL.
  */
 export async function replaceOldDriveFile(oldValue: string | null | undefined): Promise<void> {
   if (!oldValue) return;
   if (!isDriveUrl(oldValue)) return; // was base64 or empty — nothing to delete
-  const fileId = extractDriveFileId(oldValue);
-  if (fileId) await deleteFromDrive(fileId);
+  const key = extractDriveFileId(oldValue);
+  if (key) await deleteFromDrive(key);
 }
 
 /**
  * Upload if the value is a base64 data URL; return as-is if it's already a URL.
- * filename is used only for the Drive file name (cosmetic).
+ * filename is used only as a cosmetic hint in the R2 key.
  * Returns null/undefined passthrough for empty values.
  */
 export async function maybeUpload(
