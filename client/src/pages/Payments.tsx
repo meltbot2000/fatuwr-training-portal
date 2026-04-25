@@ -183,6 +183,7 @@ export default function Payments() {
                 Transfer to UEN <span className="font-medium text-white">{CLUB_UEN}</span>.{" "}
                 Your payment ID must be the <span className="font-medium text-white">only</span> text in the reference field.
               </p>
+              <p className="text-[13px] font-bold text-white mt-2">Payments may take up to 5 minutes to reflect.</p>
             </div>
 
             {/* Payments received */}
