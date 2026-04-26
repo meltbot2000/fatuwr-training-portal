@@ -1569,6 +1569,18 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    deletePayment: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const payDb = await db.getDb();
+        if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await payDb.delete(sheetPayments).where(eq(sheetPayments.id, input.id));
+        return { success: true };
+      }),
+
     editSession: protectedProcedure
       .input(z.object({
         rowId: z.string(),

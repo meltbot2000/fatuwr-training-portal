@@ -435,18 +435,22 @@ interface EditPaymentSheetProps {
 function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSheetProps) {
   const utils = trpc.useUtils();
   const [paymentId, setPaymentId] = useState(payment.paymentId);
+  const [reference, setReference] = useState(payment.reference);
   const [amount, setAmount] = useState(String(payment.amount));
   const [email, setEmail] = useState(payment.email);
   const [date, setDate] = useState(payment.date);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setPaymentId(payment.paymentId);
+    setReference(payment.reference);
     setAmount(String(payment.amount));
     setEmail(payment.email);
     setDate(payment.date);
+    setConfirmDelete(false);
   }, [payment]);
 
-  const mutation = trpc.admin.editPayment.useMutation({
+  const saveMutation = trpc.admin.editPayment.useMutation({
     onSuccess: async () => {
       toast.success("Payment updated.");
       await utils.admin.allPayments.invalidate();
@@ -455,6 +459,18 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
     },
     onError: (err) => toast.error(err.message || "Failed to update payment."),
   });
+
+  const deleteMutation = trpc.admin.deletePayment.useMutation({
+    onSuccess: async () => {
+      toast.success("Payment deleted.");
+      await utils.admin.allPayments.invalidate();
+      onOpenChange(false);
+      onDone();
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete payment."),
+  });
+
+  const isPending = saveMutation.isPending || deleteMutation.isPending;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -466,13 +482,30 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
           </button>
           <p className="text-[15px] font-semibold text-white">Edit payment</p>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4">
 
-        <div className="space-y-1 mb-5">
-          <p className="text-xs text-muted-foreground font-mono truncate">{payment.reference || "(no reference)"}</p>
-        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Amount ($)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="h-10"
+            />
+          </div>
 
-        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Date</Label>
+            <Input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Payment ID Match</Label>
             <Input
@@ -495,48 +528,71 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Amount ($)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Date</Label>
-              <Input
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="h-10"
-              />
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Reference</Label>
+            <Input
+              placeholder="e.g. PayNow reference text"
+              value={reference}
+              onChange={e => setReference(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="mt-2 space-y-2">
+            <Button
+              onClick={() => saveMutation.mutate({
+                id: payment.id,
+                paymentId: paymentId.trim(),
+                reference: reference.trim(),
+                email: email.trim(),
+                amount: parseFloat(amount) || 0,
+                date: date.trim(),
+              })}
+              disabled={isPending}
+              className="w-full bg-navy text-white hover:bg-navy/90"
+            >
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Save changes
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)} disabled={isPending}>
+              Cancel
+            </Button>
+
+            {/* Delete — two-tap confirmation */}
+            <div className="pt-2 border-t border-[#2C2C2C]">
+              {!confirmDelete ? (
+                <Button
+                  variant="ghost"
+                  className="w-full text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={isPending}
+                >
+                  Delete payment
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-center text-muted-foreground">This will permanently remove the payment record.</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={isPending}
+                    >
+                      Keep
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                      onClick={() => deleteMutation.mutate({ id: payment.id })}
+                      disabled={isPending}
+                    >
+                      {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm delete"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-
-        <div className="mt-6 space-y-2">
-          <Button
-            onClick={() => mutation.mutate({
-              id: payment.id,
-              paymentId: paymentId.trim(),
-              email: email.trim(),
-              amount: parseFloat(amount) || 0,
-              date: date.trim(),
-            })}
-            disabled={mutation.isPending}
-            className="w-full bg-navy text-white hover:bg-navy/90"
-          >
-            {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save changes
-          </Button>
-          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-        </div>
         </div>
       </SheetContent>
     </Sheet>
