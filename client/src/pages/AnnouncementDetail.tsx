@@ -47,7 +47,7 @@ export default function AnnouncementDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Announcement" showBack backPath="/announcements" />
+        <AppHeader title="Announcement" showBack backPath="/home" />
         <main className="mx-auto max-w-[480px] px-4 pt-6 space-y-3">
           {[240, 48, 120].map((h, i) => (
             <div key={i} className="rounded-2xl bg-[#1E1E1E] animate-pulse" style={{ height: h }} />
@@ -60,7 +60,7 @@ export default function AnnouncementDetail() {
   if (!ann) {
     return (
       <div className="min-h-screen bg-[#111111]">
-        <AppHeader title="Announcement" showBack backPath="/announcements" />
+        <AppHeader title="Announcement" showBack backPath="/home" />
         <main className="mx-auto max-w-[480px] px-4 pt-16 text-center">
           <Megaphone className="w-10 h-10 text-white/20 mx-auto mb-3" />
           <p className="text-[13px] text-[#888888]">Announcement not found.</p>
@@ -71,7 +71,7 @@ export default function AnnouncementDetail() {
 
   return (
     <div className="min-h-screen bg-[#111111] pb-32">
-      <AppHeader title="Announcement" showBack backPath="/announcements" />
+      <AppHeader title="Announcement" showBack backPath="/home" />
 
       <main className="mx-auto max-w-[480px] px-4 pt-6 pb-8 space-y-4">
 

@@ -1699,10 +1699,15 @@ export const appRouter = router({
         if (input.title !== undefined) updates.title = input.title || null;
         if (input.content !== undefined) updates.content = input.content || null;
         if (input.imageUrl !== undefined) {
-          // Delete old Drive file if being replaced
-          const [existing] = await aDb.select({ imageUrl: announcements.imageUrl }).from(announcements).where(eq(announcements.id, input.id));
-          await replaceOldDriveFile(existing?.imageUrl);
-          updates.imageUrl = await maybeUpload(input.imageUrl, `announcement_${input.id}_${Date.now()}.jpg`);
+          if (isDriveDataUrl(input.imageUrl)) {
+            // New file uploaded — delete old R2 object then upload new one
+            const [existing] = await aDb.select({ imageUrl: announcements.imageUrl }).from(announcements).where(eq(announcements.id, input.id));
+            await replaceOldDriveFile(existing?.imageUrl);
+            updates.imageUrl = await uploadToDrive(input.imageUrl, `announcement_${input.id}_${Date.now()}.jpg`);
+          } else {
+            // Existing URL echoed back or external URL pasted — store as-is, do NOT delete R2 object
+            updates.imageUrl = input.imageUrl || null;
+          }
         }
         if (Object.keys(updates).length === 0) return { success: true };
         await aDb.update(announcements).set(updates).where(eq(announcements.id, input.id));
@@ -1824,12 +1829,20 @@ export const appRouter = router({
         const ts = Date.now();
         const fields: Record<string, unknown> = { ...rest };
         if (p1In !== undefined) {
-          await replaceOldDriveFile(existing?.photo1);
-          fields.photo1 = await maybeUpload(p1In, `merch_${id}_photo1_${ts}.jpg`);
+          if (isDriveDataUrl(p1In)) {
+            await replaceOldDriveFile(existing?.photo1);
+            fields.photo1 = await uploadToDrive(p1In, `merch_${id}_photo1_${ts}.jpg`);
+          } else {
+            fields.photo1 = p1In || null;
+          }
         }
         if (p2In !== undefined) {
-          await replaceOldDriveFile(existing?.photo2);
-          fields.photo2 = await maybeUpload(p2In, `merch_${id}_photo2_${ts}.jpg`);
+          if (isDriveDataUrl(p2In)) {
+            await replaceOldDriveFile(existing?.photo2);
+            fields.photo2 = await uploadToDrive(p2In, `merch_${id}_photo2_${ts}.jpg`);
+          } else {
+            fields.photo2 = p2In || null;
+          }
         }
         await mDb.update(merchItems).set(fields).where(eq(merchItems.id, id));
         return { success: true };
