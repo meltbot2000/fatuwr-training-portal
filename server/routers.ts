@@ -1518,6 +1518,30 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    addPayment: protectedProcedure
+      .input(z.object({
+        paymentId: z.string().default(""),
+        reference: z.string().default(""),
+        amount: z.number(),
+        date: z.string().default(""),
+        email: z.string().default(""),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const payDb = await db.getDb();
+        if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await payDb.insert(sheetPayments).values({
+          paymentId: input.paymentId,
+          reference: input.reference,
+          amount: input.amount,
+          date: input.date,
+          email: input.email,
+        });
+        return { success: true };
+      }),
+
     editPayment: protectedProcedure
       .input(z.object({
         id: z.number(),

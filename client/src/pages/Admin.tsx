@@ -543,6 +543,138 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
   );
 }
 
+// ─── AddPaymentSheet ──────────────────────────────────────────────────────────
+
+interface AddPaymentSheetProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDone: () => void;
+}
+
+function AddPaymentSheet({ open, onOpenChange, onDone }: AddPaymentSheetProps) {
+  const utils = trpc.useUtils();
+  const [paymentId, setPaymentId] = useState("");
+  const [reference, setReference] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Reset form when sheet opens
+  useEffect(() => {
+    if (open) {
+      setPaymentId("");
+      setReference("");
+      setAmount("");
+      setDate(new Date().toISOString().split("T")[0]); // default to today
+      setEmail("");
+    }
+  }, [open]);
+
+  const mutation = trpc.admin.addPayment.useMutation({
+    onSuccess: async () => {
+      toast.success("Payment added.");
+      await utils.admin.allPayments.invalidate();
+      onOpenChange(false);
+      onDone();
+    },
+    onError: (err) => toast.error(err.message || "Failed to add payment."),
+  });
+
+  const parsedAmount = parseFloat(amount);
+  const canSubmit = !isNaN(parsedAmount) && parsedAmount > 0 && !mutation.isPending;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="h-[100dvh] rounded-none flex flex-col p-0 [&>button:last-child]:hidden bg-[#111111]">
+        {/* Full-screen header */}
+        <div className="flex items-center gap-3 px-4 h-14 border-b border-[#2C2C2C] shrink-0">
+          <button onClick={() => onOpenChange(false)} className="p-1 rounded-full hover:bg-white/10 transition-colors">
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </button>
+          <p className="text-[15px] font-semibold text-white">Add payment</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Amount ($) <span className="text-red-400">*</span></Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Date</Label>
+            <Input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Payment ID Match</Label>
+            <Input
+              placeholder="e.g. jtan"
+              value={paymentId}
+              onChange={e => setPaymentId(e.target.value)}
+              className="h-10 font-mono"
+            />
+            <p className="text-xs text-muted-foreground">The user's payment ID this payment is matched to.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Email</Label>
+            <Input
+              type="email"
+              placeholder="user@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Reference</Label>
+            <Input
+              placeholder="e.g. PayNow reference text"
+              value={reference}
+              onChange={e => setReference(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          <div className="mt-2 space-y-2">
+            <Button
+              onClick={() => mutation.mutate({
+                paymentId: paymentId.trim(),
+                reference: reference.trim(),
+                amount: parsedAmount,
+                date: date.trim(),
+                email: email.trim(),
+              })}
+              disabled={!canSubmit}
+              className="w-full bg-navy text-white hover:bg-navy/90"
+            >
+              {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Add payment
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ─── AddSessionSheet ──────────────────────────────────────────────────────────
 
 interface AddSessionSheetProps {
@@ -1015,6 +1147,7 @@ export default function Admin() {
   const [viewingSessionRowId, setViewingSessionRowId] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
   const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
   const utils = trpc.useUtils();
@@ -1347,6 +1480,16 @@ export default function Admin() {
                 onChange={e => setPaymentSearch(e.target.value)}
                 className="h-10"
               />
+              {isAdmin && (
+                <Button
+                  size="icon"
+                  className="h-10 w-10 shrink-0 bg-navy text-white hover:bg-navy/90"
+                  onClick={() => setAddPaymentOpen(true)}
+                  title="Add payment"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="icon"
@@ -1752,6 +1895,12 @@ export default function Admin() {
           onDone={() => setEditingPayment(null)}
         />
       )}
+
+      <AddPaymentSheet
+        open={addPaymentOpen}
+        onOpenChange={setAddPaymentOpen}
+        onDone={() => refetchPayments()}
+      />
 
       {/* ── Session Attendees Sheet ───────────────────────────────────── */}
       <Sheet open={!!viewingSessionRowId} onOpenChange={(v) => { if (!v) { setViewingSessionRowId(null); setEditingAttendeeId(null); setAddingAttendee(false); } }}>
