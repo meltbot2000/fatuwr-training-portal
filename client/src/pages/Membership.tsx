@@ -80,7 +80,7 @@ function ProRatedSchedule() {
                     {month}
                   </span>
                   <span
-                    className={`text-[14px] tabular-nums ${isCurrent ? "font-medium text-[#F5C518]" : "text-white"}`}
+                    className={`text-[14px] tabular-nums ${isCurrent ? "font-medium text-[#2196F3]" : "text-white"}`}
                   >
                     ${fee}
                   </span>
@@ -92,7 +92,7 @@ function ProRatedSchedule() {
           // Collapsed: current month only
           <div className="flex items-center justify-between">
             <span className="text-[14px] font-medium text-[#2196F3]">{current.month}</span>
-            <span className="text-[14px] font-medium text-[#F5C518] tabular-nums">${current.fee}</span>
+            <span className="text-[14px] font-medium text-[#2196F3] tabular-nums">${current.fee}</span>
           </div>
         )}
       </div>
@@ -121,7 +121,6 @@ function AnnualCard({ paymentId, onConfirm, isPending, succeeded, disabled }: An
       {/* Header row */}
       <div className="flex items-baseline justify-between">
         <p className="text-[15px] font-medium text-[#2196F3]">Annual Membership</p>
-        <p className="text-[15px] font-medium text-[#2196F3] tabular-nums">${fee}</p>
       </div>
 
       {/* Sub-copy */}

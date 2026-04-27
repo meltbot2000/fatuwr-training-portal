@@ -12,8 +12,9 @@ const CONTENT_BEFORE = `
 <h3>When are the next sessions?</h3>
 <p>In 2026 the next newbie sessions are currently:</p>
 <ul>
-  <li>Feb 8, Mar 1, Apr 19, Apr 21, Apr 26, Apr 28</li>
+  <li>May 10</li>
 </ul>
+<p>Contact the newbie subcomm to ask about other future dates.</p>
 <p>There are up to 10 slots per session subject to available gear. Priority for fin size requested will be given in order of sign ups.</p>
 
 <h3>What do I need to do?</h3>
@@ -41,8 +42,6 @@ const CONTENT_AFTER = `
 
 <h3>Any further questions?</h3>
 <p>Feel free to reach out to our Newbie Subcomm: Gaya (Lead), Hayley, Dylia, Steph, Sophie, Charlotte, Sid, Owen, Fiona and Chong Zhi.</p>
-
-<p style="font-size:11px;color:#555555;margin-top:1.5em;">Image attribution — <a href="https://www.freepik.com/free-vector/cute-diver-riding-bike-with-puffer-fish-balloon-ocean-cartoon-vector-icon-illustration-science_30137891.htm#query=puffer%20fish%20cartoon&position=29&from_view=keyword&track=ais" target="_blank" rel="noopener noreferrer">Image by catalyststuff</a> on Freepik</p>
 `.trim();
 
 export default function FunResourcesInvite() {

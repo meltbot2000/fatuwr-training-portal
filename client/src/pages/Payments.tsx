@@ -184,6 +184,7 @@ export default function Payments() {
                 Your payment ID must be the <span className="font-medium text-white">only</span> text in the reference field.
               </p>
               <p className="text-[13px] font-bold text-white mt-2">Payments may take up to 5 minutes to reflect.</p>
+              <p className="text-[13px] text-[#888888] mt-1">You may top up any amount and draw down on the credit over time.</p>
             </div>
 
             {/* Payments received */}
