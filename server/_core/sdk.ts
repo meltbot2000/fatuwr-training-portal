@@ -264,8 +264,11 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    // If user not in DB, optionally sync from OAuth server (legacy fallback).
+    // Only attempted when OAUTH_SERVER_URL is configured — this app uses its own
+    // OTP-based auth so this path is normally unreachable. Without the guard,
+    // an empty baseURL causes ERR_INVALID_URL spam in Railway logs.
+    if (!user && ENV.oAuthServerUrl) {
       try {
         const userInfo = await this.getUserInfoWithJwt(tokenToVerify ?? "");
         await db.upsertUser({
