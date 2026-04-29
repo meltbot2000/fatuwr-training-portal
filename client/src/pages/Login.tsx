@@ -10,6 +10,7 @@ const RESEND_COOLDOWN = 60;
 
 export default function Login() {
   const [step, setStep] = useState<"landing" | "email" | "otp" | "profile">("landing");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [email, setEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -59,7 +60,7 @@ export default function Login() {
   };
 
   const STEP_ICONS = { email: Mail, otp: ShieldCheck, profile: UserCircle2 };
-  const STEP_TITLES = { email: "Sign in", otp: "Check your email", profile: "Complete profile" };
+  const STEP_TITLES = { email: isCreatingAccount ? "Create account" : "Sign in", otp: "Check your email", profile: "Complete profile" };
   const StepIcon = step !== "landing" ? STEP_ICONS[step] : Mail;
 
   // ── Landing screen ──────────────────────────────────────────────────────────
@@ -135,14 +136,14 @@ export default function Login() {
         {/* Actions */}
         <div className="relative z-10 flex flex-col gap-2.5 px-6 pb-10">
           <button
-            onClick={() => setStep("email")}
+            onClick={() => { setIsCreatingAccount(false); setStep("email"); }}
             className="w-full h-12 rounded-full bg-[#2196F3] text-white font-semibold text-[15px] flex items-center justify-center"
             style={{ boxShadow: "0 10px 30px rgba(33,150,243,0.45), 0 2px 0 rgba(255,255,255,0.08) inset" }}
           >
             Sign in
           </button>
           <button
-            onClick={() => setStep("email")}
+            onClick={() => { setIsCreatingAccount(true); setStep("email"); }}
             className="w-full h-12 rounded-full text-white font-medium text-[15px] flex items-center justify-center"
             style={{
               background: "rgba(255,255,255,0.06)",
