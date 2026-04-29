@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-04-26*
+*Last updated: 2026-04-29*
 
 ---
 
@@ -133,11 +133,15 @@ Maybank email → Gmail label "Maybank2"
 ```
 User selects photo → client compresses to max 600×600 JPEG 0.75 quality (~50–150 KB)
   → base64 data URL → POST profile.updatePhoto (or announcements/merch mutation)
-  → server: replaceOldDriveFile(oldUrl) → delete old R2 object
-  → uploadToDrive(base64DataUrl, filename) → PutObjectCommand to R2  ← function still named uploadToDrive for API compatibility
-  → return https://<r2PublicUrl>/photos/<uuid>-<filename>
+  → server: isDriveDataUrl(imageUrl)?
+      YES (new upload) → replaceOldDriveFile(oldUrl) → delete old R2 object
+                       → uploadToDrive(base64DataUrl, filename) → PutObjectCommand to R2
+                       → return https://<r2PublicUrl>/photos/<uuid>-<filename>
+      NO (existing URL echoed back) → store as-is, do NOT delete R2 object
   → store URL in DB column
 ```
+
+**Critical guard:** When editing an announcement or merch item without changing the image, the client echoes the existing R2 URL back in the payload. The server must check `isDriveDataUrl()` before deleting the old R2 object — otherwise the image is silently deleted and the URL in the DB becomes a 404. Only call `replaceOldDriveFile` when the incoming value is a `data:` base64 string (a genuinely new upload). This applies to `announcements.update` and `merch.update`.
 
 ### 4.5 Trial membership sign-up
 
@@ -171,7 +175,7 @@ User taps "Become a Member" on /membership (any authenticated user)
       dateOfTraining=today (DD/MM/YYYY), pool=""
     → UPDATE sheet_users SET memberStatus="Member", membershipStartDate=today
       WHERE email = $email OR userEmail = $email
-    → upsertUser: memberStatus="Member", membershipStartDate=today
+    → upsertUser: memberStatus="Member"   ← membershipStartDate is NOT on the users table; only sheetUsers has it
   → return updated user
 ```
 
@@ -179,9 +183,25 @@ User taps "Become a Member" on /membership (any authenticated user)
 - Annual fee is pro-rated: full $80 in January, reduced by completed months through the year
 - Fee is recorded as a sign-up row (activity="Membership Fee") — visible in Payments page under Membership Fees
 - `MEMBERSHIP_ACTIVITIES = ["Membership Fee", "Trial Membership"]` — both appear under Membership Fees section in Payments, not Training Fees
-- Membership start date stored as `DD/MM/YYYY`
+- Membership start date stored as `DD/MM/YYYY` in `sheetUsers.membershipStartDate` only — the `users` table has no such column
 
-### 4.7 Session sign-up count display
+### 4.7 Admin delete of sign-up / membership records
+
+Admin can delete any sign-up row from **Admin → User → Sign-ups tab**. The delete logic differs by `activity`:
+
+| `activity` value | Delete behaviour |
+|---|---|
+| `"Trial Membership"` | Delete row; reset `memberStatus → "Non-Member"`, clear `trialStartDate` + `trialEndDate` on both `users` and `sheetUsers` |
+| `"Membership Fee"` | Delete row; revert `memberStatus`: if `trialEndDate` is still in the future → `"Trial"`; else → `"Non-Member"`. Also clear `sheetUsers.membershipStartDate`. |
+| Any other (training session) | Delete row only; no status changes |
+
+tRPC procedures:
+- `admin.deleteSignup` — training sign-ups (activity is a session activity name)
+- `admin.deleteMembershipSignup` — membership records (Trial Membership / Membership Fee); handles status revert
+
+Both are Admin-only. After delete, the sign-ups list refreshes and the inline edit panel collapses.
+
+### 4.8 Session sign-up count display
 
 ```
 Sessions list: COUNT(signups) per session using toIsoDate(trainingDate) as key
@@ -211,7 +231,7 @@ PK: auto-increment `id`. Sheets cache. **Full DELETE+INSERT on forceSync — nev
 PK: `id` (UUID). Auth table. `email`, `name`, `phone`, `dob`, `memberStatus`, `clubRole`, `paymentId`, `image` (MEDIUMTEXT — R2 URL or null).
 
 ### `announcements`, `merch_items`, `videos`
-Fully DB-primary. Never touch Sheets.
+Fully DB-primary. Never touch Sheets. The `videos` table includes a `notes` text column (free-text field shown on video cards and in the add-video form).
 
 ---
 
@@ -234,6 +254,7 @@ Fully DB-primary. Never touch Sheets.
 | Fee utilities | `client/src/lib/feeUtils.ts` |
 | Routes | `client/src/App.tsx` |
 | Landing / login | `client/src/pages/Login.tsx` |
+| Announcement detail | `client/src/pages/AnnouncementDetail.tsx` |
 | Sessions list | `client/src/pages/Sessions.tsx` |
 | Session detail | `client/src/pages/SessionDetail.tsx` |
 | Sign-up form | `client/src/pages/SignUpForm.tsx` |
@@ -342,6 +363,16 @@ Do not include your own LIMIT clause when querying in Railway console — syntax
 
 ### Bug 8: Signup edit/delete must use DB primary key
 **Rule:** Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` can affect multiple rows due to date format inconsistency.
+
+### Bug 9: R2 image silently deleted on announcement/merch edit (fixed 2026-04-29)
+**Root cause:** `announcements.update` and `merch.update` called `replaceOldDriveFile(oldUrl)` unconditionally whenever `imageUrl`/`photo` was present in the payload. The client echoes the existing URL back when editing text fields without changing the image — so the R2 object was deleted, leaving a broken image in the DB.
+**Fix:** Gate the delete+re-upload on `isDriveDataUrl(input.imageUrl)`. If the value is already a hosted URL (not a `data:` base64 string), store it as-is and do not touch R2.
+**Rule:** Only call `replaceOldDriveFile` when the incoming value is a `data:` base64 string. This applies to every mutation that accepts an image field.
+
+### Bug 10: membershipStartDate silently dropped on upsertUser (fixed 2026-04-29)
+**Root cause:** `membership.signupMember` passed `membershipStartDate` to `db.upsertUser()`, but the `users` table has no such column. `InsertUser` (Drizzle's inferred type) does not include it — Drizzle silently ignores unknown fields, so the value was never persisted to `users`.
+**Fix:** Removed `membershipStartDate` from the `upsertUser` call. The correct write path is `sheetUsers` only (already done one line above via `UPDATE sheet_users SET memberStatus="Member", membershipStartDate=today`).
+**Rule:** `membershipStartDate` belongs to `sheetUsers` only. Never attempt to write it to `users`.
 
 ---
 
