@@ -13,7 +13,7 @@
  */
 
 import { google } from "googleapis";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { getDb } from "./db";
 import {
@@ -684,25 +684,40 @@ export async function getPayments(): Promise<PaymentRow[]> {
 }
 
 /**
- * Returns all sign-up rows for a given email.
+ * Returns all sign-up rows belonging to a given user.
+ * Attribution is paymentId-primary: a row with a paymentId is owned by whoever
+ * has that paymentId, regardless of the email column on the row.
+ *
+ * @param email         - the user's email (normalised to lowercase)
+ * @param membershipFeeRefs - Set of paymentId refs known to belong to this user
+ *                            (built by getMyPayments; always contains userPaymentId)
+ * @param userPaymentId - the user's canonical paymentId (used for the DB OR query)
  */
 export async function getAllSignupsByEmail(
   email: string,
   membershipFeeRefs?: Set<string>,
+  userPaymentId?: string,
 ): Promise<SignUpRow[]> {
   const normalizedEmail = email.toLowerCase().trim();
+  const normPid = (userPaymentId || "").toLowerCase().trim();
 
   let allSignups: SignUpRow[];
   try {
     const db = await getDb();
     if (db) {
-      // Use email index — avoids full table scan
-      const rows = await db.select().from(sheetSignups)
-        .where(eq(sheetSignups.email, normalizedEmail));
+      // Fetch rows matching email OR paymentId — same strategy as admin.getUserActivity.
+      // This is critical: admin-created sign-ups have the admin's email but the
+      // target user's paymentId, so a pure email WHERE would miss them entirely.
+      const rows = normPid
+        ? await db.select().from(sheetSignups)
+            .where(or(eq(sheetSignups.email, normalizedEmail), eq(sheetSignups.paymentId, normPid)))
+        : await db.select().from(sheetSignups)
+            .where(eq(sheetSignups.email, normalizedEmail));
+
       if (rows.length > 0) {
         allSignups = rows.map(dbSignupToSignupRow);
       } else {
-        // No rows for this email — could be paymentId-only rows; fetch all to be safe
+        // No rows at all — fall back to full Sheets fetch
         const allRows = await db.select().from(sheetSignups);
         allSignups = allRows.length > 0 ? allRows.map(dbSignupToSignupRow) : await fetchSheetsSignups();
       }
@@ -714,20 +729,18 @@ export async function getAllSignupsByEmail(
     allSignups = await fetchSheetsSignups();
   }
 
+  // Build the effective set of paymentId refs for this user.
+  // membershipFeeRefs is already seeded with the user's own paymentId by getMyPayments.
+  const pidRefs = membershipFeeRefs && membershipFeeRefs.size > 0
+    ? membershipFeeRefs
+    : normPid ? new Set([normPid]) : new Set<string>();
+
   return allSignups.filter(s => {
-    const rowEmail = (s.email || "").toLowerCase().trim();
+    const rowEmail  = (s.email     || "").toLowerCase().trim();
     const rowPayRef = (s.paymentId || "").toLowerCase().trim();
 
-    // If the row has a paymentId, ownership is determined by paymentId only.
-    // This covers admin-created sign-ups for other users (admin's email on the row,
-    // but the correct person's paymentId) and all historical Sheets rows.
-    if (rowPayRef) {
-      return Boolean(
-        membershipFeeRefs &&
-        membershipFeeRefs.size > 0 &&
-        membershipFeeRefs.has(rowPayRef),
-      );
-    }
+    // PaymentId-primary: a row with a paymentId is owned by the matching paymentId holder.
+    if (rowPayRef) return pidRefs.has(rowPayRef);
 
     // No paymentId on the row — fall back to email match.
     return rowEmail === normalizedEmail;

@@ -627,7 +627,7 @@ export const appRouter = router({
           const userPaymentId = (user.paymentId || "").trim();
           const allPayments = await getPayments();
           const { myPayments: myPmts, myPaymentRefs } = await getMyPayments(userEmail, allPayments, userPaymentId);
-          const mySignups = await getAllSignupsByEmail(userEmail, myPaymentRefs);
+          const mySignups = await getAllSignupsByEmail(userEmail, myPaymentRefs, userPaymentId);
           const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
           const totalPaid = myPmts.reduce((sum, p) => sum + p.amount, 0);
           const currentDebt = Math.max(0, totalFees - totalPaid);
@@ -703,7 +703,7 @@ export const appRouter = router({
 
       const allPayments = await getPayments();
       const { myPayments, myPaymentRefs } = await getMyPayments(email, allPayments, paymentId);
-      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
+      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs, paymentId);
 
       const totalFees = mySignups.reduce((sum, s) => sum + s.actualFees, 0);
       const totalPaid = myPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -778,7 +778,7 @@ export const appRouter = router({
 
       const allPayments = await getPayments();
       const { myPayments: myPaymentsRaw, myPaymentRefs } = await getMyPayments(email, allPayments, paymentId);
-      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs);
+      const mySignups = await getAllSignupsByEmail(email, myPaymentRefs, paymentId);
 
       // Separate training sign-ups from membership fee entries
       const MEMBERSHIP_ACTIVITIES = ["Membership Fee", "Trial Membership"];
