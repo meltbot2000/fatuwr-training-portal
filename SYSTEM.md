@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-04-29*
+*Last updated: 2026-04-29 (comprehensive review)*
 
 ---
 
@@ -101,6 +101,8 @@ On first login: copy sheetUsers.image → users.image (Glide URL inheritance)
 Trial status check: if sheetUsers.trialEndDate < today → treat as Non-Member immediately
 ```
 
+**Login title:** The landing screen has two buttons — "Sign in" and "Create account". Both lead to the same OTP email flow but the email step title reflects the choice ("Sign in" vs "Create account") via `isCreatingAccount` state. There is no functional difference — both paths create an account if the email is new.
+
 ### 4.2 Sign-up submit
 
 ```
@@ -185,7 +187,23 @@ User taps "Become a Member" on /membership (any authenticated user)
 - `MEMBERSHIP_ACTIVITIES = ["Membership Fee", "Trial Membership"]` — both appear under Membership Fees section in Payments, not Training Fees
 - Membership start date stored as `DD/MM/YYYY` in `sheetUsers.membershipStartDate` only — the `users` table has no such column
 
-### 4.7 Admin delete of sign-up / membership records
+### 4.7 Session management (Admin)
+
+All session mutations call `clearSessionsCache()` after completion.
+
+**Add session** (`admin.addSession`): Admin fills `AddSessionSheet` form (date, pool, fees, time, notes) → inserts into `sheet_sessions` → closes sheet. Session immediately visible on sessions list.
+
+**Close session** (`admin.closeSession`): Sets `isClosed = "TRUE"` on the `sheet_sessions` row by `rowId`. Closed sessions still visible in Admin panel; hidden from user sign-up.
+
+**Edit session** (`admin.editSession`): Updates any field on a session row by `rowId`. Same form as add session, pre-populated.
+
+**Rain-off** (`admin.processRainOff`): Marks session as rain-off, refunds all sign-ups for that session (sets `actualFees = 0` on all sign-up rows for that session), updates session notes.
+
+**Add sign-up on behalf of user** (`admin.addSignup`): Admin enters paymentId + activity for an existing session. Bypasses debt and duplicate checks.
+
+**Edit sign-up** (`admin.editSignup`): Admin edits any field on an existing sign-up row by `id` (DB PK). Available from Admin → Sessions → session attendees, and from Admin → Members → user → Sign-ups tab.
+
+### 4.8 Admin delete of sign-up / membership records
 
 Admin can delete any sign-up row from **Admin → User → Sign-ups tab**. The delete logic differs by `activity`:
 
@@ -201,7 +219,7 @@ tRPC procedures:
 
 Both are Admin-only. After delete, the sign-ups list refreshes and the inline edit panel collapses.
 
-### 4.8 Session sign-up count display
+### 4.9 Session sign-up count display
 
 ```
 Sessions list: COUNT(signups) per session using toIsoDate(trainingDate) as key
@@ -228,7 +246,7 @@ PK: auto-increment `id`. GAS-owned. Full DELETE+INSERT on every sync. `paymentId
 PK: auto-increment `id`. Sheets cache. **Full DELETE+INSERT on forceSync — never store app-generated data here.** `image` column stores legacy Glide URL only.
 
 ### `users`
-PK: `id` (UUID). Auth table. `email`, `name`, `phone`, `dob`, `memberStatus`, `clubRole`, `paymentId`, `image` (MEDIUMTEXT — R2 URL or null).
+PK: `id` (auto-increment int). Auth table. Key columns: `openId` (unique — used as session identity), `email`, `name`, `memberStatus`, `clubRole`, `paymentId`, `trialStartDate`, `trialEndDate`, `image` (MEDIUMTEXT — R2 URL or null). **No `phone`, `dob`, or `membershipStartDate` columns** — those live on `sheetUsers` only.
 
 ### `announcements`, `merch_items`, `videos`
 Fully DB-primary. Never touch Sheets. The `videos` table includes a `notes` text column (free-text field shown on video cards and in the add-video form).
@@ -236,6 +254,8 @@ Fully DB-primary. Never touch Sheets. The `videos` table includes a `notes` text
 ---
 
 ## 6. Key file locations
+
+### Server
 
 | Concern | File |
 |---|---|
@@ -250,18 +270,54 @@ Fully DB-primary. Never touch Sheets. The `videos` table includes a `notes` text
 | Environment config | `server/_core/env.ts` |
 | OTP email send | `server/email.ts` |
 | GAS script (live) | `google-apps-script/Code_v10_2026-04-18.gs` |
+
+### Client — utilities & components
+
+| Concern | File |
+|---|---|
 | Date utilities | `client/src/lib/dateUtils.ts` |
 | Fee utilities | `client/src/lib/feeUtils.ts` |
+| tRPC client | `client/src/lib/trpc.ts` |
 | Routes | `client/src/App.tsx` |
-| Landing / login | `client/src/pages/Login.tsx` |
-| Announcement detail | `client/src/pages/AnnouncementDetail.tsx` |
-| Sessions list | `client/src/pages/Sessions.tsx` |
-| Session detail | `client/src/pages/SessionDetail.tsx` |
-| Sign-up form | `client/src/pages/SignUpForm.tsx` |
-| Edit sign-up sheet | `client/src/components/EditSignupSheet.tsx` |
-| Profile | `client/src/pages/Profile.tsx` |
-| Admin panel | `client/src/pages/Admin.tsx` |
 | Bottom nav | `client/src/components/BottomNav.tsx` |
+| App header | `client/src/components/AppHeader.tsx` |
+| Edit sign-up sheet | `client/src/components/EditSignupSheet.tsx` |
+
+### Client — pages (route → file)
+
+| Route | File | Notes |
+|---|---|---|
+| `/login` | `Login.tsx` | Landing screen + OTP flow |
+| `/` | `Sessions.tsx` | Sessions list (home tab) |
+| `/home` | `Home.tsx` | Announcements / home tab |
+| `/session/:rowId` | `SessionDetail.tsx` | Session detail + attendees |
+| `/session/:rowId/splits` | `Splits.tsx` | Per-session PnL splits view |
+| `/signup/:rowId` | `SignUpForm.tsx` | Sign-up form with fee calc |
+| `/payments` | `Payments.tsx` | User payment history + instructions |
+| `/membership` | `Membership.tsx` | Membership status + sign-up |
+| `/admin` | `Admin.tsx` | Full admin panel (see §6.1) |
+| `/profile` | `Profile.tsx` | User profile + photo upload |
+| `/announcements` | `Announcements.tsx` | Announcements list |
+| `/announcements/:id` | `AnnouncementDetail.tsx` | Announcement detail; back → `/home` |
+| `/fun-resources` | `FunResources.tsx` | Hub page for club resources |
+| `/fun-resources/invite` | `FunResourcesInvite.tsx` | Invite a friend + newbie form link |
+| `/fun-resources/merch` | `FunResourcesMerch.tsx` | Merch catalogue |
+| `/fun-resources/merch/:id` | `MerchDetail.tsx` | Merch item detail |
+| `/fun-resources/videos` | `FunResourcesVideos.tsx` | Training videos list + add |
+| `/fun-resources/resources` | `FunResourcesResources.tsx` | Downloadable resources |
+| `/fun-resources/policies` | `FunResourcesPolicies.tsx` | Club policies |
+| `/newbie` | `NewToClub.tsx` | New-to-club info page |
+
+### 6.1 Admin panel structure (`/admin`)
+
+Four tabs. Access gated by `clubRole`:
+
+| Tab | Visible to | Contents |
+|---|---|---|
+| **Members** | Admin + Helper | Searchable user list. Click user → `EditUserSheet` (full-screen, 3 sub-tabs: Profile / Payments / Sign-ups). Profile sub-tab: edit name, paymentId, dob, memberStatus, clubRole, trial dates, membership start date; add membership fee record. Payments sub-tab: user's payment history. Sign-ups sub-tab: all sign-ups incl. membership records; Admin can edit or delete each row. |
+| **Payments** | Admin + Helper | All payments list with search. Admin: add payment (`+` button), edit any field incl. reference, delete with two-tap confirm. |
+| **Sessions** | Admin only | All sessions list. Add session (`AddSessionSheet`). Per session: view attendees, close session, process rain-off, edit session details, add sign-up on behalf of user. |
+| **Data** | Admin only | Per-session + overall PnL report (past sessions only). Spreadsheet sync panel (`forceSync` per tab or all). Migrate Glide photos to R2. |
 
 ---
 
