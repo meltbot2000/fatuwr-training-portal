@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>FATUWR — Newbie Session flow v3</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Tokens lifted from More.html / Training Sessions redesign.html */
+    --bg-base: #111111;
+    --bg-card: #1E1E1E;
+    --bg-card-2: #252525;
+    --bg-modal: #2A2A2A;
+    --primary: #2196F3;
+    --primary-light: #93C5FD;
+    --primary-tint-bg: rgba(33,150,243,0.08);
+    --primary-tint-border: rgba(33,150,243,0.22);
+    --success: #3DDC84;
+    --success-bg: rgba(61,220,132,0.12);
+    --text: #FFFFFF;
+    --text-2: #9B9B9B;
+    --text-3: #6B6B6B;
+    --divider: #2C2C2C;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #1a1a1a;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #fff;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  .head { text-align: center; padding: 32px 20px 8px; }
+  .head h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .head p { font-size: 13px; color: #aaa; max-width: 720px; margin: 0 auto; line-height: 1.5; }
+
+  .grid {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 40px 24px;
+    padding: 30px 20px 80px;
+    max-width: 1800px; margin: 0 auto;
+  }
+  .cell { display: flex; flex-direction: column; align-items: center; width: 320px; flex: 0 0 320px; }
+  .label { font-size: 11px; color: #888; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; margin-bottom: 10px; text-align: center; }
+  .caption { font-size: 12px; color: #aaa; text-align: center; line-height: 1.5; margin-top: 12px; width: 100%; }
+
+  /* ---- Phone frame matches DSM (bg-base body, card-bg topbar, no coloured bar) ---- */
+  .phone {
+    width: 320px; flex: 0 0 320px;
+    height: 660px; min-height: 660px; max-height: 660px;
+    background: var(--bg-base);
+    border-radius: 36px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    display: flex; flex-direction: column;
+    contain: layout size;
+  }
+  .topbar {
+    flex: 0 0 52px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--divider);
+    position: relative;
+    display: flex; align-items: center;
+    padding: 0 14px;
+  }
+  .topbar .back { width: 24px; height: 24px; color: #fff; flex-shrink: 0; }
+  .topbar .title {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px; font-weight: 600;
+    pointer-events: none;
+  }
+  .scroll {
+    flex: 1 1 0; min-height: 0; overflow: hidden;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* ---- Controls ---- */
+  .input {
+    background: var(--bg-card);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-md);
+    padding: 11px 12px;
+    color: #fff; font-size: 14px; font-family: inherit;
+    width: 100%;
+  }
+  .input:focus { outline: none; border-color: var(--primary); }
+  .input::placeholder { color: var(--text-3); }
+
+  .btn-primary {
+    background: var(--primary); color: #fff; border: 0;
+    border-radius: var(--radius-full); height: 44px;
+    font-size: 15px; font-weight: 500;
+    width: 100%; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; gap: 6px;
+  }
+  .btn-secondary {
+    background: transparent; color: #fff;
+    border: 1.5px solid var(--divider);
+    border-radius: var(--radius-full); height: 44px;
+    font-size: 15px; font-weight: 500;
+    width: 100%; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; gap: 6px;
+  }
+  .link-btn {
+    background: transparent; border: 0;
+    color: var(--primary); font-size: 14px; font-weight: 500;
+    padding: 10px; text-align: center;
+  }
+
+  /* ---- Typography blocks ---- */
+  .h-block { padding: 4px 2px 0; flex-shrink: 0; }
+  .h-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--primary); text-transform: uppercase; margin-bottom: 4px; }
+  .h-title { font-size: 22px; font-weight: 600; color: #fff; line-height: 1.2; margin-bottom: 6px; letter-spacing: -0.01em; }
+  .h-sub { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+  .body-text { font-size: 14px; color: #fff; line-height: 1.55; }
+  .body-text-muted { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+
+  /* ---- Complete profile (post-OTP) ---- */
+  .profile-wrap {
+    flex: 1 1 0; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: 20px 16px 16px;
+    background: var(--bg-base);
+    gap: 16px;
+    overflow: hidden;
+  }
+  .steps { display: flex; gap: 6px; justify-content: center; flex-shrink: 0; }
+  .step-dot { width: 28px; height: 3px; border-radius: 2px; background: #3a3a3a; }
+  .step-dot.active { background: var(--primary); }
+  .profile-card {
+    background: var(--bg-card);
+    border-radius: 18px;
+    padding: 18px 16px 18px;
+    display: flex; flex-direction: column;
+    gap: 14px;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .profile-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: #2C2C2C;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+    margin: 0 auto;
+    flex-shrink: 0;
+  }
+  .profile-title { font-size: 19px; font-weight: 600; color: #fff; text-align: center; letter-spacing: -0.01em; }
+  .profile-sub { font-size: 13px; color: var(--text-2); text-align: center; line-height: 1.45; margin-top: -6px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--text-2); text-transform: uppercase;
+  }
+  .field-label .opt, .field-label .hint { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-3); margin-left: 4px; }
+  .footer-brand { font-size: 11px; color: var(--text-3); text-align: center; flex-shrink: 0; }
+
+  /* ---- Landing ---- */
+  .landing {
+    flex: 1 1 0; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: 28px 22px 26px;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 18% 8%, rgba(33,150,243,0.35), transparent 45%),
+      radial-gradient(circle at 88% 18%, rgba(33,150,243,0.22), transparent 40%),
+      radial-gradient(circle at 50% 105%, rgba(33,150,243,0.28), transparent 55%),
+      linear-gradient(180deg, #0a1a2e 0%, #0a0f1a 55%, #050810 100%);
+  }
+  .landing::before {
+    /* soft grain / caustics */
+    content: '';
+    position: absolute; inset: -20%;
+    background:
+      radial-gradient(ellipse at 60% 30%, rgba(147,197,253,0.12), transparent 50%),
+      radial-gradient(ellipse at 20% 80%, rgba(33,150,243,0.1), transparent 55%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+  .landing::after {
+    /* subtle curved highlight near top */
+    content: '';
+    position: absolute;
+    top: -50%; left: -20%; right: -20%;
+    height: 70%;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.06), transparent 60%);
+    pointer-events: none;
+  }
+  .landing-hero {
+    flex: 1 1 auto;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px; text-align: center;
+    position: relative; z-index: 1;
+  }
+  .logo-wrap {
+    position: relative;
+    width: 144px; height: 144px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 2px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 10px 40px rgba(33,150,243,0.4), 0 0 0 1px rgba(33,150,243,0.15);
+  }
+  .logo-wrap::before {
+    content: '';
+    position: absolute; inset: -18%;
+    background: radial-gradient(circle, rgba(33,150,243,0.5) 0%, transparent 65%);
+    filter: blur(10px);
+    animation: pulse 3.6s ease-in-out infinite;
+    z-index: -1;
+  }
+  .logo-wrap img {
+    position: relative;
+    width: 82%; height: 82%;
+    object-fit: contain;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+  .landing-eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--primary-light);
+    padding: 5px 11px;
+    border-radius: 9999px;
+    background: rgba(33,150,243,0.12);
+    border: 1px solid rgba(33,150,243,0.28);
+    position: relative; z-index: 1;
+  }
+  .landing-eyebrow::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+  }
+  .landing-title {
+    font-size: 26px; font-weight: 700; line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: #fff;
+    max-width: 260px;
+  }
+  .landing-sub {
+    font-size: 13px; color: rgba(255,255,255,0.68);
+    line-height: 1.5; max-width: 260px;
+  }
+  .landing-actions {
+    display: flex; flex-direction: column; gap: 10px;
+    flex-shrink: 0;
+    position: relative; z-index: 1;
+  }
+  .landing-actions .btn-primary {
+    box-shadow: 0 10px 30px rgba(33,150,243,0.45), 0 2px 0 rgba(255,255,255,0.08) inset;
+    height: 48px;
+    font-weight: 600;
+  }
+  .landing-actions .btn-secondary {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.18);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    height: 48px;
+    font-weight: 500;
+  }
+  .find-out-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 4px;
+    color: var(--primary-light);
+    font-size: 13.5px; font-weight: 500;
+    padding: 10px;
+    text-align: center;
+    background: transparent; border: 0;
+  }
+  .find-out-link:hover { color: #fff; }
+
+  /* ---- Card (matches More.html pattern) ---- */
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  /* ---- Account type picker ---- */
+  .picker { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; flex-shrink: 0; }
+  .picker-item {
+    background: var(--bg-card);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .picker-item.selected {
+    border-color: var(--primary);
+    background: var(--primary-tint-bg);
+  }
+  .pi-body { flex: 1 1 auto; min-width: 0; }
+  .pi-title { font-size: 15px; font-weight: 500; color: #fff; margin-bottom: 2px; }
+  .pi-sub { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .pi-radio {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--text-3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .picker-item.selected .pi-radio {
+    border-color: var(--primary);
+    background: var(--primary);
+  }
+  .picker-item.selected .pi-radio::after {
+    content: '';
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fff;
+  }
+
+  /* ---- Session picker ---- */
+  .dates { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .date-row {
+    background: var(--bg-card);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .date-row.selected {
+    border-color: var(--primary);
+    background: var(--primary-tint-bg);
+  }
+  .date-circle {
+    width: 44px; height: 48px; border-radius: 10px;
+    background: #2C2C2C;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .date-row.selected .date-circle { background: var(--primary); }
+  .date-day { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; color: var(--primary); text-transform: uppercase; }
+  .date-row.selected .date-day { color: #fff; }
+  .date-num { font-size: 17px; font-weight: 600; color: #fff; line-height: 1; margin-top: 2px; }
+  .date-body { flex: 1 1 auto; min-width: 0; }
+  .date-title { font-size: 14px; color: #fff; margin-bottom: 1px; font-weight: 500; }
+  .date-sub { font-size: 12px; color: var(--text-2); }
+  .date-slots { font-size: 11px; color: var(--text-2); text-align: right; flex-shrink: 0; line-height: 1.3; }
+  .date-slots b { color: var(--primary); font-weight: 600; }
+
+  .no-date-row {
+    background: transparent;
+    border: 1.5px dashed var(--divider);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+  }
+  .no-date-row.selected {
+    border-color: var(--primary);
+    background: var(--primary-tint-bg);
+    border-style: solid;
+  }
+  .no-date-row .ico {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--primary-tint-bg);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .no-date-row .body { flex: 1; min-width: 0; }
+  .no-date-row .t { font-size: 14px; color: #fff; margin-bottom: 1px; font-weight: 500; }
+  .no-date-row .s { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+
+  .empty-dates {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 18px 14px;
+    text-align: center;
+    font-size: 13px; color: var(--text-2); line-height: 1.5;
+  }
+
+  /* ---- Equipment checkboxes ---- */
+  .check-group {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .check-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px;
+    border-bottom: 1px solid var(--divider);
+    cursor: pointer;
+  }
+  .check-row:last-child { border-bottom: 0; }
+  .check-box {
+    width: 22px; height: 22px; border-radius: 6px;
+    border: 1.5px solid var(--text-3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; background: transparent;
+  }
+  .check-row.on .check-box { background: var(--primary); border-color: var(--primary); }
+  .check-row.on .check-box svg { display: block; }
+  .check-box svg { display: none; }
+  .check-body { flex: 1; min-width: 0; }
+  .check-t { font-size: 15px; color: #fff; font-weight: 400; }
+
+  .conditional {
+    background: var(--primary-tint-bg);
+    border: 1px solid var(--primary-tint-border);
+    padding: 14px;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .conditional .lbl { font-size: 13px; color: #fff; font-weight: 500; }
+  .conditional .hint { font-size: 11.5px; color: var(--text-2); line-height: 1.45; }
+
+  /* ---- Confirmation ---- */
+  .conf-check {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--success-bg);
+    color: var(--success);
+    display: flex; align-items: center; justify-content: center;
+    margin: 16px auto 12px;
+    flex-shrink: 0;
+  }
+  .conf-title { font-size: 20px; font-weight: 600; color: #fff; text-align: center; margin-bottom: 6px; flex-shrink: 0; letter-spacing: -0.01em; }
+  .conf-sub { font-size: 13px; color: var(--text-2); text-align: center; line-height: 1.5; max-width: 260px; margin: 0 auto 8px; flex-shrink: 0; }
+  .summary-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    flex-shrink: 0;
+  }
+  .sum-row {
+    display: flex; justify-content: space-between;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--divider);
+    font-size: 13px; gap: 12px;
+  }
+  .sum-row:last-child { border-bottom: 0; }
+  .sum-label { color: var(--text-2); flex-shrink: 0; }
+  .sum-val { color: #fff; text-align: right; font-weight: 500; }
+
+  /* WhatsApp CTA — keep brand green but restyle as list-item-style CTA */
+  .wa-row {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .wa-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: #25D366;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .wa-body { flex: 1; min-width: 0; }
+  .wa-title { font-size: 14px; color: #fff; font-weight: 500; margin-bottom: 2px; }
+  .wa-sub { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .wa-chev { color: var(--text-3); font-size: 20px; line-height: 1; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Newbie Session flow — v3 (design-system aligned)</h1>
+  <p>Rebuilt with DSM tokens from More.html and Training Sessions redesign.html — card-bg top bar (not primary), DSM success green <code style="color:#3DDC84">#3DDC84</code>, Inter 400/500/600, consistent radii, outlined inputs, primary-tint selected states.</p>
+</div>
+
+<div class="grid">
+
+  <!-- 0 · Landing -->
+  <div class="cell">
+    <div class="label">1 · Welcome</div>
+    <div class="phone">
+      <div class="landing">
+        <div class="landing-hero">
+          <div class="logo-wrap"><img src="assets/logo.jpg" alt="FATUWR Singapore"/></div>
+          <div class="landing-title">Welcome to the FATUWR App</div>
+          <div class="landing-sub">Save the app to your homescreen as a webapp for added convenience!</div>
+        </div>
+        <div class="landing-actions">
+          <button class="btn-primary">Sign in</button>
+          <button class="btn-secondary">Create account</button>
+          <button class="find-out-link">Find out more about trying UWR for free ›</button>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Logo + Sign in / Create account / Find out more link. No top bar on this first screen.</div>
+  </div>
+
+  <!-- 2 · Find out more -->
+  <div class="cell">
+    <div class="label">2 · Find out more</div>
+    <div class="phone">
+      <div class="topbar">
+        <svg class="back" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="title">About UWR</div>
+      </div>
+      <div class="scroll">
+        <div class="h-block" style="padding-top: 4px;">
+          <div class="h-title">Try underwater rugby for free</div>
+        </div>
+        <div class="body-text-muted">We'll go through all the basics in a safe and structured session. We provide all the gear, just come in your swimsuit.</div>
+        <div class="body-text-muted">Sessions are held at either the MGS or CCAB (Evans Road) swimming pools.</div>
+
+        <div style="font-size: 13px; color: #fff; font-weight: 500; padding: 6px 2px 0;">Next available dates</div>
+        <div class="dates">
+          <div class="date-row">
+            <div class="date-circle"><div class="date-day">SUN</div><div class="date-num">26</div></div>
+            <div class="date-body"><div class="date-title">26 April · 5:00 PM</div><div class="date-sub">CCAB · Evans Rd</div></div>
+          </div>
+          <div class="date-row">
+            <div class="date-circle"><div class="date-day">TUE</div><div class="date-num">28</div></div>
+            <div class="date-body"><div class="date-title">28 April · 7:45 PM</div><div class="date-sub">MGS · Blackmore Dr</div></div>
+          </div>
+          <div class="date-row">
+            <div class="date-circle"><div class="date-day">SUN</div><div class="date-num">10</div></div>
+            <div class="date-body"><div class="date-title">10 May · 5:00 PM</div><div class="date-sub">CCAB · Evans Rd</div></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" style="margin-top: auto;">Sign up for a session</button>
+      </div>
+    </div>
+    <div class="caption">Plain text description — no coloured hero, no decorative blocks. Dates use the same date-row component as screen 4.</div>
+  </div>
+
+  <!-- 2b · Complete profile (post-OTP) -->
+  <div class="cell">
+    <div class="label">2b · Complete profile (after OTP)</div>
+    <div class="phone">
+      <div class="profile-wrap">
+        <div class="steps">
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot active"></div>
+        </div>
+        <div class="profile-card">
+          <div class="profile-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20a8 8 0 0116 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+          <div class="profile-title">Complete profile</div>
+          <div class="profile-sub">A few details so we know who you are</div>
+
+          <div class="field">
+            <div class="field-label">Full name <span style="color: var(--primary);">*</span></div>
+            <input class="input" placeholder="e.g. Jane Tan"/>
+          </div>
+
+          <div class="field">
+            <div class="field-label">Phone <span style="color: var(--primary);">*</span><span class="hint">(so we can contact you)</span></div>
+            <input class="input" placeholder="e.g. 91234567" type="tel"/>
+          </div>
+
+          <button class="btn-primary" style="margin-top: auto;">Complete sign up</button>
+        </div>
+        <div class="footer-brand">FATUWR Training Portal</div>
+      </div>
+    </div>
+    <div class="caption">Shown right after OTP entry. Step indicator (3/3), DSM tokens, phone required with helper text. Date of birth removed.</div>
+  </div>
+
+  <!-- 3 · Which best describes you -->
+  <div class="cell">
+    <div class="label">3 · Which best describes you</div>
+    <div class="phone">
+      <div class="profile-wrap" style="padding-top: 28px; gap: 20px;">
+        <div class="profile-title" style="font-size: 22px;">Which best describes you?</div>
+
+        <div class="picker">
+          <div class="picker-item selected">
+            <div class="pi-body"><div class="pi-title">First timer / Newbie</div><div class="pi-sub">I'm completely new to underwater rugby</div></div>
+            <div class="pi-radio"></div>
+          </div>
+          <div class="picker-item">
+            <div class="pi-body"><div class="pi-title">Overseas guest player</div><div class="pi-sub">I play UWR elsewhere and want to drop in</div></div>
+            <div class="pi-radio"></div>
+          </div>
+          <div class="picker-item">
+            <div class="pi-body"><div class="pi-title">Local player, new app account</div><div class="pi-sub">I've played with FATUWR before</div></div>
+            <div class="pi-radio"></div>
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-top: auto;">Continue</button>
+      </div>
+    </div>
+    <div class="caption">Standalone one-off selection — no top bar, no back. Only "First timer" continues into the newbie flow; the other two route to the regular training sign-up screen.</div>
+  </div>
+
+  <!-- 4 · Pick a session -->
+  <div class="cell">
+    <div class="label">4 · Pick a session</div>
+    <div class="phone">
+      <div class="topbar">
+        <svg class="back" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="title">Pick a session</div>
+      </div>
+      <div class="scroll">
+        <div class="h-block">
+          <div class="h-title" style="font-size: 19px;">Upcoming newbie sessions</div>
+          <div class="h-sub">First come, first served · 10 slots per session</div>
+        </div>
+        <div class="dates">
+          <div class="date-row selected">
+            <div class="date-circle"><div class="date-day">SUN</div><div class="date-num">26</div></div>
+            <div class="date-body"><div class="date-title">26 April · 5:00 PM</div><div class="date-sub">CCAB · Evans Rd</div></div>
+            <div class="date-slots"><b>3 left</b><br>of 10</div>
+          </div>
+          <div class="date-row">
+            <div class="date-circle"><div class="date-day">TUE</div><div class="date-num">28</div></div>
+            <div class="date-body"><div class="date-title">28 April · 7:45 PM</div><div class="date-sub">MGS · Blackmore Dr</div></div>
+            <div class="date-slots">6 left<br>of 10</div>
+          </div>
+          <div class="date-row">
+            <div class="date-circle"><div class="date-day">SUN</div><div class="date-num">10</div></div>
+            <div class="date-body"><div class="date-title">10 May · 5:00 PM</div><div class="date-sub">CCAB · Evans Rd</div></div>
+            <div class="date-slots">8 left<br>of 10</div>
+          </div>
+          <div class="no-date-row">
+            <div class="body"><div class="t">Can't make any of these?</div><div class="s">We'll contact you to arrange a date.</div></div>
+          </div>
+        </div>
+        <button class="btn-primary">Continue</button>
+      </div>
+    </div>
+    <div class="caption">Location only. Slots counter in DSM primary (not warning amber). Fallback row is a selectable dashed container.</div>
+  </div>
+
+  <!-- 5 · Equipment -->
+  <div class="cell">
+    <div class="label">5 · Gear</div>
+    <div class="phone">
+      <div class="topbar">
+        <svg class="back" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="title">Gear</div>
+      </div>
+      <div class="scroll">
+        <div class="h-block">
+          <div class="h-title" style="font-size: 19px;">What do you need us to provide?</div>
+          <div class="h-sub">Tick anything you'd like us to bring. Leave unticked if you have your own.</div>
+        </div>
+
+        <div class="check-group">
+          <div class="check-row on">
+            <div class="check-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="check-body"><div class="check-t">Mask</div></div>
+          </div>
+          <div class="check-row on">
+            <div class="check-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="check-body"><div class="check-t">Snorkel</div></div>
+          </div>
+          <div class="check-row on">
+            <div class="check-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="check-body"><div class="check-t">Fins</div></div>
+          </div>
+        </div>
+
+        <div class="conditional">
+          <div class="lbl">Foot size (EU)</div>
+          <input class="input" placeholder="e.g. 42"/>
+          <div class="hint">So we can pick fins that fit</div>
+        </div>
+
+        <button class="btn-primary" style="margin-top: auto;">Continue</button>
+      </div>
+    </div>
+    <div class="caption">Checkbox list inside a card. Foot-size field only appears when Fins is ticked.</div>
+  </div>
+
+  <!-- 6 · Confirmation -->
+  <div class="cell">
+    <div class="label">6 · Confirmation</div>
+    <div class="phone">
+      <div class="topbar">
+        <div class="title">You're in</div>
+      </div>
+      <div class="scroll" style="gap: 14px;">
+        <div class="conf-check"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="conf-title">See you at the pool!</div>
+        <div class="conf-sub">We've saved your spot. Full details are in your email.</div>
+
+        <div class="summary-card">
+          <div class="sum-row"><span class="sum-label">Session</span><span class="sum-val">Sun 26 Apr · 5:00 PM</span></div>
+          <div class="sum-row"><span class="sum-label">Venue</span><span class="sum-val">CCAB · Evans Rd</span></div>
+          <div class="sum-row"><span class="sum-label">Fee</span><span class="sum-val" style="color: var(--success);">Free · First timer</span></div>
+          <div class="sum-row"><span class="sum-label">We'll bring</span><span class="sum-val">Mask, Snorkel, Fins (EU 42)</span></div>
+        </div>
+
+        <div class="wa-row">
+          <div class="wa-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M20 4a10 10 0 00-16 13L2 22l5-2a10 10 0 0013-16zm-6 13c-2 0-4-.8-5.5-2.2l-.3-.3-3 .8.8-3-.3-.3A7 7 0 1119 12a7 7 0 01-5 5zm4-5c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.8 1-.3.1-.5 0a6 6 0 01-3-2.6c-.2-.3 0-.5.1-.6l.4-.4.3-.4.1-.3-.1-.3-.8-1.9c-.2-.4-.4-.4-.5-.4h-.5c-.2 0-.4 0-.6.3a2.3 2.3 0 00-.7 1.8c0 1 .8 2.1 1 2.3s1.9 3 4.7 4.2a5.5 5.5 0 002.3.5c.5 0 1.5-.3 1.8-.9s.3-1 .2-1.2c0-.2-.2-.2-.4-.3z"/></svg>
+          </div>
+          <div class="wa-body">
+            <div class="wa-title">Join the newbie WhatsApp group</div>
+            <div class="wa-sub">Ask questions and get session updates</div>
+          </div>
+          <div class="wa-chev">›</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">WhatsApp CTA restyled as a list-row (same pattern as More.html cards) — green only on the icon chip, not the whole button. No "add to calendar".</div>
+  </div>
+
+  <!-- 4b · Pick a session — empty state -->
+  <div class="cell">
+    <div class="label">4b · Pick a session — no upcoming dates</div>
+    <div class="phone">
+      <div class="topbar">
+        <svg class="back" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="title">Pick a session</div>
+      </div>
+      <div class="scroll">
+        <div class="h-block">
+          <div class="h-title" style="font-size: 19px;">Upcoming newbie sessions</div>
+          <div class="h-sub">First come, first served · 10 slots per session</div>
+        </div>
+        <div class="dates">
+          <div class="empty-dates">No sessions scheduled right now.</div>
+          <div class="no-date-row selected">
+            <div class="body"><div class="t">Contact me to arrange a date</div><div class="s">We'll contact you to arrange a date.</div></div>
+          </div>
+        </div>
+        <button class="btn-primary">Continue</button>
+      </div>
+    </div>
+    <div class="caption">Same screen as #4, with no dates — the "contact me" row becomes the only pre-selected option.</div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.check-row, .picker-item, .date-row, .no-date-row').forEach(el => {
+    el.addEventListener('click', () => el.classList.toggle('on'));
+  });
+</script>
+
+</body>
+</html>

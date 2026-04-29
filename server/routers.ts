@@ -926,7 +926,6 @@ export const appRouter = router({
       await db.upsertUser({
         openId: user.openId,
         memberStatus: "Member",
-        membershipStartDate: todayStr,
       });
 
       const updated = await db.getUserByOpenId(user.openId);
@@ -1229,6 +1228,61 @@ export const appRouter = router({
         const sessDb = await db.getDb();
         if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         await sessDb.delete(sheetSignups).where(eq(sheetSignups.id, input.id));
+        return { success: true };
+      }),
+
+    deleteMembershipSignup: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.clubRole !== "Admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        const mDb = await db.getDb();
+        if (!mDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Fetch the signup row to get activity type and user email
+        const [signup] = await mDb.select().from(sheetSignups).where(eq(sheetSignups.id, input.id)).limit(1);
+        if (!signup) throw new TRPCError({ code: "NOT_FOUND", message: "Sign-up record not found" });
+
+        const activity = signup.activity ?? "";
+        const email = (signup.email ?? "").toLowerCase().trim();
+
+        // Delete the signup row first
+        await mDb.delete(sheetSignups).where(eq(sheetSignups.id, input.id));
+
+        if (activity === "Trial Membership") {
+          // Reset user back to Non-Member, clearing all trial dates
+          await mDb.update(users)
+            .set({ memberStatus: "Non-Member", trialStartDate: "", trialEndDate: "" })
+            .where(eq(users.email, email));
+          await mDb.update(sheetUsers)
+            .set({ memberStatus: "Non-Member", trialStartDate: "", trialEndDate: "" })
+            .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
+
+        } else if (activity === "Membership Fee") {
+          // Determine revert status: Trial if trial still valid, else Non-Member
+          const [dbUser] = await mDb.select({ trialEndDate: users.trialEndDate }).from(users)
+            .where(eq(users.email, email)).limit(1);
+          const trialEndRaw = dbUser?.trialEndDate ?? "";
+          let revertStatus = "Non-Member";
+          if (trialEndRaw && trialEndRaw !== "" && trialEndRaw !== "NA") {
+            // Parse DD/MM/YYYY or YYYY-MM-DD
+            let trialEnd: Date | null = null;
+            const ddmm = trialEndRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (ddmm) trialEnd = new Date(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1]));
+            else { const iso = new Date(trialEndRaw); if (!isNaN(iso.getTime())) trialEnd = iso; }
+            if (trialEnd && trialEnd >= new Date(new Date().toDateString())) {
+              revertStatus = "Trial";
+            }
+          }
+          await mDb.update(users)
+            .set({ memberStatus: revertStatus })
+            .where(eq(users.email, email));
+          await mDb.update(sheetUsers)
+            .set({ memberStatus: revertStatus, membershipStartDate: "" })
+            .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
+        }
+
         return { success: true };
       }),
 

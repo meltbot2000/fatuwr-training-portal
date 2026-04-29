@@ -99,9 +99,10 @@ interface EditUserSheetProps {
   onOpenChange: (v: boolean) => void;
   user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; membershipStartDate: string; trialStartDate: string; trialEndDate: string; dob: string };
   onDone: () => void;
+  isAdmin?: boolean;
 }
 
-function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps) {
+function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: EditUserSheetProps) {
   const utils = trpc.useUtils();
   const [name, setName] = useState(user.name || "");
   const [paymentId, setPaymentId] = useState(user.paymentId || "");
@@ -139,6 +140,24 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
       await activityQuery.refetch();
     },
     onError: (err) => toast.error(err.message || "Failed to update sign-up."),
+  });
+
+  const deleteSignupMut = trpc.admin.deleteSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Sign-up deleted.");
+      setEditingSignupId(null);
+      await activityQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete sign-up."),
+  });
+
+  const deleteMembershipMut = trpc.admin.deleteMembershipSignup.useMutation({
+    onSuccess: async () => {
+      toast.success("Record deleted.");
+      setEditingSignupId(null);
+      await activityQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete record."),
   });
 
   const mutation = trpc.admin.updateUserStatus.useMutation({
@@ -359,10 +378,17 @@ function EditUserSheet({ open, onOpenChange, user, onDone }: EditUserSheetProps)
                       <AdminEditAttendee
                         attendee={attendeeRow}
                         onSave={(updates) => editSignupMut.mutate({ id: su.id, ...updates })}
-                        onDelete={() => { /* deletion not shown here — use session attendees */ }}
+                        onDelete={() => {
+                          const act = su.activity ?? "";
+                          if (act === "Trial Membership" || act === "Membership Fee") {
+                            deleteMembershipMut.mutate({ id: su.id });
+                          } else {
+                            deleteSignupMut.mutate({ id: su.id });
+                          }
+                        }}
                         isSaving={editSignupMut.isPending}
-                        isDeleting={false}
-                        hideDelete
+                        isDeleting={deleteSignupMut.isPending || deleteMembershipMut.isPending}
+                        hideDelete={!isAdmin}
                       />
                     </div>
                   );
@@ -1925,6 +1951,7 @@ export default function Admin() {
           onOpenChange={(v) => { if (!v) setEditingUser(null); }}
           user={editingUser}
           onDone={() => setEditingUser(null)}
+          isAdmin={isAdmin}
         />
       )}
 
