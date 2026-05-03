@@ -1620,15 +1620,23 @@ export const appRouter = router({
         if (fields.date !== undefined) updates.date = fields.date;
         if (fields.email !== undefined) updates.email = fields.email;
         if (Object.keys(updates).length === 0) return { success: true };
-        await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
-        // Also update the Sheet so the DB sync can't overwrite the edit
+        // Write to Sheet first (source of truth) — must complete before DB update
+        // to prevent the 1-min GAS trigger from syncing stale Sheet values over
+        // the edit. GAS also calls notifyRailway("payments") at the end, which
+        // re-syncs the DB from the (now-updated) Sheet.
         if (rowIndex && rowIndex >= 2) {
-          appsScript.editPayment({
-            rowIndex,
-            paymentId: fields.paymentId,
-            email: fields.email,
-          }).catch((e: any) => console.error("[GAS] editPayment failed:", e.message));
+          try {
+            await appsScript.editPayment({
+              rowIndex,
+              paymentId: fields.paymentId,
+              email: fields.email,
+            });
+          } catch (e: any) {
+            console.error("[GAS] editPayment failed:", e.message);
+            // Fall through — still update DB directly so it reflects the edit
+          }
         }
+        await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
         return { success: true };
       }),
 
