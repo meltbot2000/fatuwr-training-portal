@@ -115,7 +115,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false, read
   const [trialStartDate, setTrialStartDate] = useState(user.trialStartDate || "");
   const [trialEndDate, setTrialEndDate] = useState(user.trialEndDate || "");
   const [membershipFee, setMembershipFee] = useState("");
-  const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{ id: number; rowIndex: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [editingSignupId, setEditingSignupId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -338,7 +338,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false, read
                   {payments.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => readOnly ? undefined : setEditingPayment({ id: p.id, paymentId: p.paymentId ?? "", reference: p.reference ?? "", amount: p.amount, date: p.date ?? "", email: p.email ?? "" })}
+                      onClick={() => readOnly ? undefined : setEditingPayment({ id: p.id, rowIndex: p.rowIndex ?? 0, paymentId: p.paymentId ?? "", reference: p.reference ?? "", amount: p.amount, date: p.date ?? "", email: p.email ?? "" })}
                       className={`w-full text-left rounded-lg border bg-card px-3 py-2.5 ${readOnly ? "cursor-default" : "hover:bg-muted/50 transition-colors cursor-pointer"}`}
                     >
                       <div className="flex items-center justify-between">
@@ -461,7 +461,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false, read
 interface EditPaymentSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  payment: { id: number; paymentId: string; reference: string; amount: number; date: string; email: string };
+  payment: { id: number; rowIndex: number; paymentId: string; reference: string; amount: number; date: string; email: string };
   onDone: () => void;
 }
 
@@ -575,6 +575,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
             <Button
               onClick={() => saveMutation.mutate({
                 id: payment.id,
+                rowIndex: payment.rowIndex,
                 paymentId: paymentId.trim(),
                 reference: reference.trim(),
                 email: email.trim(),
@@ -1235,7 +1236,7 @@ export default function Admin() {
   const [editingSession, setEditingSession] = useState<SessionForEdit | null>(null);
   const [viewingSessionRowId, setViewingSessionRowId] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
-  const [editingPayment, setEditingPayment] = useState<{ id: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{ id: number; rowIndex: number; paymentId: string; reference: string; amount: number; date: string; email: string } | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [addSessionOpen, setAddSessionOpen] = useState(false);
 
@@ -1613,7 +1614,7 @@ export default function Admin() {
                     return (
                       <button
                         key={i}
-                        onClick={() => canEditPayment ? setEditingPayment({ id: (p as any).id, paymentId: p.paymentId, reference: (p as any).reference || "", amount: p.amount, date: p.date, email: p.email }) : undefined}
+                        onClick={() => canEditPayment ? setEditingPayment({ id: (p as any).id, rowIndex: (p as any).rowIndex ?? 0, paymentId: p.paymentId, reference: (p as any).reference || "", amount: p.amount, date: p.date, email: p.email }) : undefined}
                         className={`w-full text-left px-4 py-2.5 flex items-start justify-between gap-3 ${canEditPayment ? "hover:bg-muted/50 transition-colors" : ""}`}
                       >
                         <div className="min-w-0">

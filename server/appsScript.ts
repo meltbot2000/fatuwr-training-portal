@@ -118,3 +118,11 @@ export function addSession(payload: {
 export function closeSession(payload: { rowId: string }) {
   return gasPost("closeSession", payload);
 }
+
+export function editPayment(payload: {
+  rowIndex: number;
+  paymentId?: string;
+  email?: string;
+}) {
+  return gasPost("editPayment", payload);
+}

@@ -1599,6 +1599,7 @@ export const appRouter = router({
     editPayment: protectedProcedure
       .input(z.object({
         id: z.number(),
+        rowIndex: z.number().optional(),
         paymentId: z.string().optional(),
         reference: z.string().optional(),
         amount: z.number().optional(),
@@ -1611,7 +1612,7 @@ export const appRouter = router({
         }
         const payDb = await db.getDb();
         if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        const { id, ...fields } = input;
+        const { id, rowIndex, ...fields } = input;
         const updates: Record<string, unknown> = {};
         if (fields.paymentId !== undefined) updates.paymentId = fields.paymentId;
         if (fields.reference !== undefined) updates.reference = fields.reference;
@@ -1620,6 +1621,14 @@ export const appRouter = router({
         if (fields.email !== undefined) updates.email = fields.email;
         if (Object.keys(updates).length === 0) return { success: true };
         await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
+        // Also update the Sheet so the DB sync can't overwrite the edit
+        if (rowIndex && rowIndex >= 2) {
+          appsScript.editPayment({
+            rowIndex,
+            paymentId: fields.paymentId,
+            email: fields.email,
+          }).catch((e: any) => console.error("[GAS] editPayment failed:", e.message));
+        }
         return { success: true };
       }),
 

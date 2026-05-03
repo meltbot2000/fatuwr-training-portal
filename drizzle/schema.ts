@@ -72,6 +72,7 @@ export type SheetSession = typeof sheetSessions.$inferSelect;
 
 export const sheetPayments = mysqlTable("sheet_payments", {
   id: int("id").primaryKey().autoincrement(),
+  rowIndex: int("rowIndex").default(0),
   paymentId: varchar("paymentId", { length: 128 }).default(""),
   reference: text("reference"),
   amount: double("amount").notNull(),

@@ -83,6 +83,8 @@ export interface UserRow {
 export interface PaymentRow {
   /** DB row id — present when served from DB, absent when served from Sheets fallback */
   id?: number;
+  /** 1-based sheet row number — used to target GAS editPayment; 0 when row came from Sheets fallback */
+  rowIndex?: number;
   /** The matched reference/name from the sheet (col F — "PaymentID Match"), or "" if unmatched */
   paymentId: string;
   /** Raw PayNow reference text the sender typed (col E — "OTHR Message") */
@@ -353,7 +355,7 @@ export async function fetchSheetsPayments(): Promise<PaymentRow[]> {
     const reference = (row[4] || "").trim();
     const rawEmail = (row[6] || "").trim();
     const email = (!rawEmail || rawEmail === "#N/A" || rawEmail === "undefined") ? "" : rawEmail.toLowerCase();
-    payments.push({ paymentId, reference, amount, date: row[2] || "", email });
+    payments.push({ paymentId, reference, amount, date: row[2] || "", email, rowIndex: i + 1 });
   }
   return payments;
 }
@@ -416,6 +418,7 @@ function dbSessionToSessionRow(r: any): SessionRow {
 function dbPaymentToPaymentRow(r: any): PaymentRow {
   return {
     id: r.id,
+    rowIndex: r.rowIndex ?? 0,
     paymentId: r.paymentId ?? "",
     reference: r.reference ?? "",
     amount: r.amount ?? 0,

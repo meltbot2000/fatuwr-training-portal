@@ -1,0 +1,1 @@
+ALTER TABLE `sheet_payments` ADD `rowIndex` int DEFAULT 0;
