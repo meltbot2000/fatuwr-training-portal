@@ -100,9 +100,11 @@ interface EditUserSheetProps {
   user: { name: string; email: string; paymentId: string; memberStatus: string; clubRole: string; membershipStartDate: string; trialStartDate: string; trialEndDate: string; dob: string };
   onDone: () => void;
   isAdmin?: boolean;
+  /** When true: all tabs are visible but all edit/delete actions are hidden */
+  readOnly?: boolean;
 }
 
-function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: EditUserSheetProps) {
+function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false, readOnly = false }: EditUserSheetProps) {
   const utils = trpc.useUtils();
   const [name, setName] = useState(user.name || "");
   const [paymentId, setPaymentId] = useState(user.paymentId || "");
@@ -212,25 +214,28 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
 
             {/* ── Profile tab ─────────────────────────────── */}
             <TabsContent value="profile" className="space-y-4">
+              {readOnly && (
+                <p className="text-xs text-muted-foreground italic">Read-only view — contact an Admin to make changes.</p>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Name</Label>
-                <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="h-10" />
+                <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="h-10" disabled={readOnly} />
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Payment ID</Label>
-                <Input placeholder="e.g. jtan" value={paymentId} onChange={e => setPaymentId(e.target.value)} className="h-10 font-mono" />
+                <Input placeholder="e.g. jtan" value={paymentId} onChange={e => setPaymentId(e.target.value)} className="h-10 font-mono" disabled={readOnly} />
                 <p className="text-xs text-muted-foreground">Used as PayNow reference for payment matching.</p>
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Date of Birth <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                <Input placeholder="e.g. 01/01/1990" value={dob} onChange={e => setDob(e.target.value)} className="h-10" />
+                <Input placeholder="e.g. 01/01/1990" value={dob} onChange={e => setDob(e.target.value)} className="h-10" disabled={readOnly} />
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Membership Status</Label>
-                <Select value={memberStatus} onValueChange={setMemberStatus}>
+                <Select value={memberStatus} onValueChange={setMemberStatus} disabled={readOnly}>
                   <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["Non-Member", "Trial", "Member", "Student"].map(s => (
@@ -240,7 +245,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
                 </Select>
               </div>
 
-              {isSettingMember && (
+              {isSettingMember && !readOnly && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">
                     Membership Fee Paid <span className="text-muted-foreground/60">(optional)</span>
@@ -252,23 +257,23 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Annual Membership Start <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                <Input placeholder="e.g. 01/04/2026" value={membershipStartDate} onChange={e => setMembershipStartDate(e.target.value)} className="h-10" />
+                <Input placeholder="e.g. 01/04/2026" value={membershipStartDate} onChange={e => setMembershipStartDate(e.target.value)} className="h-10" disabled={readOnly} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Trial Start <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                  <Input placeholder="e.g. 01/04/2026" value={trialStartDate} onChange={e => setTrialStartDate(e.target.value)} className="h-10" />
+                  <Input placeholder="e.g. 01/04/2026" value={trialStartDate} onChange={e => setTrialStartDate(e.target.value)} className="h-10" disabled={readOnly} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Trial End <span className="text-muted-foreground/60">(DD/MM/YYYY)</span></Label>
-                  <Input placeholder="e.g. 01/07/2026" value={trialEndDate} onChange={e => setTrialEndDate(e.target.value)} className="h-10" />
+                  <Input placeholder="e.g. 01/07/2026" value={trialEndDate} onChange={e => setTrialEndDate(e.target.value)} className="h-10" disabled={readOnly} />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Club Role</Label>
-                <Select value={clubRole} onValueChange={setClubRole}>
+                <Select value={clubRole} onValueChange={setClubRole} disabled={readOnly}>
                   <SelectTrigger className="h-10"><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
@@ -278,28 +283,30 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
                 </Select>
               </div>
 
-              <div className="pt-2 space-y-2">
-                <Button
-                  onClick={() => mutation.mutate({
-                    email: user.email,
-                    name: name.trim() || undefined,
-                    paymentId: paymentId.trim() || undefined,
-                    dob: dob.trim() || undefined,
-                    memberStatus,
-                    clubRole: clubRole === "none" ? "" : clubRole,
-                    membershipStartDate: membershipStartDate || undefined,
-                    trialStartDate: trialStartDate || undefined,
-                    trialEndDate: trialEndDate || undefined,
-                    ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
-                  })}
-                  disabled={mutation.isPending}
-                  className="w-full bg-navy text-white hover:bg-navy/90"
-                >
-                  {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save changes
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Cancel</Button>
-              </div>
+              {!readOnly && (
+                <div className="pt-2 space-y-2">
+                  <Button
+                    onClick={() => mutation.mutate({
+                      email: user.email,
+                      name: name.trim() || undefined,
+                      paymentId: paymentId.trim() || undefined,
+                      dob: dob.trim() || undefined,
+                      memberStatus,
+                      clubRole: clubRole === "none" ? "" : clubRole,
+                      membershipStartDate: membershipStartDate || undefined,
+                      trialStartDate: trialStartDate || undefined,
+                      trialEndDate: trialEndDate || undefined,
+                      ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
+                    })}
+                    disabled={mutation.isPending}
+                    className="w-full bg-navy text-white hover:bg-navy/90"
+                  >
+                    {mutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Save changes
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Cancel</Button>
+                </div>
+              )}
             </TabsContent>
 
             {/* ── Payments tab ─────────────────────────────── */}
@@ -331,8 +338,8 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
                   {payments.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setEditingPayment({ id: p.id, paymentId: p.paymentId ?? "", reference: p.reference ?? "", amount: p.amount, date: p.date ?? "", email: p.email ?? "" })}
-                      className="w-full text-left rounded-lg border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                      onClick={() => readOnly ? undefined : setEditingPayment({ id: p.id, paymentId: p.paymentId ?? "", reference: p.reference ?? "", amount: p.amount, date: p.date ?? "", email: p.email ?? "" })}
+                      className={`w-full text-left rounded-lg border bg-card px-3 py-2.5 ${readOnly ? "cursor-default" : "hover:bg-muted/50 transition-colors cursor-pointer"}`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-green-400">${(p.amount ?? 0).toFixed(2)}</span>
@@ -340,7 +347,7 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
                         <span className="text-xs text-white/60 font-mono">{p.paymentId || p.reference || "—"}</span>
-                        <Pencil className="w-3 h-3 text-muted-foreground/50" />
+                        {!readOnly && <Pencil className="w-3 h-3 text-muted-foreground/50" />}
                       </div>
                     </button>
                   ))}
@@ -409,8 +416,8 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false }: Ed
                       {signups.map((s, idx) => (
                         <button
                           key={s.id ?? idx}
-                          onClick={() => s.id != null ? setEditingSignupId(s.id) : undefined}
-                          className="w-full text-left rounded-lg border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                          onClick={() => (!readOnly && s.id != null) ? setEditingSignupId(s.id) : undefined}
+                          className={`w-full text-left rounded-lg border bg-card px-3 py-2.5 ${readOnly || s.id == null ? "cursor-default" : "hover:bg-muted/50 transition-colors cursor-pointer"}`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-white">{s.dateOfTraining || "—"}</span>
@@ -1483,12 +1490,12 @@ export default function Admin() {
             {filteredUsers.map((u, idx) => {
               const displayEmail = u.email || u.userEmail || "";
               // Only allow editing if we have a valid email — the server requires one
-              const canEdit = isAdmin && !!displayEmail;
+              const canView = isAdminOrHelper && !!displayEmail;
               return (
                 <button
                   key={displayEmail || `user-${idx}`}
-                  onClick={() => canEdit ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", membershipStartDate: (u as any).membershipStartDate || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "", dob: (u as any).dob || "" }) : undefined}
-                  className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canEdit ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
+                  onClick={() => canView ? setEditingUser({ name: u.name || "", email: displayEmail, paymentId: u.paymentId || "", memberStatus: u.memberStatus || "Non-Member", clubRole: u.clubRole || "", membershipStartDate: (u as any).membershipStartDate || "", trialStartDate: (u as any).trialStartDate || "", trialEndDate: (u as any).trialEndDate || "", dob: (u as any).dob || "" }) : undefined}
+                  className={`w-full text-left rounded-lg border bg-card px-4 py-3 space-y-1 transition-colors ${canView ? "hover:bg-muted/50 active:bg-muted cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm text-white truncate">{u.name || "(no name)"}</span>
@@ -1499,7 +1506,7 @@ export default function Admin() {
                       <Badge className={`text-xs ${STATUS_COLORS[u.memberStatus] || STATUS_COLORS["Non-Member"]} hover:opacity-100`}>
                         {u.memberStatus || "Non-Member"}
                       </Badge>
-                      {!canEdit && <Lock className="w-3 h-3 text-muted-foreground" />}
+                      {!canView && <Lock className="w-3 h-3 text-muted-foreground" />}
                       {isAdmin && displayEmail && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -1952,6 +1959,7 @@ export default function Admin() {
           user={editingUser}
           onDone={() => setEditingUser(null)}
           isAdmin={isAdmin}
+          readOnly={!isAdmin}
         />
       )}
 
