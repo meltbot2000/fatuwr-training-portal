@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-04-29 (comprehensive review)*
+*Last updated: 2026-05-04 (Helper nav fix, GAS health monitor, payment edit persistence)*
 
 ---
 
@@ -57,7 +57,7 @@ Cloudflare R2
 | Database | Railway MySQL | `DATABASE_URL` env var |
 | Image storage | Cloudflare R2 | S3-compatible; free tier (10 GB, 1M requests, zero egress) |
 | Email (OTP) | Resend | `RESEND_API_KEY`, `RESEND_API_FROM` |
-| Payment emails | Google Apps Script | Gmail-based; 1-min cron trigger |
+| Payment emails | Google Apps Script | Gmail-based; 1-min cron trigger. Health monitor on server alerts if GAS silent > 90 min. |
 | Backup | SMTP/Resend | Daily CSV email to fatuwrevents@gmail.com at 23:59 SGT |
 
 ### Required environment variables
@@ -124,11 +124,35 @@ User taps Sign Up → /signup/:rowId (SignUpForm.tsx)
 ```
 Maybank email → Gmail label "Maybank2"
   → GAS 1-min cron → processMaybankEmails()
+    → dedup layer 1: Gmail label (Maybank_Done2 = already processed)
+    → dedup layer 2: Script Properties (processedMaybankIds — rolling 200-entry window)
   → parse credit amount + reference
   → write row to Sheets payments tab
-  → POST /api/sync?tab=payments&token=SECRET
+  → POST /api/sync?tab=payments&token=SECRET  (notifyRailway)
+  → server: recordGasWebhook() resets health timer
   → server deletes+reinserts sheet_payments from Sheets
 ```
+
+**Admin payment edit flow:**
+```
+Admin edits payment (paymentId or email) → admin.editPayment tRPC mutation
+  → AWAIT appsScript.editPayment({ rowIndex, paymentId, email })
+    → GAS editPaymentRow: updates col F (PaymentID Match) / col G (Email) by 1-based row number
+    → GAS calls notifyRailway("payments") → server re-syncs from (now-updated) Sheet
+  → server updates sheet_payments DB row
+```
+rowIndex is stored in `sheet_payments.rowIndex` during sync (1-based Sheet row number). The server MUST await the GAS call before updating DB — otherwise the next startup or 6-hour sync would re-read the stale Sheet and overwrite the DB edit.
+
+**GAS health monitor:**
+- `recordGasWebhook()` is called in POST /api/sync after token validation
+- Hourly background check: if GAS has not called /api/sync in > 90 min, send alert email via SendGrid/Resend to tanmelanie@gmail.com
+- Alert fires at most once per hour (cooldown); silent on fresh deploys (only alerts after first ever GAS contact)
+- Covers: OAuth revocation, trigger deletion, unhandled GAS errors
+
+**Dedup layers for email processing:**
+- **Primary:** Gmail label — processed threads moved to `Maybank_Done2`, removed from `Maybank`
+- **Secondary:** Script Properties (`processedMaybankIds`) — rolling window of 200 message IDs
+- **CRITICAL:** Do NOT manually re-label processed emails back to `Maybank`. Both dedup layers are defeated simultaneously if you do — Script Properties can be wiped during script edits, leaving no fallback.
 
 ### 4.4 Image upload (R2)
 
@@ -240,7 +264,7 @@ PK: `rowIndex` (sheet row number). Contains all session metadata: date, pool, fe
 PK: auto-increment `id`. Linked to sessions by `pool + dateOfTraining` string matching (no FK — tech debt). `dateOfTraining` is always ISO for app-written rows; legacy seeded rows may be "19 April 2026". Always use `datesMatch()` for comparisons.
 
 ### `sheet_payments`
-PK: auto-increment `id`. GAS-owned. Full DELETE+INSERT on every sync. `paymentId` is primary attribution key; email is fallback.
+PK: auto-increment `id`. GAS-owned. Full DELETE+INSERT on every sync. `paymentId` is primary attribution key; email is fallback. `rowIndex` stores the 1-based Sheet row number for each payment — used by `editPaymentRow` in GAS to write back admin edits to the correct Sheet row.
 
 ### `sheet_users`
 PK: auto-increment `id`. Sheets cache. **Full DELETE+INSERT on forceSync — never store app-generated data here.** `image` column stores legacy Glide URL only.
@@ -268,8 +292,8 @@ Fully DB-primary. Never touch Sheets. The `videos` table includes a `notes` text
 | Daily backup | `server/backup.ts` |
 | Server entry + /api/sync endpoint | `server/_core/index.ts` |
 | Environment config | `server/_core/env.ts` |
-| OTP email send | `server/email.ts` |
-| GAS script (live) | `google-apps-script/Code_v10_2026-04-18.gs` |
+| OTP + alert email send | `server/email.ts` — `sendOtpEmail()` for OTP; `sendAlertEmail(subject, text)` for server-side alerts |
+| GAS script (live) | `google-apps-script/Code_v12_2026-05-03.gs` |
 
 ### Client — utilities & components
 
@@ -314,10 +338,12 @@ Four tabs. Access gated by `clubRole`:
 
 | Tab | Visible to | Contents |
 |---|---|---|
-| **Members** | Admin + Helper | Searchable user list. Click user → `EditUserSheet` (full-screen, 3 sub-tabs: Profile / Payments / Sign-ups). Profile sub-tab: edit name, paymentId, dob, memberStatus, clubRole, trial dates, membership start date; add membership fee record. Payments sub-tab: user's payment history. Sign-ups sub-tab: all sign-ups incl. membership records; Admin can edit or delete each row. |
-| **Payments** | Admin + Helper | All payments list with search. Admin: add payment (`+` button), edit any field incl. reference, delete with two-tap confirm. |
+| **Members** | Admin + Helper | Searchable user list. Click user → `EditUserSheet` (full-screen, 3 sub-tabs: Profile / Payments / Sign-ups). **Admin:** full edit (name, paymentId, dob, memberStatus, clubRole, trial dates, membership start date; add membership fee; edit/delete sign-ups). **Helper:** read-only — all 3 tabs visible, no save/edit/delete actions. |
+| **Payments** | Admin + Helper | All payments list with search. Admin: add payment (`+` button), edit any field incl. reference, delete with two-tap confirm. Helper: read-only view. |
 | **Sessions** | Admin only | All sessions list. Add session (`AddSessionSheet`). Per session: view attendees, close session, process rain-off, edit session details, add sign-up on behalf of user. |
 | **Data** | Admin only | Per-session + overall PnL report (past sessions only). Spreadsheet sync panel (`forceSync` per tab or all). Migrate Glide photos to R2. |
+
+**Bottom nav:** The Admin tab is shown to both `"Admin"` and `"Helper"` clubRoles (`BottomNav.tsx`). Sessions and Data tabs inside `/admin` are conditionally hidden for Helpers.
 
 ---
 
@@ -339,7 +365,7 @@ Four tabs. Access gated by `clubRole`:
 | Role | Access |
 |---|---|
 | (none) | No admin access |
-| Helper | Can **read** Admin panel (Members tab, Payments tab); can **write** announcements, merch, videos; cannot access Sessions or Data tabs; cannot edit users or payments |
+| Helper | Admin tab visible in bottom nav. Can **read** Members + Payments tabs (EditUserSheet opens in read-only mode — all 3 sub-tabs visible, no save/edit/delete). Can **write** announcements, merch, videos. Cannot access Sessions or Data tabs. |
 | Admin | Full admin access; bypasses debt blocking and duplicate sign-up check; can edit users, payments, sessions, run data imports |
 
 ### Unauthenticated users
@@ -424,6 +450,15 @@ Do not include your own LIMIT clause when querying in Railway console — syntax
 **Root cause:** `announcements.update` and `merch.update` called `replaceOldDriveFile(oldUrl)` unconditionally whenever `imageUrl`/`photo` was present in the payload. The client echoes the existing URL back when editing text fields without changing the image — so the R2 object was deleted, leaving a broken image in the DB.
 **Fix:** Gate the delete+re-upload on `isDriveDataUrl(input.imageUrl)`. If the value is already a hosted URL (not a `data:` base64 string), store it as-is and do not touch R2.
 **Rule:** Only call `replaceOldDriveFile` when the incoming value is a `data:` base64 string. This applies to every mutation that accepts an image field.
+
+### Bug 11: Payment data-patch reverted after deployment (fixed 2026-05-04)
+**Root cause:** Admin edits a payment via the admin UI → server calls `appsScript.editPayment()` → previously this failed silently because `GOOGLE_APPS_SCRIPT_URL` pointed at a stale v1 GAS deployment that returned "Unknown action" for all actions. The Sheet was never updated. The DB row was updated. On the next Railway deploy, `syncTab("payments")` fires 5 seconds after startup and does a full DELETE+INSERT from the Sheet — overwriting the DB edit with the original Sheet values.
+**Fix:** (1) Updated `GOOGLE_APPS_SCRIPT_URL` in Railway env to the correct v7+ Web App URL. (2) Code_v12 GAS adds `editPaymentRow()` which updates col F/G by 1-based row number. (3) Server `await`s the GAS call before updating the DB, so the Sheet is always updated first. Subsequent syncs re-read the already-corrected Sheet and do not revert the edit.
+**Rule:** Every deployment triggers a startup sync for payments. Any DB edit that is not also written to the Sheet will be reverted within seconds of the next deploy.
+
+### Bug 12: Helper role could not see Admin tab in bottom nav (fixed 2026-05-04)
+**Root cause:** `BottomNav.tsx` had `const isAdmin = clubRole === "Admin"`. Helpers have `clubRole === "Helper"` — the condition never matched, so the Admin tab was hidden.
+**Fix:** Changed to `const isAdminOrHelper = clubRole === "Admin" || clubRole === "Helper"`.
 
 ### Bug 10: membershipStartDate silently dropped on upsertUser (fixed 2026-04-29)
 **Root cause:** `membership.signupMember` passed `membershipStartDate` to `db.upsertUser()`, but the `users` table has no such column. `InsertUser` (Drizzle's inferred type) does not include it — Drizzle silently ignores unknown fields, so the value was never persisted to `users`.
