@@ -1620,22 +1620,35 @@ export const appRouter = router({
         if (fields.date !== undefined) updates.date = fields.date;
         if (fields.email !== undefined) updates.email = fields.email;
         if (Object.keys(updates).length === 0) return { success: true };
-        // Write to Sheet first (source of truth) — must complete before DB update
-        // to prevent the 1-min GAS trigger from syncing stale Sheet values over
-        // the edit. GAS also calls notifyRailway("payments") at the end, which
-        // re-syncs the DB from the (now-updated) Sheet.
-        if (rowIndex && rowIndex >= 2) {
-          try {
-            await appsScript.editPayment({
-              rowIndex,
-              paymentId: fields.paymentId,
-              email: fields.email,
-            });
-          } catch (e: any) {
-            console.error("[GAS] editPayment failed:", e.message);
-            // Fall through — still update DB directly so it reflects the edit
-          }
+        // Sheet is the source of truth for payments — write there FIRST.
+        // If GAS fails, surface the error to the admin (do NOT update the DB).
+        // A DB-only update would be silently reverted by the next 6-hour sync or
+        // deployment startup sync, which does a full DELETE+INSERT from the Sheet.
+        if (!rowIndex || rowIndex < 2) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Cannot save: this payment is missing its Sheet row reference. Re-import payments from Sheets (Admin → Data → Import from Sheets) then try again.",
+          });
         }
+        try {
+          await appsScript.editPayment({
+            rowIndex,
+            paymentId: fields.paymentId,
+            email:     fields.email,
+            reference: fields.reference,
+            amount:    fields.amount,
+            date:      fields.date,
+          });
+        } catch (e: any) {
+          console.error("[GAS] editPayment failed:", e.message);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Failed to save to Sheet: ${e.message}. Please try again.`,
+          });
+        }
+        // GAS succeeded — Sheet has the new values. Now mirror to DB.
+        // GAS also calls notifyRailway("payments"), which will re-sync the DB
+        // from the updated Sheet shortly, but we update immediately for instant UI feedback.
         await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
         return { success: true };
       }),

@@ -123,6 +123,9 @@ export function editPayment(payload: {
   rowIndex: number;
   paymentId?: string;
   email?: string;
+  reference?: string;
+  amount?: number;
+  date?: string;
 }) {
   return gasPost("editPayment", payload);
 }
