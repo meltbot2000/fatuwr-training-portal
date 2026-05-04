@@ -57,14 +57,15 @@ const INACTIVE = "#888888";
 export default function BottomNav() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
-  const isAdmin = (user as any)?.clubRole === "Admin";
+  const clubRole = (user as any)?.clubRole;
+  const isAdminOrHelper = clubRole === "Admin" || clubRole === "Helper";
 
   const tabs = [
     { label: "Trainings", Icon: IconTrainings, path: "/",              exact: true  },
     { label: "Info",      Icon: IconInfo,      path: "/home",          exact: true  },
     { label: "Payments",  Icon: IconPayments,  path: "/payments",      exact: false },
     { label: "More",      Icon: IconMore,      path: "/fun-resources", exact: false },
-    ...(isAdmin ? [{ label: "Admin", Icon: IconAdmin, path: "/admin", exact: false }] : []),
+    ...(isAdminOrHelper ? [{ label: "Admin", Icon: IconAdmin, path: "/admin", exact: false }] : []),
   ] as const;
 
   function isActive(tab: (typeof tabs)[number]) {

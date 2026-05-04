@@ -8,7 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
-import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus } from "../sync";
+import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus, recordGasWebhook } from "../sync";
 import { seedMerchIfEmpty } from "../merchSeed";
 import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
@@ -70,6 +70,9 @@ async function startServer() {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    // Record that GAS is alive (used by hourly health monitor)
+    recordGasWebhook();
+
     const validTabs = ["sessions", "payments", "signups", "users"] as const;
     if (tab !== "all" && !validTabs.includes(tab as any)) {
       res.status(400).json({ error: `Invalid tab. Use one of: ${validTabs.join(", ")} or "all"` });

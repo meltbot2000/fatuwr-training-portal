@@ -270,9 +270,60 @@ export function startBackgroundSync(): void {
   setTimeout(() => expireTrialMemberships().catch(console.error), 6_000);
   setInterval(() => expireTrialMemberships().catch(console.error), DAY_MS);
 
+  // GAS health monitor — hourly in-memory timestamp check; alerts if GAS silent > 90 min
+  setInterval(() => checkGasHealth().catch(console.error), 60 * 60 * 1_000);
+
   console.log("[Sync] Background sync started — DB-primary: sessions, signups, users | Sheets-managed: payments (6h fallback; GAS webhook is primary)");
 }
 
 export function getSyncStatus() {
   return syncStatus;
+}
+
+// ─── GAS health monitoring ────────────────────────────────────────────────────
+// Tracks the last time GAS called POST /api/sync (notifyRailway).
+// An hourly background check sends a Resend/SendGrid alert if GAS has been
+// silent for > 90 min. This is server-side only, so it fires even when GAS
+// OAuth is fully broken (which is exactly when we need to know).
+
+let lastGasWebhookAt = 0;
+let gasAlertSentAt   = 0;
+
+/** Call this each time GAS successfully hits POST /api/sync. */
+export function recordGasWebhook(): void {
+  lastGasWebhookAt = Date.now();
+  gasAlertSentAt   = 0; // reset so a future outage can alert again
+}
+
+const GAS_STALE_MS       = 90 * 60 * 1000; // alert if silent for 90 min
+const GAS_ALERT_COOLDOWN = 60 * 60 * 1000; // re-alert at most once per hour
+
+async function checkGasHealth(): Promise<void> {
+  // Never fired (fresh deploy / GAS not yet wired up) → skip silently
+  if (lastGasWebhookAt === 0) return;
+  // Still fresh → healthy
+  if (Date.now() - lastGasWebhookAt < GAS_STALE_MS) return;
+  // Cooldown — don't spam
+  if (gasAlertSentAt > 0 && Date.now() - gasAlertSentAt < GAS_ALERT_COOLDOWN) return;
+
+  gasAlertSentAt = Date.now();
+  const staleMin = Math.round((Date.now() - lastGasWebhookAt) / 60_000);
+  console.error(`[GAS Health] ⚠️ No GAS webhook for ${staleMin} min — sending alert`);
+  try {
+    const { sendAlertEmail } = await import("./email");
+    await sendAlertEmail(
+      "⚠️ FATUWR: GAS payment sync is stale",
+      `The GAS payment processor has not contacted the server for ${staleMin} minutes.\n\n` +
+      `Last contact: ${new Date(lastGasWebhookAt).toISOString()}\n\n` +
+      `Possible causes:\n` +
+      `  • GAS OAuth requires re-authorisation (a new scope was added to the script)\n` +
+      `  • Time-based trigger was deleted\n` +
+      `  • Unhandled error in processMaybankEmails\n\n` +
+      `Fix: open the Apps Script editor, run processMaybankEmails() manually,\n` +
+      `re-grant permissions when prompted, then verify the trigger is still active\n` +
+      `in the Triggers panel.`
+    );
+  } catch (err: any) {
+    console.error("[GAS Health] Failed to send alert:", err?.message ?? err);
+  }
 }
