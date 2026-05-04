@@ -3,11 +3,12 @@
  * Google Sheets, the DB, and ISO strings.
  *
  * Formats seen in practice:
- *   - ISO timestamp : "2025-10-16T15:28:30.179Z"
- *   - ISO date      : "2025-10-16"
- *   - DD/MM/YYYY    : "16/01/2026"   (app input fields)
- *   - M/D/YYYY      : "1/16/2026"    (Sheets default in some locales)
- *   - Human         : "15 May 2008"  (DOB from Sheets)
+ *   - ISO timestamp   : "2025-10-16T15:28:30.179Z"
+ *   - ISO date        : "2025-10-16"
+ *   - DD/MM/YYYY      : "16/01/2026"   (app input fields)
+ *   - M/D/YYYY        : "1/16/2026"    (Sheets US locale, date only)
+ *   - M/D/YYYY H:MM:SS: "5/4/2026 14:30:00"  (GAS formatDateTime — payment dates)
+ *   - Human           : "15 May 2008"  (DOB from Sheets)
  */
 
 /**
@@ -34,7 +35,17 @@ export function parseAnyDate(str: string): Date | null {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // M/D/YYYY or MM/DD/YYYY (Sheets US locale)
+  // M/D/YYYY HH:MM:SS — GAS formatDateTime output for payment dates.
+  // Must be checked before plain M/D/YYYY since the time suffix prevents the
+  // plain regex from matching. Time component is discarded (date-only display).
+  const mdyTime = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+\d{1,2}:\d{2}:\d{2}$/);
+  if (mdyTime) {
+    const [, m, d, y] = mdyTime.map(Number);
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // M/D/YYYY or MM/DD/YYYY (Sheets US locale, date only)
   const mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mdy) {
     const [, m, d, y] = mdy.map(Number);

@@ -16,7 +16,7 @@ import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRi
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
-import { formatDisplayDate } from "@/lib/dateUtils";
+import { formatDisplayDate, parseAnyDate } from "@/lib/dateUtils";
 
 const STATUS_COLORS: Record<string, string> = {
   "Member": "bg-green-500 text-white",
@@ -87,9 +87,21 @@ function formatMonthLabel(ym: string): string {
 }
 
 function formatPaymentDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  if (!dateStr) return "—";
+  const d = parseAnyDate(dateStr);
+  if (!d) return dateStr;
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Convert any known date format to YYYY-MM-DD for <input type="date"> */
+function toInputDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const d = parseAnyDate(dateStr);
+  if (!d) return "";
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const dd   = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // ─── EditUserSheet ────────────────────────────────────────────────────────────
@@ -471,7 +483,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
   const [reference, setReference] = useState(payment.reference);
   const [amount, setAmount] = useState(String(payment.amount));
   const [email, setEmail] = useState(payment.email);
-  const [date, setDate] = useState(payment.date);
+  const [date, setDate] = useState(toInputDate(payment.date));
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -479,7 +491,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
     setReference(payment.reference);
     setAmount(String(payment.amount));
     setEmail(payment.email);
-    setDate(payment.date);
+    setDate(toInputDate(payment.date));
     setConfirmDelete(false);
   }, [payment]);
 

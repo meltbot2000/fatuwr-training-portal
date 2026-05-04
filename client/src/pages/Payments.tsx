@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
 import { ChevronDown, ChevronUp, Copy, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { parseAnyDate } from "@/lib/dateUtils";
 
 const CLUB_UEN = "T14SS0144D";
 
@@ -13,8 +14,8 @@ function formatFee(amount: number): string {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = parseAnyDate(dateStr);
+  if (!d) return dateStr;
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
 }
 
