@@ -1647,9 +1647,9 @@ export const appRouter = router({
           });
         }
         // GAS succeeded — Sheet has the new values. Now mirror to DB.
-        // GAS also calls notifyRailway("payments"), which will re-sync the DB
-        // from the updated Sheet shortly, but we update immediately for instant UI feedback.
-        await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.id, id));
+        // Use rowIndex (stable Sheet row number) not id — id changes on every
+        // DELETE+INSERT sync cycle, so a stale client id would silently update 0 rows.
+        await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.rowIndex, rowIndex));
         return { success: true };
       }),
 
