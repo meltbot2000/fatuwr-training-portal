@@ -270,7 +270,8 @@ export function startBackgroundSync(): void {
   setTimeout(() => expireTrialMemberships().catch(console.error), 6_000);
   setInterval(() => expireTrialMemberships().catch(console.error), DAY_MS);
 
-  // GAS health monitor — hourly in-memory timestamp check; alerts if GAS silent > 90 min
+  // GAS health monitor — hourly in-memory timestamp check; alerts if the GAS
+  // heartbeat trigger has not pinged for > GAS_STALE_MS.
   setInterval(() => checkGasHealth().catch(console.error), 60 * 60 * 1_000);
 
   console.log("[Sync] Background sync started — DB-primary: sessions, signups, users | Sheets-managed: payments (6h fallback; GAS webhook is primary)");
@@ -281,47 +282,50 @@ export function getSyncStatus() {
 }
 
 // ─── GAS health monitoring ────────────────────────────────────────────────────
-// Tracks the last time GAS called POST /api/sync (notifyRailway).
-// An hourly background check sends a Resend/SendGrid alert if GAS has been
-// silent for > 90 min. This is server-side only, so it fires even when GAS
-// OAuth is fully broken (which is exactly when we need to know).
+// Tracks the last time the GAS heartbeat trigger pinged
+// POST /api/health/gas-heartbeat. The heartbeat is a dedicated time-based
+// trigger in Apps Script (gasHeartbeat() in Code.gs) that runs every 30 min
+// regardless of whether any payment emails or web-app activity occurred.
+//
+// Reactive POST /api/sync calls do NOT reset this timer — otherwise a broken
+// heartbeat trigger would be masked by occasional sign-up / admin activity.
 
-let lastGasWebhookAt = 0;
-let gasAlertSentAt   = 0;
+let lastGasHeartbeatAt = 0;
+let gasAlertSentAt     = 0;
 
-/** Call this each time GAS successfully hits POST /api/sync. */
-export function recordGasWebhook(): void {
-  lastGasWebhookAt = Date.now();
-  gasAlertSentAt   = 0; // reset so a future outage can alert again
+/** Call this each time GAS successfully hits POST /api/health/gas-heartbeat. */
+export function recordGasHeartbeat(): void {
+  lastGasHeartbeatAt = Date.now();
+  gasAlertSentAt     = 0; // reset so a future outage can alert again
 }
 
-const GAS_STALE_MS       = 90 * 60 * 1000; // alert if silent for 90 min
+const GAS_STALE_MS       = 75 * 60 * 1000; // alert if silent for 75 min (~2 missed 30-min beats + buffer)
 const GAS_ALERT_COOLDOWN = 60 * 60 * 1000; // re-alert at most once per hour
 
 async function checkGasHealth(): Promise<void> {
-  // Never fired (fresh deploy / GAS not yet wired up) → skip silently
-  if (lastGasWebhookAt === 0) return;
+  // Never fired (fresh deploy / heartbeat trigger not yet installed) → skip silently
+  if (lastGasHeartbeatAt === 0) return;
   // Still fresh → healthy
-  if (Date.now() - lastGasWebhookAt < GAS_STALE_MS) return;
+  if (Date.now() - lastGasHeartbeatAt < GAS_STALE_MS) return;
   // Cooldown — don't spam
   if (gasAlertSentAt > 0 && Date.now() - gasAlertSentAt < GAS_ALERT_COOLDOWN) return;
 
   gasAlertSentAt = Date.now();
-  const staleMin = Math.round((Date.now() - lastGasWebhookAt) / 60_000);
-  console.error(`[GAS Health] ⚠️ No GAS webhook for ${staleMin} min — sending alert`);
+  const staleMin = Math.round((Date.now() - lastGasHeartbeatAt) / 60_000);
+  console.error(`[GAS Health] ⚠️ No GAS heartbeat for ${staleMin} min — sending alert`);
   try {
     const { sendAlertEmail } = await import("./email");
     await sendAlertEmail(
-      "⚠️ FATUWR: GAS payment sync is stale",
-      `The GAS payment processor has not contacted the server for ${staleMin} minutes.\n\n` +
-      `Last contact: ${new Date(lastGasWebhookAt).toISOString()}\n\n` +
+      "⚠️ FATUWR: GAS heartbeat is stale",
+      `The GAS heartbeat trigger has not pinged the server for ${staleMin} minutes.\n\n` +
+      `Last heartbeat: ${new Date(lastGasHeartbeatAt).toISOString()}\n\n` +
       `Possible causes:\n` +
       `  • GAS OAuth requires re-authorisation (a new scope was added to the script)\n` +
-      `  • Time-based trigger was deleted\n` +
-      `  • Unhandled error in processMaybankEmails\n\n` +
-      `Fix: open the Apps Script editor, run processMaybankEmails() manually,\n` +
-      `re-grant permissions when prompted, then verify the trigger is still active\n` +
-      `in the Triggers panel.`
+      `  • The heartbeat time-based trigger was deleted or paused\n` +
+      `  • Unhandled error in gasHeartbeat()\n\n` +
+      `Fix: open the Apps Script editor, run gasHeartbeat() manually, re-grant\n` +
+      `permissions when prompted, then run createHeartbeatTrigger() to reinstall\n` +
+      `the 30-min time-based trigger and verify it appears in the Triggers panel.`
     );
   } catch (err: any) {
     console.error("[GAS Health] Failed to send alert:", err?.message ?? err);

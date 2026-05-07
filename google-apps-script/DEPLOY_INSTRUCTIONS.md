@@ -73,6 +73,18 @@ Expected response:
 
 ---
 
+## Step 7 — Install the heartbeat trigger (one-time)
+
+The Railway server's GAS health monitor expects a heartbeat ping every 30 min. Without it, no alert can be detected and no alert will fire — but you also won't get notified if GAS itself stops working.
+
+1. In the Apps Script IDE, select **`createHeartbeatTrigger`** in the function dropdown at the top.
+2. Click ▶ **Run**. Grant permissions if prompted.
+3. Click the clock icon (Triggers) in the left sidebar and confirm a `gasHeartbeat` time-based trigger appears, scheduled every 30 min.
+
+To remove later: run `deleteHeartbeatTrigger`.
+
+---
+
 ## Re-deploying after code changes
 
 When you update `Code.gs`, you must create a **new deployment version** for changes to take effect:
