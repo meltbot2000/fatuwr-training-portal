@@ -149,12 +149,13 @@ Maybank email arrives → Gmail label "Maybank" or "Maybank2"
     → appendPaymentRow(): sheet.appendRow([body, subject, date, amount, othr, paymentId, email])
     → if newCount > 0:
         notifyRailway("payments") → POST /api/sync?tab=payments&token=SECRET
-        → server: recordGasWebhook() (resets health timer)
         → server queues syncTab("payments") asynchronously
           → fetchSheetsPayments() → Sheet → DELETE+INSERT sheet_payments DB
 ```
 
 **Critical:** `notifyRailway("payments")` is called from `processMaybankEmails` **only when `newCount > 0`** (new payment rows were written). If no new emails are found in a given minute, the server is NOT called. The 1-min cron itself does not trigger a sync on every tick.
+
+The reactive `/api/sync` endpoint **does not** reset the GAS health timer — that signal would be too noisy / too sparse to reliably detect a broken GAS. The dedicated `gasHeartbeat()` trigger is the sole source of `recordGasHeartbeat()` (see GAS health monitor below).
 
 #### Admin payment edit flow (current — as of v13 + patches)
 
@@ -197,10 +198,12 @@ Admin opens payment row → EditPaymentSheet (Admin.tsx)
 
 #### GAS health monitor
 
-- `recordGasWebhook()` is called in POST `/api/sync` immediately after token validation
-- Hourly background check in `sync.ts`: if GAS has not called `/api/sync` in > 90 min, send alert email to tanmelanie@gmail.com via `sendAlertEmail()`
-- Alert fires at most once per hour (cooldown); silent on fresh deploys (only alerts after first-ever GAS contact)
-- Covers: OAuth revocation, trigger deletion, unhandled GAS errors
+- Health is tracked via a dedicated heartbeat: `gasHeartbeat()` in `Code.gs` runs every 30 min on a time-based trigger and POSTs to `/api/health/gas-heartbeat` (token-protected). That endpoint is the *only* caller of `recordGasHeartbeat()`.
+- Hourly background check in `sync.ts`: if no heartbeat in > 75 min (~2 missed beats + buffer), send alert email to tanmelanie@gmail.com via `sendAlertEmail()`.
+- Alert fires at most once per hour (cooldown); silent on fresh deploys (only alerts after the first-ever heartbeat).
+- **Reactive `/api/sync` calls do NOT reset the timer** — earlier design did, which silently masked broken triggers behind sporadic sign-up / admin / payment activity. The heartbeat is independent of work happening.
+- Covers: OAuth revocation, deletion/pause of the heartbeat trigger, unhandled errors in `gasHeartbeat`.
+- One-time setup: in the Apps Script editor, run `createHeartbeatTrigger()` once and grant permissions.
 
 #### Dedup layers for email processing
 

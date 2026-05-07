@@ -8,7 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { testEmailSending } from "../email";
-import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus, recordGasWebhook } from "../sync";
+import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus, recordGasHeartbeat } from "../sync";
 import { seedMerchIfEmpty } from "../merchSeed";
 import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
@@ -70,8 +70,10 @@ async function startServer() {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    // Record that GAS is alive (used by hourly health monitor)
-    recordGasWebhook();
+    // NOTE: this reactive endpoint deliberately does NOT reset the GAS health
+    // timer. Health is tracked via the dedicated heartbeat trigger below — see
+    // POST /api/health/gas-heartbeat. Reactive sign-up/admin/payment activity
+    // is sporadic and would mask a broken heartbeat trigger.
 
     const validTabs = ["sessions", "payments", "signups", "users"] as const;
     if (tab !== "all" && !validTabs.includes(tab as any)) {
@@ -86,6 +88,19 @@ async function startServer() {
 
   app.get("/api/sync/status", (_req, res) => {
     res.json(getSyncStatus());
+  });
+
+  // GAS heartbeat — called every 30 min by the gasHeartbeat() time-based
+  // trigger in Apps Script. Resets the health watchdog. If this stops firing
+  // for > 75 min, sync.ts emails an alert.
+  app.post("/api/health/gas-heartbeat", (req, res) => {
+    const { token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    recordGasHeartbeat();
+    res.json({ status: "ok" });
   });
 
   // DB → Sheet export endpoint (called by GAS "Sync from DB" menu)
