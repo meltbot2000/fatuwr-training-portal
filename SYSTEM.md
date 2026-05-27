@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-05-05 (payment edit race fix, rowIndex stability, date format, GAS architecture clarifications)*
+*Last updated: 2026-05-27 (trial date "null" string fix, alert email recipients, admin blank-field fix)*
 
 ---
 
@@ -74,7 +74,7 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 | Image storage | Cloudflare R2 | S3-compatible; free tier (10 GB, 1M requests, zero egress) |
 | Email (OTP) | Resend | `RESEND_API_KEY`, `RESEND_API_FROM` |
 | Payment emails | Google Apps Script | Gmail-based; 1-min cron trigger on `processMaybankEmails`. Only calls `/api/sync` when new payment rows are written. |
-| Alert email | Resend → SendGrid fallback → console.error | `sendAlertEmail()` in `server/email.ts`; used for GAS health monitor |
+| Alert email | Resend → SendGrid fallback → console.error | `sendAlertEmail()` in `server/email.ts`; sends to tanmelanie@gmail.com, fatuwr@gmail.com, fatuwrevents@gmail.com |
 | Backup | SMTP/Resend | Daily CSV email to fatuwrevents@gmail.com at 23:59 SGT |
 
 ### Required environment variables
@@ -245,6 +245,24 @@ User taps "Sign up for Trial" on /membership (Non-Member only)
     → upsertUser: memberStatus="Trial", trialStartDate, trialEndDate
   → return updated user
 ```
+
+#### trialStartDate semantics (CRITICAL)
+
+| Value | Meaning | Can sign up for trial? |
+|---|---|---|
+| `""` (empty string) | Never trialled | **Yes** |
+| `"null"` or `"undefined"` | Data corruption (stringified JS null) | **Yes** (sanitised to `""` at every layer) |
+| `"NA"` | Legacy marker: already trialled in past years, no date on record | **No** |
+| Any date string (e.g. `"01/05/2025"`) | Trialled on that date | **No** |
+
+**`"NA"` blocks trial signup.** It is the legacy convention for users who trialled before the app existed and have no recorded date. Do NOT treat `"NA"` as empty/non-trialled.
+
+Sanitisation layers (all convert `"null"`/`"undefined"` → `""`):
+- `normalizeToddmmyyyy()` in `routers.ts` (login sync path)
+- `fetchSheetsUsers()` in `googleSheets.ts` (Sheets → DB sync)
+- `upsertUser()` in `db.ts` (DB write layer)
+- `signupTrial` guard in `routers.ts` (server-side check)
+- `Membership.tsx` (client-side check)
 
 ### 4.6 Annual membership sign-up
 
@@ -438,6 +456,15 @@ Sessions hidden from user-facing list once `now > sessionStart + 1 hour` in SGT 
 ### sheet_users is a sync cache — never write app data to it
 `forceSync("users")` does DELETE+INSERT — any app-written data would be wiped. Profile photos must be in `users.image`, not `sheetUsers.image`.
 
+### Trial date — "NA" means already trialled (CRITICAL)
+`"NA"` in `trialStartDate` is a legacy marker meaning "user already used their trial in past years, no date recorded." It **blocks** trial sign-up. Do NOT treat `"NA"` as empty or exclude it from the `hasTrialled` check. See §4.5 for the full semantics table.
+
+### Admin form — blank vs undefined (CRITICAL)
+When building admin form submissions, do NOT use `value || undefined` for fields where blank/empty is a meaningful write. `"" || undefined` evaluates to `undefined`, and the server skips `undefined` fields — so the save silently does nothing. Send the value directly: `trialStartDate: trialStartDate`.
+
+### String "null" sanitisation
+JS `null` can silently become the string `"null"` when crossing system boundaries (GAS → Sheets → DB, or JSON serialization). All DB write paths sanitise `"null"` and `"undefined"` strings to `""` for `trialStartDate`/`trialEndDate`. If adding new nullable fields to the sync pipeline, add the same sanitisation.
+
 ### Trial membership — fee rate determined by SESSION DATE
 What matters for fee calculation is whether the **training session's date** falls within the user's trial period — not whether the user is Trial at the moment they sign up. Implemented in `getMembershipOnTrainingDate()` in `feeUtils.ts`.
 
@@ -501,9 +528,15 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 **Root cause:** `admin.editPayment` used `payDb.update(sheetPayments).where(id = input.id)`. The `id` is an auto-increment PK that changes on every `syncTab("payments")` DELETE+INSERT cycle. If the sync ran between when the admin loaded the payments list and when they saved the edit, the `id` no longer existed — 0 rows updated, silently.
 **Fix:** Changed WHERE clause to `rowIndex = input.rowIndex`. `rowIndex` is the 1-based Sheet row number, stable across sync cycles. `rowIndex` is already validated (must be ≥ 2) before the GAS call.
 
-### Bug 15: Payment reference field reverted immediately after save (fixed 2026-05-05)
+### Bug 15: Trial signup blocked by "null" string in trialStartDate (fixed 2026-05-27)
+**Root cause:** A user (Cheryl Cheong) had the literal string `"null"` in `trialStartDate` (stringified JS `null` written during a sync or data corruption). The `hasTrialled` check treated any non-empty, non-`""` value as "already trialled", so `"null"` blocked trial signup.
+**Secondary issue:** The `hasTrialled` check incorrectly EXCLUDED `"NA"` from blocking. `"NA"` is the legacy marker for "already trialled in past years" and SHOULD block.
+**Tertiary issue:** Admin panel could not clear the field — `trialStartDate || undefined` converted blank input to `undefined`, which the server skips. The save appeared to succeed but wrote nothing.
+**Fix:** (1) Sanitise `"null"`/`"undefined"` strings to `""` at every layer (DB write, Sheets sync, login sync, trial guard). (2) `"NA"` now correctly blocks trial signup (removed from exclusion list). (3) Admin form sends `trialStartDate` directly (not `|| undefined`) so blanking the field writes `""` to DB.
+**Lesson:** When syncing data between systems (GAS ↔ Sheets ↔ DB), JS `null` can silently become the string `"null"`. Always sanitise at write boundaries. Also: `value || undefined` in form submissions silently drops empty strings — use the value directly when blank is a meaningful state.
+
+### Bug 16: Payment reference field reverted immediately after save (fixed 2026-05-05)
 **Root cause:** `editPaymentRow` in GAS called `notifyRailway("payments")` at the end, which triggered an immediate Sheet→DB sync. The Google Sheets API can serve cached/pre-flush data in the seconds after a GAS `SpreadsheetApp.flush()`. The sync read old col E (reference) from the Sheets API before the flush had propagated externally, then did a full DELETE+INSERT — overwriting the DB with the old reference within seconds of the save.
-PaymentId (col F) had been written since v12 and the Sheets API cache reflected it; reference (col E) was new in v13 and the cache had not yet seen the write.
 **Fix:** Removed `notifyRailway("payments")` from `editPaymentRow`. The server updates the DB directly via `payDb.update(...).where(rowIndex = ...)` after GAS returns. The 6-hourly sync will re-read the Sheet (which GAS has correctly flushed) and confirms the DB. `SpreadsheetApp.flush()` is kept in `editPaymentRow` for consistency.
 
 ---
@@ -535,7 +568,7 @@ PaymentId (col F) had been written since v12 and the Sheets API cache reflected 
 - No LIMIT clause needed — Railway auto-adds LIMIT 100.
 
 ### Before touching payment logic
-- Re-read §5 (sheet_payments id instability), §8 (critical behaviours), and §9 (bugs 11–15).
+- Re-read §5 (sheet_payments id instability), §8 (critical behaviours), and §9 (bugs 11–16).
 - Key rule: **Sheet is source of truth for payments. Always write Sheet first (via GAS), then update DB. Never DB-only for payments.**
 - Key rule: **Target payment rows by rowIndex, not id.**
 
