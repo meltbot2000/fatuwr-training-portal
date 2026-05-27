@@ -134,7 +134,7 @@ function parseFlexDate(str: string): Date | null {
  * Returns the input unchanged if it's already DD/MM/YYYY or unrecognised.
  */
 function normalizeToddmmyyyy(str: string): string {
-  if (!str || str === "NA") return str;
+  if (!str || str === "NA" || str === "null" || str === "undefined") return "";
   const d = parseFlexDate(str);
   if (!d) return str;
   const dd = String(d.getDate()).padStart(2, "0");
@@ -830,8 +830,9 @@ export const appRouter = router({
   membership: router({
     signupTrial: protectedProcedure.mutation(async ({ ctx }) => {
       const user = ctx.user;
-      // Prevent re-trial: if trialStartDate is set, the user has already used their trial
-      const hasTrialled = user.trialStartDate && user.trialStartDate !== "" && user.trialStartDate !== "NA";
+      // Prevent re-trial: if trialStartDate is set (including "NA" for legacy users), block
+      const BLANK_TRIAL = ["", "null", "undefined"];
+      const hasTrialled = user.trialStartDate && !BLANK_TRIAL.includes(user.trialStartDate);
       if (hasTrialled) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "You have already used your free trial membership." });
       }

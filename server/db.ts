@@ -69,12 +69,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.clubRole = user.clubRole;
     }
     if (user.trialStartDate !== undefined) {
-      values.trialStartDate = user.trialStartDate;
-      updateSet.trialStartDate = user.trialStartDate;
+      const tsd = user.trialStartDate === "null" || user.trialStartDate === "undefined" ? "" : user.trialStartDate;
+      values.trialStartDate = tsd;
+      updateSet.trialStartDate = tsd;
     }
     if (user.trialEndDate !== undefined) {
-      values.trialEndDate = user.trialEndDate;
-      updateSet.trialEndDate = user.trialEndDate;
+      const ted = user.trialEndDate === "null" || user.trialEndDate === "undefined" ? "" : user.trialEndDate;
+      values.trialEndDate = ted;
+      updateSet.trialEndDate = ted;
     }
 
     if (!values.lastSignedIn) {

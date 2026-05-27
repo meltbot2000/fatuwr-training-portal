@@ -258,7 +258,7 @@ export default function Membership() {
   const trialEndDate: string = (user as any)?.trialEndDate || "";
   const paymentId: string = (user as any)?.paymentId || "";
 
-  const hasTrialled = trialStartDate !== "" && trialStartDate !== "NA";
+  const hasTrialled = trialStartDate !== "" && trialStartDate !== "null";
   const trialEndParsed = parseAnyDate(trialEndDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);

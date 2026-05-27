@@ -306,8 +306,8 @@ function EditUserSheet({ open, onOpenChange, user, onDone, isAdmin = false, read
                       memberStatus,
                       clubRole: clubRole === "none" ? "" : clubRole,
                       membershipStartDate: membershipStartDate || undefined,
-                      trialStartDate: trialStartDate || undefined,
-                      trialEndDate: trialEndDate || undefined,
+                      trialStartDate: trialStartDate,
+                      trialEndDate: trialEndDate,
                       ...(isSettingMember && membershipFee ? { membershipFee: parseFloat(membershipFee) } : {}),
                     })}
                     disabled={mutation.isPending}

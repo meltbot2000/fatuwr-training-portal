@@ -331,8 +331,8 @@ export async function fetchSheetsUsers(): Promise<UserRow[]> {
       paymentId: row[0] || "",  // col A = PaymentID (same as id; col H is phone number)
       membershipStartDate: row[6] || "", // col G = Annual Membership Start
       memberStatus: row[9] || "Non-Member",
-      trialStartDate: row[10] || "",
-      trialEndDate: row[11] || "",
+      trialStartDate: row[10] && row[10] !== "null" ? row[10] : "",
+      trialEndDate: row[11] && row[11] !== "null" ? row[11] : "",
       dob: row[8] || "",        // col I = Date of Birth
     });
   }

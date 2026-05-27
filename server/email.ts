@@ -186,7 +186,11 @@ export async function sendOtpEmail(email: string, code: string): Promise<boolean
  * falls back to a loud console.error if both fail so Railway logs capture it.
  */
 export async function sendAlertEmail(subject: string, text: string): Promise<void> {
-  const to = "tanmelanie@gmail.com";
+  const recipients = [
+    "tanmelanie@gmail.com",
+    "fatuwr@gmail.com",
+    "fatuwrevents@gmail.com",
+  ];
 
   if (ENV.sendgridApiKey && ENV.sendgridFrom) {
     try {
@@ -197,14 +201,14 @@ export async function sendAlertEmail(subject: string, text: string): Promise<voi
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: to }] }],
+          personalizations: [{ to: recipients.map(email => ({ email })) }],
           from: { email: ENV.sendgridFrom },
           subject,
           content: [{ type: "text/plain", value: text }],
         }),
       });
       if (res.ok) {
-        console.log(`[Alert] Sent via SendGrid: ${subject}`);
+        console.log(`[Alert] Sent via SendGrid to ${recipients.length} recipients: ${subject}`);
         return;
       }
       console.warn(`[Alert] SendGrid HTTP ${res.status} — falling back to Resend`);
@@ -216,9 +220,9 @@ export async function sendAlertEmail(subject: string, text: string): Promise<voi
   if (ENV.resendApiKey) {
     try {
       const resend = new Resend(ENV.resendApiKey);
-      const result = await resend.emails.send({ from: ENV.resendApiFrom, to, subject, text });
+      const result = await resend.emails.send({ from: ENV.resendApiFrom, to: recipients, subject, text });
       if (!result.error) {
-        console.log(`[Alert] Sent via Resend: ${subject}`);
+        console.log(`[Alert] Sent via Resend to ${recipients.length} recipients: ${subject}`);
         return;
       }
       console.warn(`[Alert] Resend error: ${result.error.message}`);
