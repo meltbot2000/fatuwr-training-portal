@@ -202,7 +202,7 @@ Admin opens payment row → EditPaymentSheet (Admin.tsx)
 - Hourly background check in `sync.ts`: if no heartbeat in > 75 min (~2 missed beats + buffer), send alert email to tanmelanie@gmail.com via `sendAlertEmail()`.
 - Alert fires at most once per hour (cooldown); silent on fresh deploys (only alerts after the first-ever heartbeat).
 - **Reactive `/api/sync` calls do NOT reset the timer** — earlier design did, which silently masked broken triggers behind sporadic sign-up / admin / payment activity. The heartbeat is independent of work happening.
-- Covers: OAuth revocation, deletion/pause of the heartbeat trigger, unhandled errors in `gasHeartbeat`.
+- Covers: OAuth revocation, deletion/pause of the heartbeat trigger, unhandled errors in `gasHeartbeat`, and the 7-day refresh-token expiry that silently stops triggers from firing (see §"GAS deployment facts" — the common weekly disconnect case).
 - One-time setup: in the Apps Script editor, run `createHeartbeatTrigger()` once and grant permissions.
 
 #### Dedup layers for email processing
@@ -555,6 +555,7 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 - GAS is deployed as a web app with a stable URL (set in `GOOGLE_APPS_SCRIPT_URL`). Deploying a new version does NOT change the URL — the same deployment URL serves the latest version.
 - The GAS 1-min cron trigger calls `processMaybankEmails`. It does NOT call `syncPaymentsFromDb` or any other sync function — those are manual-only.
 - OAuth: all GAS scopes (GmailApp, MailApp, UrlFetchApp, SpreadsheetApp) share a single project authorization. If OAuth is revoked, ALL fail simultaneously. Re-run any function from the GAS editor to re-grant permissions.
+- **Weekly silent disconnect pattern:** triggers stop firing with no errors in the execution log, roughly every 7 days. Root cause is the OAuth consent screen being in "Testing" status (default for unverified personal-Gmail apps using sensitive Gmail scopes) — Google expires refresh tokens after 7 days in that state. Symptom: `processMaybankEmails` and `gasHeartbeat` both stop, no failures preceding, heartbeat alert fires. Fix: open the script editor, run any function, grant consent again. The trigger entries themselves are not deleted — they just can't authorize. Do not assume code/handler failure when this pattern appears.
 
 ### Deployment
 - Push to `main` → Railway auto-deploys.
