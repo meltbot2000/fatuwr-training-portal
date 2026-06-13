@@ -201,24 +201,38 @@ export async function sendOtpEmail(email: string, code: string): Promise<boolean
   console.log(`[OTP] SENDGRID_API_KEY set: ${Boolean(ENV.sendgridApiKey)}, SENDGRID_FROM set: ${Boolean(ENV.sendgridFrom)}`);
   console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}, OTP_RELAY_TO set: ${Boolean(ENV.otpRelayTo)}`);
 
-  // --- Stopgap relay mode: send every OTP to the account owner for manual forward.
-  // Works with the Resend sandbox (no verified domain) since the destination is
-  // the account owner. Enabled by setting OTP_RELAY_TO; remove it to disable.
+  // --- Stopgap relay mode: send each OTP to the admin relay address(es) for manual
+  // forward, instead of to the user. Works with the Resend sandbox (no verified
+  // domain) since the destination is the account owner. OTP_RELAY_TO may be a
+  // comma-separated list — each is sent individually (best-effort), so the
+  // owner address still gets it even if the others are rejected by the sandbox.
+  // Once a domain is verified this same path delivers to all of them. Unset to disable.
   const relay = Boolean(ENV.otpRelayTo);
-  const to = relay ? ENV.otpRelayTo : email;
+  const targets = relay
+    ? ENV.otpRelayTo.split(",").map(s => s.trim()).filter(Boolean)
+    : [email];
   const subject = relay
     ? `FATUWR login code for ${email} — forward to them`
     : "Your FATUWR Training Portal Login Code";
   const html = relay ? buildRelayOtpHtml(email, code) : buildOtpHtml(code);
 
-  // In relay mode the recipient is the Resend account owner, so try Resend first
-  // (the sandbox can deliver there). Otherwise prefer Resend only once verified.
+  // In relay mode try Resend first (the sandbox can reach the owner); otherwise
+  // prefer Resend only once it has a verified domain.
   const resendFirst = relay || resendHasVerifiedDomain();
   const attempts = resendFirst ? [tryResendOtp, trySendGridOtp] : [trySendGridOtp, tryResendOtp];
-  console.log(`[OTP] ${relay ? `RELAY → ${to} (for ${email})` : `direct → ${to}`}; order: ${resendFirst ? "Resend → SendGrid" : "SendGrid → Resend"}`);
-  for (const attempt of attempts) {
-    if (await attempt(to, subject, html)) return true;
+  console.log(`[OTP] ${relay ? `RELAY → [${targets.join(", ")}] (for ${email})` : `direct → ${email}`}; order: ${resendFirst ? "Resend → SendGrid" : "SendGrid → Resend"}`);
+
+  // Deliver to each target independently; a single success is enough to proceed.
+  let delivered = false;
+  for (const target of targets) {
+    for (const attempt of attempts) {
+      if (await attempt(target, subject, html)) {
+        delivered = true;
+        break;
+      }
+    }
   }
+  if (delivered) return true;
 
   // --- Fallback: print to console (local dev only) -----------------------------
   console.warn(`[OTP] ⚠️  NO EMAIL PROVIDER SUCCEEDED — code will only appear in logs`);
