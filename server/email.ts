@@ -84,10 +84,10 @@ async function sendViaGmail(to: string, code: string): Promise<boolean> {
  * Note: onboarding@resend.dev (Resend sandbox) can only send to the Resend account
  * owner's email. Use a verified domain to send to any recipient.
  */
-async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
+async function sendViaResend(to: string, subject: string, html: string, from: string = ENV.resendApiFrom): Promise<boolean> {
   const resend = new Resend(ENV.resendApiKey);
   const result = await resend.emails.send({
-    from: ENV.resendApiFrom,
+    from,
     to,
     subject,
     html,
@@ -96,13 +96,13 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
   if (result.error) {
     const hint =
       result.error.name === "validation_error"
-        ? " — RESEND_API_FROM may be using an unverified domain (onboarding@resend.dev only works for the Resend account owner's email)"
+        ? ` — '${from}' may be an unverified domain (onboarding@resend.dev only works for the Resend account owner's email)`
         : "";
     console.warn(`[OTP] Resend error — name: ${result.error.name}, message: ${result.error.message}${hint}`);
     return false;
   }
 
-  console.log(`[OTP] Resend sent to ${to}, id: ${result.data?.id}`);
+  console.log(`[OTP] Resend sent to ${to} (from ${from}), id: ${result.data?.id}`);
   return true;
 }
 
@@ -165,14 +165,14 @@ async function trySendGridOtp(to: string, subject: string, html: string): Promis
 }
 
 /** Attempt Resend. Returns true on success, false if unconfigured or failed. */
-async function tryResendOtp(to: string, subject: string, html: string): Promise<boolean> {
+async function tryResendOtp(to: string, subject: string, html: string, from: string = ENV.resendApiFrom): Promise<boolean> {
   if (!ENV.resendApiKey) {
     console.warn("[OTP] Resend skipped — RESEND_API_KEY not set");
     return false;
   }
-  console.log(`[OTP] Attempting Resend to ${to} (from: ${ENV.resendApiFrom})`);
+  console.log(`[OTP] Attempting Resend to ${to} (from: ${from})`);
   try {
-    const sent = await sendViaResend(to, subject, html);
+    const sent = await sendViaResend(to, subject, html, from);
     if (!sent) console.warn("[OTP] Resend returned false — check Resend dashboard for errors");
     return sent;
   } catch (err: unknown) {
@@ -216,17 +216,23 @@ export async function sendOtpEmail(email: string, code: string): Promise<boolean
     : "Your FATUWR Training Portal Login Code";
   const html = relay ? buildRelayOtpHtml(email, code) : buildOtpHtml(code);
 
-  // In relay mode try Resend first (the sandbox can reach the owner); otherwise
-  // prefer Resend only once it has a verified domain.
+  // In relay mode, force the Resend sandbox sender — if we're relaying, the custom
+  // domain isn't verified yet, so onboarding@resend.dev is the only address that
+  // works (and it reaches the account owner). This makes relay robust even if
+  // RESEND_API_FROM has been pre-set to an as-yet-unverified domain. Outside relay,
+  // use the configured RESEND_API_FROM and only prefer Resend once it's verified.
+  const resendFrom = relay ? "onboarding@resend.dev" : ENV.resendApiFrom;
   const resendFirst = relay || resendHasVerifiedDomain();
-  const attempts = resendFirst ? [tryResendOtp, trySendGridOtp] : [trySendGridOtp, tryResendOtp];
-  console.log(`[OTP] ${relay ? `RELAY → [${targets.join(", ")}] (for ${email})` : `direct → ${email}`}; order: ${resendFirst ? "Resend → SendGrid" : "SendGrid → Resend"}`);
+  const tryResend = (target: string) => tryResendOtp(target, subject, html, resendFrom);
+  const trySendGrid = (target: string) => trySendGridOtp(target, subject, html);
+  const attempts = resendFirst ? [tryResend, trySendGrid] : [trySendGrid, tryResend];
+  console.log(`[OTP] ${relay ? `RELAY → [${targets.join(", ")}] (for ${email}, from ${resendFrom})` : `direct → ${email}`}; order: ${resendFirst ? "Resend → SendGrid" : "SendGrid → Resend"}`);
 
   // Deliver to each target independently; a single success is enough to proceed.
   let delivered = false;
   for (const target of targets) {
     for (const attempt of attempts) {
-      if (await attempt(target, subject, html)) {
+      if (await attempt(target)) {
         delivered = true;
         break;
       }
