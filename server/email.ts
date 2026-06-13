@@ -319,6 +319,8 @@ export async function sendAlertEmail(subject: string, text: string): Promise<voi
 export async function testEmailSending(to: string): Promise<{
   sendgridConfigured: boolean;
   resendConfigured: boolean;
+  resendFrom: string;
+  otpRelayTo: string;
   sendgridResult: "success" | "skipped" | "failed";
   sendgridError?: string;
   resendResult: "success" | "skipped" | "failed";
@@ -330,6 +332,9 @@ export async function testEmailSending(to: string): Promise<{
   const result = {
     sendgridConfigured: Boolean(ENV.sendgridApiKey && ENV.sendgridFrom),
     resendConfigured: Boolean(ENV.resendApiKey),
+    // Echo the live config so we can diagnose without dashboard access.
+    resendFrom: ENV.resendApiFrom,
+    otpRelayTo: ENV.otpRelayTo || "(not set — direct delivery)",
     sendgridResult: "skipped" as "success" | "skipped" | "failed",
     sendgridError: undefined as string | undefined,
     resendResult: "skipped" as "success" | "skipped" | "failed",
@@ -347,10 +352,17 @@ export async function testEmailSending(to: string): Promise<{
   }
 
   if (ENV.resendApiKey) {
+    // Call Resend directly here (rather than via sendViaResend) so we can surface
+    // the real error name + message instead of a generic string.
     try {
-      const ok = await sendViaResend(to, testSubject, testHtml);
-      result.resendResult = ok ? "success" : "failed";
-      if (!ok) result.resendError = "Resend returned error (check Resend dashboard)";
+      const resend = new Resend(ENV.resendApiKey);
+      const res = await resend.emails.send({ from: ENV.resendApiFrom, to, subject: testSubject, html: testHtml });
+      if (res.error) {
+        result.resendResult = "failed";
+        result.resendError = `${res.error.name}: ${res.error.message}`;
+      } else {
+        result.resendResult = "success";
+      }
     } catch (err: unknown) {
       result.resendResult = "failed";
       result.resendError = err instanceof Error ? err.message : String(err);
