@@ -9,6 +9,10 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendApiFrom: process.env.RESEND_API_FROM ?? "onboarding@resend.dev",
+  // Stopgap: when set, ALL OTP emails are relayed to this address (the Resend
+  // account owner, so the sandbox can deliver) with the intended recipient shown
+  // in the email, to be forwarded manually. Leave empty for normal per-user delivery.
+  otpRelayTo: process.env.OTP_RELAY_TO ?? "",
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",

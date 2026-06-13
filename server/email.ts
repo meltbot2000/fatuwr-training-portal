@@ -8,7 +8,7 @@ export function generateOtp(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
-function buildOtpHtml(code: string): string {
+function buildOtpHtml(code: string, topBannerHtml = ""): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,6 +17,7 @@ function buildOtpHtml(code: string): string {
   <title>Your Login Code</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;">
+  ${topBannerHtml}
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:40px 0;">
     <tr>
       <td align="center">
@@ -83,13 +84,13 @@ async function sendViaGmail(to: string, code: string): Promise<boolean> {
  * Note: onboarding@resend.dev (Resend sandbox) can only send to the Resend account
  * owner's email. Use a verified domain to send to any recipient.
  */
-async function sendViaResend(to: string, code: string): Promise<boolean> {
+async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
   const resend = new Resend(ENV.resendApiKey);
   const result = await resend.emails.send({
     from: ENV.resendApiFrom,
     to,
-    subject: "Your FATUWR Training Portal Login Code",
-    html: buildOtpHtml(code),
+    subject,
+    html,
   });
 
   if (result.error) {
@@ -111,7 +112,7 @@ async function sendViaResend(to: string, code: string): Promise<boolean> {
  * Domain verification uses only CNAME records — works with Wix DNS.
  * Uses HTTPS (not SMTP), so works on Railway.
  */
-async function sendViaSendGrid(to: string, code: string): Promise<boolean> {
+async function sendViaSendGrid(to: string, subject: string, html: string): Promise<boolean> {
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
@@ -121,8 +122,8 @@ async function sendViaSendGrid(to: string, code: string): Promise<boolean> {
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
       from: { email: ENV.sendgridFrom },
-      subject: "Your FATUWR Training Portal Login Code",
-      content: [{ type: "text/html", value: buildOtpHtml(code) }],
+      subject,
+      content: [{ type: "text/html", value: html }],
     }),
   });
 
@@ -146,15 +147,15 @@ function resendHasVerifiedDomain(): boolean {
   return Boolean(ENV.resendApiKey) && !ENV.resendApiFrom.includes("resend.dev");
 }
 
-/** Attempt SendGrid for an OTP. Returns true on success, false if unconfigured or failed. */
-async function trySendGridOtp(email: string, code: string): Promise<boolean> {
+/** Attempt SendGrid. Returns true on success, false if unconfigured or failed. */
+async function trySendGridOtp(to: string, subject: string, html: string): Promise<boolean> {
   if (!(ENV.sendgridApiKey && ENV.sendgridFrom)) {
     console.warn("[OTP] SendGrid skipped — SENDGRID_API_KEY or SENDGRID_FROM not set");
     return false;
   }
-  console.log(`[OTP] Attempting SendGrid to ${email} from ${ENV.sendgridFrom}`);
+  console.log(`[OTP] Attempting SendGrid to ${to} from ${ENV.sendgridFrom}`);
   try {
-    return await sendViaSendGrid(email, code);
+    return await sendViaSendGrid(to, subject, html);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[OTP] SendGrid failed: ${msg}`);
@@ -163,15 +164,15 @@ async function trySendGridOtp(email: string, code: string): Promise<boolean> {
   }
 }
 
-/** Attempt Resend for an OTP. Returns true on success, false if unconfigured or failed. */
-async function tryResendOtp(email: string, code: string): Promise<boolean> {
+/** Attempt Resend. Returns true on success, false if unconfigured or failed. */
+async function tryResendOtp(to: string, subject: string, html: string): Promise<boolean> {
   if (!ENV.resendApiKey) {
     console.warn("[OTP] Resend skipped — RESEND_API_KEY not set");
     return false;
   }
-  console.log(`[OTP] Attempting Resend to ${email} (from: ${ENV.resendApiFrom})`);
+  console.log(`[OTP] Attempting Resend to ${to} (from: ${ENV.resendApiFrom})`);
   try {
-    const sent = await sendViaResend(email, code);
+    const sent = await sendViaResend(to, subject, html);
     if (!sent) console.warn("[OTP] Resend returned false — check Resend dashboard for errors");
     return sent;
   } catch (err: unknown) {
@@ -181,18 +182,42 @@ async function tryResendOtp(email: string, code: string): Promise<boolean> {
   }
 }
 
+/**
+ * Relay-mode body: shown to the admin (Resend account owner). Prominently names
+ * the intended recipient so it can be forwarded, then shows the normal code box.
+ */
+function buildRelayOtpHtml(recipient: string, code: string): string {
+  const banner = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:24px 0 0;"><tr><td align="center">
+    <div style="max-width:480px;width:100%;box-sizing:border-box;background:#fff4e5;border:1px solid #f0b357;border-radius:8px;padding:16px 20px;text-align:left;">
+      <p style="margin:0 0 4px;font-size:13px;color:#8a5a00;font-weight:bold;">⚠️ RELAY MODE — forward this email to:</p>
+      <p style="margin:0;font-size:18px;color:#1A3A5C;font-weight:bold;">${recipient}</p>
+    </div>
+  </td></tr></table>`;
+  return buildOtpHtml(code, banner);
+}
+
 export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
   console.log(`[OTP] Starting sendOtpEmail to: ${email}`);
   console.log(`[OTP] SENDGRID_API_KEY set: ${Boolean(ENV.sendgridApiKey)}, SENDGRID_FROM set: ${Boolean(ENV.sendgridFrom)}`);
-  console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}`);
+  console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}, OTP_RELAY_TO set: ${Boolean(ENV.otpRelayTo)}`);
 
-  // Prefer Resend once it has a verified domain; otherwise keep SendGrid first.
-  const attempts = resendHasVerifiedDomain()
-    ? [tryResendOtp, trySendGridOtp]
-    : [trySendGridOtp, tryResendOtp];
-  console.log(`[OTP] Provider order: ${resendHasVerifiedDomain() ? "Resend → SendGrid" : "SendGrid → Resend"}`);
+  // --- Stopgap relay mode: send every OTP to the account owner for manual forward.
+  // Works with the Resend sandbox (no verified domain) since the destination is
+  // the account owner. Enabled by setting OTP_RELAY_TO; remove it to disable.
+  const relay = Boolean(ENV.otpRelayTo);
+  const to = relay ? ENV.otpRelayTo : email;
+  const subject = relay
+    ? `FATUWR login code for ${email} — forward to them`
+    : "Your FATUWR Training Portal Login Code";
+  const html = relay ? buildRelayOtpHtml(email, code) : buildOtpHtml(code);
+
+  // In relay mode the recipient is the Resend account owner, so try Resend first
+  // (the sandbox can deliver there). Otherwise prefer Resend only once verified.
+  const resendFirst = relay || resendHasVerifiedDomain();
+  const attempts = resendFirst ? [tryResendOtp, trySendGridOtp] : [trySendGridOtp, tryResendOtp];
+  console.log(`[OTP] ${relay ? `RELAY → ${to} (for ${email})` : `direct → ${to}`}; order: ${resendFirst ? "Resend → SendGrid" : "SendGrid → Resend"}`);
   for (const attempt of attempts) {
-    if (await attempt(email, code)) return true;
+    if (await attempt(to, subject, html)) return true;
   }
 
   // --- Fallback: print to console (local dev only) -----------------------------
@@ -286,6 +311,8 @@ export async function testEmailSending(to: string): Promise<{
   resendError?: string;
 }> {
   const testCode = "123456";
+  const testSubject = "Your FATUWR Training Portal Login Code";
+  const testHtml = buildOtpHtml(testCode);
   const result = {
     sendgridConfigured: Boolean(ENV.sendgridApiKey && ENV.sendgridFrom),
     resendConfigured: Boolean(ENV.resendApiKey),
@@ -297,7 +324,7 @@ export async function testEmailSending(to: string): Promise<{
 
   if (ENV.sendgridApiKey && ENV.sendgridFrom) {
     try {
-      await sendViaSendGrid(to, testCode);
+      await sendViaSendGrid(to, testSubject, testHtml);
       result.sendgridResult = "success";
     } catch (err: unknown) {
       result.sendgridResult = "failed";
@@ -307,7 +334,7 @@ export async function testEmailSending(to: string): Promise<{
 
   if (ENV.resendApiKey) {
     try {
-      const ok = await sendViaResend(to, testCode);
+      const ok = await sendViaResend(to, testSubject, testHtml);
       result.resendResult = ok ? "success" : "failed";
       if (!ok) result.resendError = "Resend returned error (check Resend dashboard)";
     } catch (err: unknown) {
