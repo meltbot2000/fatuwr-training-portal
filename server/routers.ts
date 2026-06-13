@@ -263,7 +263,13 @@ export const appRouter = router({
         // Truncate to second precision — MySQL TIMESTAMP doesn't support milliseconds
         const expiresAt = new Date(Math.floor((Date.now() + 10 * 60 * 1000) / 1000) * 1000);
         await db.createOtp(email.toLowerCase().trim(), code, expiresAt);
-        await sendOtpEmail(email, code);
+        const emailSent = await sendOtpEmail(email, code);
+        if (!emailSent) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Could not send verification email. Please try again in a moment or contact support.",
+          });
+        }
         return { success: true, message: "Verification code sent" };
       }),
 

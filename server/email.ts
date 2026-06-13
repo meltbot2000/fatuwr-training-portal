@@ -176,7 +176,9 @@ export async function sendOtpEmail(email: string, code: string): Promise<boolean
   console.log(`[OTP] Email: ${email}`);
   console.log(`[OTP] Code:  ${code}`);
   console.log(`[OTP] ================================================================`);
-  return true;
+  // Return false so callers know delivery failed; the OTP is still stored in DB
+  // and will appear in Railway logs, but the user will not receive an email.
+  return false;
 }
 
 /**
