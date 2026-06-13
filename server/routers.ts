@@ -202,7 +202,7 @@ async function getMyPayments(email: string, allPayments?: Awaited<ReturnType<typ
   return { myPayments: result, myPaymentRefs };
 }
 
-function generatePaymentId(name: string, existingIds: Set<string>): string {
+export function generatePaymentId(name: string, existingIds: Set<string>): string {
   const clean = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const firstName = clean(parts[0] || "") || "user";
@@ -312,7 +312,16 @@ export const appRouter = router({
             } catch (err: any) {
               console.error("[Auth] Could not fetch users for paymentId uniqueness check:", err.message);
             }
-            const existingIds = new Set(allUsers.map(u => (u.paymentId || "").toLowerCase().trim()).filter(Boolean));
+            let dbIds: string[] = [];
+            try {
+              dbIds = await db.getExistingPaymentIds();
+            } catch (err: any) {
+              console.error("[Auth] Could not fetch DB payment IDs for uniqueness check:", err.message);
+            }
+            const existingIds = new Set([
+              ...allUsers.map(u => (u.paymentId || "").toLowerCase().trim()).filter(Boolean),
+              ...dbIds,
+            ]);
             paymentId = generatePaymentId(name, existingIds);
           }
 
@@ -410,11 +419,19 @@ export const appRouter = router({
         } catch (err: any) {
           console.error("[Auth] completeProfile: could not fetch users:", err.message);
         }
-        const existingIds = new Set(
-          allUsers
+        let dbIds: string[] = [];
+        try {
+          dbIds = await db.getExistingPaymentIds();
+        } catch (err: any) {
+          console.error("[Auth] completeProfile: could not fetch DB payment IDs:", err.message);
+        }
+        const currentId = (user.paymentId || "").toLowerCase().trim();
+        const existingIds = new Set([
+          ...allUsers
             .map(u => (u.paymentId || "").toLowerCase().trim())
-            .filter(id => id && id !== (user.paymentId || "").toLowerCase().trim())
-        );
+            .filter(id => id && id !== currentId),
+          ...dbIds.filter(id => id !== currentId),
+        ]);
         const paymentId = generatePaymentId(name, existingIds);
 
         // Update DB with real name and new paymentId
