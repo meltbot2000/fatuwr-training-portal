@@ -135,39 +135,64 @@ async function sendViaSendGrid(to: string, code: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Resend is only promoted ahead of SendGrid once it has a real verified sending
+ * domain. The onboarding@resend.dev sandbox only delivers to the Resend account
+ * owner, so until RESEND_API_FROM is a real domain we keep SendGrid first.
+ * This lets the Railway RESEND_API_FROM env change flip provider priority with
+ * no code deploy — and keeps a stray deploy from routing real OTPs to the sandbox.
+ */
+function resendHasVerifiedDomain(): boolean {
+  return Boolean(ENV.resendApiKey) && !ENV.resendApiFrom.includes("resend.dev");
+}
+
+/** Attempt SendGrid for an OTP. Returns true on success, false if unconfigured or failed. */
+async function trySendGridOtp(email: string, code: string): Promise<boolean> {
+  if (!(ENV.sendgridApiKey && ENV.sendgridFrom)) {
+    console.warn("[OTP] SendGrid skipped — SENDGRID_API_KEY or SENDGRID_FROM not set");
+    return false;
+  }
+  console.log(`[OTP] Attempting SendGrid to ${email} from ${ENV.sendgridFrom}`);
+  try {
+    return await sendViaSendGrid(email, code);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[OTP] SendGrid failed: ${msg}`);
+    console.error("[OTP] SendGrid error detail:", err);
+    return false;
+  }
+}
+
+/** Attempt Resend for an OTP. Returns true on success, false if unconfigured or failed. */
+async function tryResendOtp(email: string, code: string): Promise<boolean> {
+  if (!ENV.resendApiKey) {
+    console.warn("[OTP] Resend skipped — RESEND_API_KEY not set");
+    return false;
+  }
+  console.log(`[OTP] Attempting Resend to ${email} (from: ${ENV.resendApiFrom})`);
+  try {
+    const sent = await sendViaResend(email, code);
+    if (!sent) console.warn("[OTP] Resend returned false — check Resend dashboard for errors");
+    return sent;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[OTP] Resend exception: ${msg}`);
+    return false;
+  }
+}
+
 export async function sendOtpEmail(email: string, code: string): Promise<boolean> {
   console.log(`[OTP] Starting sendOtpEmail to: ${email}`);
   console.log(`[OTP] SENDGRID_API_KEY set: ${Boolean(ENV.sendgridApiKey)}, SENDGRID_FROM set: ${Boolean(ENV.sendgridFrom)}`);
   console.log(`[OTP] RESEND_API_KEY set: ${Boolean(ENV.resendApiKey)}`);
 
-  // --- Provider 1: SendGrid Web API (HTTPS — works on Railway, CNAME verification works with Wix) ---
-  if (ENV.sendgridApiKey && ENV.sendgridFrom) {
-    console.log(`[OTP] Attempting SendGrid to ${email} from ${ENV.sendgridFrom}`);
-    try {
-      const ok = await sendViaSendGrid(email, code);
-      if (ok) return true;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[OTP] SendGrid failed: ${msg}`);
-      console.error("[OTP] SendGrid error detail:", err);
-    }
-  } else {
-    console.warn("[OTP] SendGrid skipped — SENDGRID_API_KEY or SENDGRID_FROM not set");
-  }
-
-  // --- Provider 2: Resend (requires verified sending domain) -------------------
-  if (ENV.resendApiKey) {
-    console.log(`[OTP] Attempting Resend to ${email} (from: ${ENV.resendApiFrom})`);
-    try {
-      const sent = await sendViaResend(email, code);
-      if (sent) return true;
-      console.warn("[OTP] Resend returned false — check Resend dashboard for errors");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[OTP] Resend exception: ${msg}`);
-    }
-  } else {
-    console.warn("[OTP] Resend skipped — RESEND_API_KEY not set");
+  // Prefer Resend once it has a verified domain; otherwise keep SendGrid first.
+  const attempts = resendHasVerifiedDomain()
+    ? [tryResendOtp, trySendGridOtp]
+    : [trySendGridOtp, tryResendOtp];
+  console.log(`[OTP] Provider order: ${resendHasVerifiedDomain() ? "Resend → SendGrid" : "SendGrid → Resend"}`);
+  for (const attempt of attempts) {
+    if (await attempt(email, code)) return true;
   }
 
   // --- Fallback: print to console (local dev only) -----------------------------
@@ -192,7 +217,8 @@ export async function sendAlertEmail(subject: string, text: string): Promise<voi
     "fatuwrevents@gmail.com",
   ];
 
-  if (ENV.sendgridApiKey && ENV.sendgridFrom) {
+  const trySendGridAlert = async (): Promise<boolean> => {
+    if (!(ENV.sendgridApiKey && ENV.sendgridFrom)) return false;
     try {
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
@@ -209,26 +235,37 @@ export async function sendAlertEmail(subject: string, text: string): Promise<voi
       });
       if (res.ok) {
         console.log(`[Alert] Sent via SendGrid to ${recipients.length} recipients: ${subject}`);
-        return;
+        return true;
       }
-      console.warn(`[Alert] SendGrid HTTP ${res.status} — falling back to Resend`);
+      console.warn(`[Alert] SendGrid HTTP ${res.status} — trying next provider`);
     } catch (err: unknown) {
       console.warn(`[Alert] SendGrid failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }
+    return false;
+  };
 
-  if (ENV.resendApiKey) {
+  const tryResendAlert = async (): Promise<boolean> => {
+    if (!ENV.resendApiKey) return false;
     try {
       const resend = new Resend(ENV.resendApiKey);
       const result = await resend.emails.send({ from: ENV.resendApiFrom, to: recipients, subject, text });
       if (!result.error) {
         console.log(`[Alert] Sent via Resend to ${recipients.length} recipients: ${subject}`);
-        return;
+        return true;
       }
       console.warn(`[Alert] Resend error: ${result.error.message}`);
     } catch (err: unknown) {
       console.warn(`[Alert] Resend failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+    return false;
+  };
+
+  // Prefer Resend once it has a verified domain; otherwise keep SendGrid first.
+  const attempts = resendHasVerifiedDomain()
+    ? [tryResendAlert, trySendGridAlert]
+    : [trySendGridAlert, tryResendAlert];
+  for (const attempt of attempts) {
+    if (await attempt()) return;
   }
 
   // Last resort — loud Railway log (visible in dashboard and any log alerts)
