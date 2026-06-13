@@ -3,9 +3,21 @@
  *
  * Strategy: within each duplicate group the OLDEST user (lowest id) keeps
  * the original paymentId. Every newer duplicate is re-assigned the next
- * available numeric suffix (samuel → samuel1, samuel2, …) and all rows in
- * sheetUsers, sheetPayments, and sheetSignups that are linked to that user
- * by email are updated to the new paymentId.
+ * available numeric suffix (samuel → samuel1, samuel2, …).
+ *
+ * Tables updated:
+ *   users      — auth table; source of truth for login attribution
+ *   sheetUsers — DB cache of the Google Sheets "Users" tab; updated here so
+ *                the app sees the new ID immediately. NOTE: a manual forceSync
+ *                (Admin → Data tab) would revert this unless you also update
+ *                col A (PaymentID) in the actual Google Sheet for this user.
+ *
+ * Tables NOT updated (handle these manually):
+ *   sheetPayments — GAS-owned cache; full DELETE+INSERT on every payment sync
+ *                   would revert any DB change here. Edit col F in the Google
+ *                   Sheet "Payments" tab directly instead.
+ *   sheetSignups  — DB-primary; patch affected rows in the Admin panel or
+ *                   via the Railway MySQL console.
  *
  * Usage:
  *   pnpm tsx scripts/repair-duplicate-paymentids.ts          # dry run (safe, no writes)
@@ -15,7 +27,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/mysql2";
 import { eq, or, sql } from "drizzle-orm";
-import { users, sheetUsers, sheetPayments, sheetSignups } from "../drizzle/schema";
+import { users, sheetUsers } from "../drizzle/schema";
 
 const APPLY = process.argv.includes("--apply");
 
@@ -81,35 +93,24 @@ async function main() {
       takenIds.add(newId); // reserve it for subsequent iterations
 
       console.log(`  REASSIGN id=${dup.id} (${email}): "${dupId}" → "${newId}"`);
+      console.log(`  ACTION NEEDED after --apply:`);
+      console.log(`    • Google Sheet "Users" tab col A: change "${dupId}" → "${newId}" for ${email}`);
+      console.log(`    • Google Sheet "Payments" tab col F: change "${dupId}" → "${newId}" for rows belonging to ${email}`);
+      console.log(`    • sheetSignups rows with paymentId="${dupId}" and email="${email}": update to "${newId}" manually`);
 
       if (!APPLY) continue;
 
-      // users table
+      // users table (auth — source of truth)
       await db.update(users)
         .set({ paymentId: newId })
         .where(eq(users.id, dup.id));
 
-      // sheetUsers table (match by email or userEmail)
+      // sheetUsers table (DB cache — gives immediate effect; survives until next forceSync)
       await db.update(sheetUsers)
         .set({ paymentId: newId, sheetId: newId })
         .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
 
-      // sheetPayments — only rows whose email matches this user
-      // (rows with no email and paymentId=dupId belong to the original owner)
-      await db.update(sheetPayments)
-        .set({ paymentId: newId })
-        .where(
-          sql`LOWER(TRIM(paymentId)) = ${dupId} AND LOWER(TRIM(email)) = ${email}`
-        );
-
-      // sheetSignups — same logic
-      await db.update(sheetSignups)
-        .set({ paymentId: newId })
-        .where(
-          sql`LOWER(TRIM(paymentId)) = ${dupId} AND LOWER(TRIM(email)) = ${email}`
-        );
-
-      console.log(`  DONE id=${dup.id}`);
+      console.log(`  DONE id=${dup.id} — remember to update the Google Sheets manually.`);
     }
     console.log();
   }
@@ -117,7 +118,7 @@ async function main() {
   if (!APPLY) {
     console.log("--- DRY RUN complete — no changes written. Re-run with --apply to execute. ---\n");
   } else {
-    console.log("--- All repairs applied. ---\n");
+    console.log("--- DB repairs applied. Complete the manual Google Sheet steps listed above. ---\n");
   }
 }
 
