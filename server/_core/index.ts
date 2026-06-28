@@ -12,7 +12,7 @@ import { startBackgroundSync, syncTab, forceSyncTab, getSyncStatus, recordGasHea
 import { seedMerchIfEmpty } from "../merchSeed";
 import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
-import { sheetSessions, sheetSignups, sheetPayments, sheetUsers } from "../../drizzle/schema";
+import { sheetSessions, sheetSignups, sheetPayments, sheetUsers, users } from "../../drizzle/schema";
 import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -101,6 +101,49 @@ async function startServer() {
     }
     recordGasHeartbeat();
     res.json({ status: "ok" });
+  });
+
+  // Resolve a Maybank PayNow reference → { paymentId, email } from the live DB.
+  // Called by GAS lookupUserByPaymentRef so payment matching uses the always-current
+  // DB instead of the periodically-synced sheet User tab (which is stale for any
+  // user created since the last manual sync). Read-only; never writes.
+  // GET /api/resolve-payment-ref?ref=<reference>&token=APPS_SCRIPT_SECRET
+  app.get("/api/resolve-payment-ref", async (req, res) => {
+    const { ref, token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const needle = (ref || "").toLowerCase().trim();
+    if (!needle) {
+      res.json({ paymentId: "", email: "" });
+      return;
+    }
+    const resolveDb = await getDb();
+    if (!resolveDb) {
+      res.status(503).json({ error: "DB unavailable" });
+      return;
+    }
+    try {
+      // Primary: full member roster (sheet_users). Fallback: auth users table —
+      // covers members who paid before their first app login.
+      const roster = await resolveDb.select().from(sheetUsers);
+      let hit = roster.find(u => (u.paymentId || "").toLowerCase().trim() === needle);
+      let paymentId = hit ? (hit.paymentId || "").trim() : "";
+      let email = hit ? (hit.email || hit.userEmail || "").toLowerCase().trim() : "";
+      if (!paymentId) {
+        const authUsers = await resolveDb.select().from(users);
+        const hit2 = authUsers.find(u => (u.paymentId || "").toLowerCase().trim() === needle);
+        if (hit2) {
+          paymentId = (hit2.paymentId || "").trim();
+          email = (hit2.email || "").toLowerCase().trim();
+        }
+      }
+      res.json({ paymentId, email });
+    } catch (e: any) {
+      console.error("[resolve-payment-ref] lookup failed:", e?.message);
+      res.status(500).json({ error: "lookup failed" });
+    }
   });
 
   // DB → Sheet export endpoint (called by GAS "Sync from DB" menu)
