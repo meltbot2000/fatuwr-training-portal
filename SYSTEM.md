@@ -726,6 +726,19 @@ Use **Playwright**. Priority flows: full login, session sign-up, admin add sessi
 | `Code_v16_2026-06-28.gs` | 2026-06-28 | `lookupUserByPaymentRef()` resolves the PayNow reference against the live Railway DB (`GET /api/resolve-payment-ref`) before falling back to the Sheet User tab — fixes payments not matching for users created since the last manual sheet sync. Sheet lookup kept as fallback. |
 | `Code_v17_2026-09-01.gs` | 2026-09-01 | **Restored `editPaymentRow()` + the `editPayment` doPost route** (lost in the v14 branch — the live script had answered "Unknown action: editPayment" since 2026-05-07, so every admin payment edit failed). **New `addPaymentRow()` + `addPayment` route** so "+ Add payment" appends to the Sheet first and returns a real `rowIndex`. Neither calls `notifyRailway()` — see Bug 16. Adds `normalisePaymentDate()`. |
 
+### Which version is actually LIVE — check, do not assume
+
+The repo tells you what has been *written*, never what is *deployed*. Melanie deploys GAS by hand, so the newest `.gs` file here can sit undeployed for days.
+
+```bash
+curl -s "$GOOGLE_APPS_SCRIPT_URL"
+# → {"status":"ok","message":"FATUWR GAS v17 running"}
+```
+
+`doGet` returns the version string, so this is a one-second check. **Run it before diagnosing any payment-write bug** — "the code is right but the behaviour is wrong" is almost always a stale deployment, not a logic error. Bump the string in `doGet` in every new version so it stays useful.
+
+As of 2026-09-01: `Code_v17_2026-09-01.gs` exists in the repo. Confirm with the curl above whether it is live before trusting `editPayment` / `addPayment` to work.
+
 **The v14 regression is the cautionary tale for this whole section.** v14 was branched from `Code.gs` rather than from `Code_v13_*.gs`, because `Code_v13_*.gs` had never been mirrored back into `Code.gs`. Three months of failing payment edits followed, with the failure visible only as a toast. When cutting a new version, branch from the **highest-numbered** file, not from `Code.gs`.
 
 **Never edit live GAS files in place. Always create a new versioned file.**
