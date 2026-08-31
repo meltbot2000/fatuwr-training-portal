@@ -16,7 +16,7 @@ import { AlertTriangle, Loader2, Plus, Lock, RefreshCw, Pencil, Users, ChevronRi
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { EditSessionSheet, type SessionForEdit } from "@/components/EditSessionSheet";
-import { formatDisplayDate, parseAnyDate } from "@/lib/dateUtils";
+import { formatDisplayDate, parseAnyDate, parseAnyDateTime, formatDateTimeDisplay, extractTimeOfDay } from "@/lib/dateUtils";
 
 const STATUS_COLORS: Record<string, string> = {
   "Member": "bg-green-500 text-white",
@@ -91,6 +91,14 @@ function formatPaymentDate(dateStr: string): string {
   const d = parseAnyDate(dateStr);
   if (!d) return dateStr;
   return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "2:30 pm" — the time-of-day only, or "" when none is recorded. */
+function formatTimeOnly(dateStr: string): string {
+  if (!extractTimeOfDay(dateStr)) return "";
+  const d = parseAnyDateTime(dateStr);
+  if (!d) return "";
+  return d.toLocaleTimeString("en-SG", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 /** Convert any known date format to YYYY-MM-DD for <input type="date"> */
@@ -541,6 +549,23 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
             />
           </div>
 
+          {/* Transfer timestamp — read-only. The Date field below is an
+              <input type="date"> and cannot carry a time; the server
+              re-attaches this time on save so it is never lost. */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Transfer received</Label>
+            <div className="h-10 flex items-center rounded-md border border-input bg-muted/30 px-3">
+              <span className="text-sm text-white/80 tabular-nums">
+                {formatDateTimeDisplay(payment.date)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {extractTimeOfDay(payment.date)
+                ? "Timestamp from the bank transfer notification."
+                : "No time recorded on this payment — date only."}
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Date</Label>
             <Input
@@ -549,6 +574,11 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
               onChange={e => setDate(e.target.value)}
               className="h-10"
             />
+            {extractTimeOfDay(payment.date) && (
+              <p className="text-xs text-muted-foreground">
+                Changing the date keeps the {formatTimeOnly(payment.date)} transfer time.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -593,6 +623,9 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
                 email: email.trim(),
                 amount: parseFloat(amount) || 0,
                 date: date.trim(),
+                // Lets the server re-attach the transfer time without a DB read
+                // that could race a payments sync. See preservePaymentTime.
+                originalDate: payment.date,
               })}
               disabled={isPending}
               className="w-full bg-navy text-white hover:bg-navy/90"

@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-05-27 (trial date "null" string fix, alert email recipients, admin blank-field fix)*
+*Last updated: 2026-09-01 (Data-tab attendance derived from sign-ups, payment transfer timestamp preserved + displayed, timezone-safe `toIsoDate`)*
 
 ---
 
@@ -157,14 +157,19 @@ Maybank email arrives → Gmail label "Maybank" or "Maybank2"
 
 The reactive `/api/sync` endpoint **does not** reset the GAS health timer — that signal would be too noisy / too sparse to reliably detect a broken GAS. The dedicated `gasHeartbeat()` trigger is the sole source of `recordGasHeartbeat()` (see GAS health monitor below).
 
-#### Admin payment edit flow (current — as of v13 + patches)
+#### Admin payment edit flow (current — as of v17)
 
 ```
 Admin opens payment row → EditPaymentSheet (Admin.tsx)
+  → "Transfer received" read-only row shows the FULL timestamp (formatDateTimeDisplay)
   → form pre-populated from DB: date via toInputDate() (any format → YYYY-MM-DD for <input type="date">)
   → admin edits fields → Save
   → admin.editPayment tRPC mutation:
       validates: rowIndex must be >= 2 (else throw — row has no Sheet reference)
+      preservePaymentTime(): re-attaches the row's time-of-day, emitting
+        "M/D/YYYY HH:MM:SS". Time source is the client's `originalDate`
+        first, DB-by-rowIndex only as fallback (see "Payment transfer
+        timestamp" in §8)
       AWAIT appsScript.editPayment({ rowIndex, paymentId, email, reference, amount, date })
         → GAS editPaymentRow():
             writes to Sheet by 1-based rowIndex:
@@ -308,6 +313,8 @@ All session mutations call `clearSessionsCache()` after completion.
 ### `sheet_sessions`
 PK: `rowIndex` (sheet row number). DB-primary. App writes directly. `trainingDate` may contain "19 April 2026" (legacy seeded) or "2026-04-19" (app-created). Always use `datesMatch()` for comparisons.
 
+**`attendance` column is DEAD DATA — never read it.** It is a one-off snapshot seeded from Sheet col [14] and is maintained by nothing: `addSession` writes `attendance: 0` and no mutation ever updates it, so every app-created session sits at 0 forever and every seeded session is frozen at whatever the count was on seeding day. `admin.allSessions` derives attendance live from `sheet_signups` (count per `date+pool`, same key as `revenue`). The column is still written out by `/api/export` for Sheet parity — that is its only remaining use. See Bug 17.
+
 ### `sheet_signups`
 PK: auto-increment `id`. DB-primary. App writes directly. `dateOfTraining` is always ISO for app-written rows; legacy seeded rows may be "19 April 2026". Always use `datesMatch()`.
 
@@ -435,6 +442,18 @@ If a sign-up or payment row has a `paymentId`, ownership is by paymentId **only*
 - Payment dates from GAS: `"M/D/YYYY HH:MM:SS"` (e.g. `"5/4/2026 14:30:00"`) — GAS `formatDateTime` output
 - **Rule**: always use `datesMatch()` for session ↔ sign-up comparisons. For display, always use `parseAnyDate()` from `dateUtils.ts` — it handles all formats. For `<input type="date">`, use `toInputDate()` (converts any format → `YYYY-MM-DD`).
 
+### Date normalisation must use LOCAL components, never toISOString()
+Both `toIsoDate()` helpers (`routers.ts`, `googleSheets.ts`) fall back to `new Date(raw)` for free-text dates like `"1 March 2026"`. JS parses that as **local** midnight. `toISOString().slice(0,10)` then converts to UTC, which in any timezone east of UTC (SGT is UTC+8) rolls the date back one day — so every seeded session keys to the wrong date and matches zero sign-ups. Railway runs in UTC so production was unaffected, but local dev and tests silently produced wrong counts. Both helpers now read back `getFullYear()/getMonth()/getDate()`. **Never reintroduce `toISOString()` in a date-normalisation path.**
+
+### Payment transfer timestamp
+`sheet_payments.date` holds the real bank-transfer timestamp as `"M/D/YYYY HH:MM:SS"` (GAS `formatDateTime`, taken from the Maybank email's send time). All 459 live rows carry a genuine time.
+
+- **Display:** `formatDateTimeDisplay()` / `parseAnyDateTime()` / `extractTimeOfDay()` in `dateUtils.ts`. `parseAnyDate()` still deliberately discards the time — it is for timezone-safe date comparison, not display.
+- **A time of exactly `00:00:00` means "no time recorded", not midnight.** It is what GAS `normalisePaymentDate()` writes when a date-only value is saved, i.e. a normalisation artefact. All three helpers treat it as absent.
+- **Editing must not destroy it.** The admin form is an `<input type="date">` and can only return `"YYYY-MM-DD"`; `preservePaymentTime()` in `routers.ts` re-attaches the row's existing time before the value reaches GAS. See Bug 18.
+- **The time source is the client's `originalDate`, not a DB read.** `admin.editPayment` takes an optional `originalDate` — the row's stored date exactly as the client rendered it. A fresh DB read is only the fallback, because `syncTab("payments")` does a full DELETE+INSERT: a read landing inside that window returns no row, and the code would then write a bare ISO date that GAS zeroes to `00:00:00`. The whole point of the fix is to not lose the timestamp, so it must not depend on a table that is periodically empty.
+- **Seconds are displayed.** Bulk-imported payments can share a minute and differ only in seconds (five live rows sit at `17:30:00`–`17:30:04`); dropping seconds would make distinct transfers indistinguishable when reconciling.
+
 ### sheet_payments id instability (CRITICAL)
 `sheet_payments.id` changes on every sync cycle (full DELETE+INSERT). **Never target a payment row by `id` in a mutation.** Use `rowIndex` (the 1-based Sheet row number, stable across cycles). The server's `admin.editPayment` mutation already uses `rowIndex` in the WHERE clause.
 
@@ -539,6 +558,24 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 **Root cause:** `editPaymentRow` in GAS called `notifyRailway("payments")` at the end, which triggered an immediate Sheet→DB sync. The Google Sheets API can serve cached/pre-flush data in the seconds after a GAS `SpreadsheetApp.flush()`. The sync read old col E (reference) from the Sheets API before the flush had propagated externally, then did a full DELETE+INSERT — overwriting the DB with the old reference within seconds of the save.
 **Fix:** Removed `notifyRailway("payments")` from `editPaymentRow`. The server updates the DB directly via `payDb.update(...).where(rowIndex = ...)` after GAS returns. The 6-hourly sync will re-read the Sheet (which GAS has correctly flushed) and confirms the DB. `SpreadsheetApp.flush()` is kept in `editPaymentRow` for consistency.
 
+### Bug 17: Data tab attendee counts wrong for months (fixed 2026-09-01)
+**Symptom:** The Admin → Data per-session PnL rows showed the wrong number of attendees — most sessions read "0 attendees" despite having a full sign-up list, and older ones showed a number that never moved.
+**Root cause:** The card read `sheet_sessions.attendance`, a column seeded once from Sheet col [14] and maintained by nothing. `addSession` hardcodes `attendance: 0`, so every session created in the app stayed at 0 permanently; seeded sessions were frozen at the count on seeding day. Measured against live data: **52 of 155 sessions showed 0 while having sign-ups**, 19 more were stale, and **0 sessions depended on the column for anything sign-ups could not reproduce**.
+**Contributing:** `revenue` on the same card was already derived live from sign-ups, so the two numbers beside each other described different things — a session could read "0 attendees · +$258".
+**Fix:** `admin.allSessions` now builds `attendanceMap` in the same pass as `revenueMap`, keyed on the same normalised `date+pool`, so attendance and revenue always describe the same rows. Sign-up rows with a blank `dateOfTraining` (Trial Membership / Membership Fee) are skipped — they belong to no session.
+**Lesson:** A denormalised count column with no writer is worse than no column: it reads as authoritative and is silently wrong forever. Derive counts at read time unless something actually maintains them.
+
+### Bug 18: Payment edit destroyed the transfer timestamp (fixed 2026-09-01)
+**Root cause:** The edit form's `<input type="date">` can only return `"YYYY-MM-DD"`. GAS `normalisePaymentDate()` expands a bare ISO date to `"M/D/YYYY 00:00:00"` — so saving a payment for *any* reason (fixing a typo'd reference, re-matching a paymentId) rewrote col C and threw away the bank's transfer time. Latent since v13 and about to start biting: `editPaymentRow` was missing from the live script from v14 until v17, so every edit failed outright rather than corrupting data.
+**Fix:** (1) `preservePaymentTime()` on the server re-attaches the row's time-of-day, emitting canonical `"M/D/YYYY HH:MM:SS"` — which `normalisePaymentDate()` passes through untouched. The time comes from the client's `originalDate` (DB read only as fallback), so a concurrent payments sync cannot cause the very data loss being fixed. (2) EditPaymentSheet shows the full timestamp, seconds included, in a read-only "Transfer received" row so the admin can see what they are reconciling against.
+**Verified against live data:** all 459 payment rows round-trip through open → save-unchanged → reopen with zero time loss, zero date drift, and idempotent re-saves, under UTC, SGT and a negative-offset timezone.
+**Lesson:** An `<input type="date">` is a lossy round-trip for any value that carries a time. Either show and preserve the time explicitly, or do not let the control write that field.
+
+### Bug 19: toIsoDate shifted free-text dates back a day outside UTC (fixed 2026-09-01)
+**Root cause:** `new Date("1 March 2026")` yields local midnight; `.toISOString().slice(0,10)` then converts to UTC and returns `"2026-02-28"` in SGT. 148 of 155 sessions store free-text dates, so in any non-UTC environment every one of them keyed to the wrong day and matched zero sign-ups.
+**Why it was invisible:** Railway runs in UTC. The bug only surfaced in local dev and in the unit test written for Bug 17.
+**Fix:** Both `toIsoDate()` helpers read back local `getFullYear()/getMonth()/getDate()`. No behaviour change on Railway.
+
 ---
 
 ## 10. How we work together (Claude ↔ Melanie)
@@ -620,16 +657,30 @@ If a requirement is ambiguous or there is risk of a wrong assumption — **stop 
 
 ## 12. Automated testing approach
 
-No automated tests currently. Recommended approach:
+**Vitest is set up.** `pnpm test` runs it. `vitest.config.ts` only includes `server/**/*.test.ts`, so **every test file must live in `server/`** — client modules are still testable from there via the `@` alias (`@/lib/dateUtils`).
 
-### Unit tests — server logic (highest ROI)
-Use **Vitest**.
+### Existing test files
+
+| File | Covers |
+|---|---|
+| `server/paymentId.test.ts` | `generatePaymentId` — all 4 naming steps |
+| `server/paymentDate.test.ts` | `preservePaymentTime` / `timeOfDayFrom` (server) and `extractTimeOfDay` / `parseAnyDateTime` / `formatDateTimeDisplay` (client) — Bug 18 |
+| `server/adminSessions.test.ts` | `admin.allSessions` live attendance + revenue derivation, mixed date formats, membership-row exclusion — Bug 17 |
+| `server/sessions.test.ts` | `sessions.list` / `sessions.detail` — **`sessions.detail` currently FAILS** (pre-existing, unrelated to the above) |
+| `server/auth.logout.test.ts` | `auth.logout` — **currently FAILS** (pre-existing) |
+
+Baseline as of 2026-09-01: **40 passing, 2 failing**, both failures pre-existing. Compare against this baseline before blaming a change.
+
+Mocking pattern for router tests: `vi.mock("./googleSheets", ...)` for session/user reads and `vi.mock("./db", ...)` returning a stub whose `select().from()` resolves to fixture rows (see `adminSessions.test.ts`).
+
+### Still to cover
 
 Priority:
 - `feeUtils.ts` — `getMembershipOnTrainingDate`, `getActivityFee`, `computeDebt`
-- `dateUtils.ts` — `parseAnyDate`, `toIsoDate`, `toInputDate`, `datesMatch` — many edge cases (M/D/YYYY HH:MM:SS, ISO, "19 April 2026", DD/MM/YYYY)
+- `dateUtils.ts` — `parseAnyDate`, `toInputDate`, `datesMatch` edge cases (ISO, "19 April 2026", DD/MM/YYYY)
+- `toIsoDate` under a non-UTC `TZ` — the Bug 19 regression guard
 - `getSignUpsForSession` — mock DB, test mixed-format dates
-- `generatePaymentId` — mock DB, test all 4 naming steps
+- Fix the two failing tests above
 
 ### Integration tests — tRPC endpoints
 Priority: `auth.sendOtp`, `auth.verifyOtp`, `signups.submit`, `/api/sync`.
@@ -649,11 +700,16 @@ Use **Playwright**. Priority flows: full login, session sign-up, admin add sessi
 3. **Restore indexed WHERE on `getSignUpsForSession`** — safe after date normalisation.
 4. **Prevent body scroll (long-term iOS fix)** — scroll inner container instead of `<body>`.
 
+### Medium priority (added 2026-09-01)
+5. **Two failing unit tests** — `sessions.detail` and `auth.logout`. Pre-existing, unrelated to Bugs 17–19. See §12.
+6. **Drop or repurpose `sheet_sessions.attendance`** — nothing reads it now (§5). Leaving a dead column that looks authoritative is how Bug 17 happened; either remove it or have a mutation maintain it.
+7. **One malformed sign-up row** — id `242246`, `activity` "Regular Training", `dateOfTraining` `2026-03-10`, **blank `pool`**. It matches no session, so its $33.33 is silently excluded from every PnL total. Needs its pool set or the row deleted.
+
 ### Deferred / nice-to-have
-5. **Real-time payment notifications** — Pub/Sub (Gmail push) instead of 1-min cron.
-6. **Automated tests** — as described in §12.
-7. **Newbie flow screens 2–6** — only screen 1 implemented.
-8. **GAS: Maybank2 label not removed** — after `thread.addLabel(doneLabel)`, add `thread.removeLabel(maybankLabel)`.
+8. **Real-time payment notifications** — Pub/Sub (Gmail push) instead of 1-min cron.
+9. **Broader automated test coverage** — as described in §12.
+10. **Newbie flow screens 2–6** — only screen 1 implemented.
+11. **GAS: Maybank2 label not removed** — after `thread.addLabel(doneLabel)`, add `thread.removeLabel(maybankLabel)`.
 
 ---
 
@@ -665,10 +721,11 @@ Use **Playwright**. Priority flows: full login, session sign-up, admin add sessi
 | `Code_v11_2026-04-26.gs` | 2026-04-26 | OAuth validity check + alert email; both Maybank labels → Maybank_Done2; appendPaymentRow in try-catch |
 | `Code_v12_2026-05-03.gs` | 2026-05-03 | Added `editPaymentRow()` (col F paymentId + col G email); `notifyRailway("payments")` in editPaymentRow; `notifyRailway("payments")` in processMaybankEmails when newCount > 0 |
 | `Code_v13_2026-05-04.gs` | 2026-05-04 | `editPaymentRow` expanded to write ALL 5 columns (C date, D amount, E reference, F paymentId, G email); doGet returns v13 |
+| `Code_v14_2026-05-07.gs` | 2026-05-07 | `gasHeartbeat()` + `createHeartbeatTrigger()` / `deleteHeartbeatTrigger()` — 30-min health beat to `/api/health/gas-heartbeat`. **Branched from the pre-v13 `Code.gs`, silently dropping `editPaymentRow` and the `editPayment` doPost route** (see v17). |
+| `Code_v15_2026-06-03.gs` | 2026-06-03 | Maintenance release; no payment-path changes. |
+| `Code_v16_2026-06-28.gs` | 2026-06-28 | `lookupUserByPaymentRef()` resolves the PayNow reference against the live Railway DB (`GET /api/resolve-payment-ref`) before falling back to the Sheet User tab — fixes payments not matching for users created since the last manual sheet sync. Sheet lookup kept as fallback. |
+| `Code_v17_2026-09-01.gs` | 2026-09-01 | **Restored `editPaymentRow()` + the `editPayment` doPost route** (lost in the v14 branch — the live script had answered "Unknown action: editPayment" since 2026-05-07, so every admin payment edit failed). **New `addPaymentRow()` + `addPayment` route** so "+ Add payment" appends to the Sheet first and returns a real `rowIndex`. Neither calls `notifyRailway()` — see Bug 16. Adds `normalisePaymentDate()`. |
 
-**Current live GAS script state** (manually patched after v13 — no separate file yet):
-- `SpreadsheetApp.flush()` added before return in `editPaymentRow`
-- `notifyRailway("payments")` removed from `editPaymentRow` (was causing immediate Sheets API cache race — see Bug 15)
-- All other v13 content unchanged
+**The v14 regression is the cautionary tale for this whole section.** v14 was branched from `Code.gs` rather than from `Code_v13_*.gs`, because `Code_v13_*.gs` had never been mirrored back into `Code.gs`. Three months of failing payment edits followed, with the failure visible only as a toast. When cutting a new version, branch from the **highest-numbered** file, not from `Code.gs`.
 
 **Never edit live GAS files in place. Always create a new versioned file.**

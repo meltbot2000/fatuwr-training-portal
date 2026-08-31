@@ -103,8 +103,53 @@ function toIsoDate(raw: string): string {
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
   const date = new Date(raw);
-  if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  // Read back LOCAL components, not toISOString(): free text like
+  // "1 March 2026" is parsed as local midnight, and in any timezone east of
+  // UTC toISOString() rolls that back to the previous calendar day — every
+  // seeded session would then key to the wrong date and match no sign-ups.
+  if (!isNaN(date.getTime())) {
+    const y  = date.getFullYear();
+    const m  = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
   return raw;
+}
+
+/**
+ * Payment dates in col C of the Payments sheet carry the real transfer
+ * timestamp ("M/D/YYYY HH:MM:SS", written by GAS formatDateTime from the
+ * Maybank email's send time).  The admin edit form is an <input type="date">,
+ * so it can only send back a bare "YYYY-MM-DD" — writing that straight through
+ * makes GAS normalisePaymentDate() stamp the row "M/D/YYYY 00:00:00" and the
+ * transfer time is gone for good.
+ *
+ * Re-attach the time-of-day already on the row so a date correction (or an
+ * unrelated field edit that resubmits the whole form) never destroys it.
+ * Emits the canonical GAS format so the Sheet stays internally consistent.
+ * A bare "YYYY-MM-DD" is returned unchanged when the row has no time recorded.
+ */
+export function timeOfDayFrom(dateStr: string): string {
+  if (!dateStr) return "";
+  const m = dateStr.match(/\s(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+    ?? dateStr.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return "";
+  const hh = String(Number(m[1])).padStart(2, "0");
+  const mm = m[2];
+  const ss = m[3] ?? "00";
+  // 00:00:00 is what a previous date-only save wrote — not a real transfer time.
+  if (hh === "00" && mm === "00" && ss === "00") return "";
+  return `${hh}:${mm}:${ss}`;
+}
+
+export function preservePaymentTime(newDate: string, existingDate: string): string {
+  const iso = (newDate ?? "").trim();
+  // Only a bare ISO date loses the time; anything else is passed through as-is.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return newDate;
+  const time = timeOfDayFrom(existingDate ?? "");
+  if (!time) return newDate;
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${m}/${d}/${y} ${time}`;
 }
 
 /**
@@ -1121,11 +1166,19 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin or Helper access required" });
       }
       const sessions = await getSessions();
-      // Compute revenue live from sign-ups (sum of actualFees per session).
+      // Compute revenue AND attendance live from sign-ups, keyed by date+pool.
       // Normalise dateOfTraining to YYYY-MM-DD in JS to handle mixed date formats
       // (Sheets stores M/D/YYYY, app stores YYYY-MM-DD).
+      //
+      // attendance is NOT read from sheet_sessions.attendance: that column is a
+      // one-off snapshot seeded from the Sheet and is never maintained — every
+      // session created in the app is written with attendance: 0 and stays 0
+      // forever, and the seeded values are frozen at whatever the count was on
+      // seeding day. Deriving it from sign-ups keeps it consistent with the
+      // revenue shown beside it and with the Attendees list in the Sessions tab.
       const sessDb = await db.getDb();
       let revenueMap: Record<string, number> = {};
+      let attendanceMap: Record<string, number> = {};
       if (sessDb) {
         const rows = await sessDb.select({
           dateOfTraining: sheetSignups.dateOfTraining,
@@ -1133,18 +1186,26 @@ export const appRouter = router({
           actualFees: sheetSignups.actualFees,
         }).from(sheetSignups);
         for (const r of rows) {
+          // Membership / trial rows carry no training date — they belong to no
+          // session and must never be counted against one.
+          if (!(r.dateOfTraining ?? "").trim()) continue;
           const key = `${toIsoDate(r.dateOfTraining ?? "")}__${(r.pool ?? "").trim()}`;
-          revenueMap[key] = (revenueMap[key] ?? 0) + Number(r.actualFees ?? 0);
+          revenueMap[key]    = (revenueMap[key] ?? 0) + Number(r.actualFees ?? 0);
+          attendanceMap[key] = (attendanceMap[key] ?? 0) + 1;
         }
       }
       return [...sessions].sort((a, b) => {
         const dA = new Date(a.trainingDate).getTime() || 0;
         const dB = new Date(b.trainingDate).getTime() || 0;
         return dB - dA;
-      }).map(s => ({
-        ...s,
-        revenue: revenueMap[`${toIsoDate(s.trainingDate)}__${(s.pool ?? "").trim()}`] ?? 0,
-      }));
+      }).map(s => {
+        const key = `${toIsoDate(s.trainingDate)}__${(s.pool ?? "").trim()}`;
+        return {
+          ...s,
+          revenue:    revenueMap[key] ?? 0,
+          attendance: attendanceMap[key] ?? 0,
+        };
+      });
     }),
 
     sessionAttendees: protectedProcedure
@@ -1622,6 +1683,9 @@ export const appRouter = router({
         reference: z.string().optional(),
         amount: z.number().optional(),
         date: z.string().optional(),
+        // The row's stored date exactly as the client rendered it. Used to
+        // recover the transfer time-of-day; see preservePaymentTime below.
+        originalDate: z.string().optional(),
         email: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1630,7 +1694,38 @@ export const appRouter = router({
         }
         const payDb = await db.getDb();
         if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        const { id, rowIndex, ...fields } = input;
+        const { id, rowIndex, originalDate, ...fields } = input;
+
+        // Validate before doing any work — a row with no Sheet reference can
+        // never be saved, so there is nothing to look up for it either.
+        if (!rowIndex || rowIndex < 2) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Cannot save: this payment is missing its Sheet row reference. Re-import payments from Sheets (Admin → Data → Import from Sheets) then try again.",
+          });
+        }
+
+        // The edit form's <input type="date"> can only hand back "YYYY-MM-DD".
+        // Re-attach the transfer time already on the row before it reaches the
+        // Sheet, otherwise GAS normalisePaymentDate() stamps it 00:00:00 and the
+        // timestamp is lost.
+        //
+        // Prefer originalDate (the value the client rendered) over a fresh DB
+        // read: syncTab("payments") does a full DELETE+INSERT, so a read that
+        // lands inside that window returns no row and would silently zero the
+        // time. Fall back to the DB by rowIndex — never by id, which is not
+        // stable across sync cycles — for older clients that omit originalDate.
+        if (fields.date !== undefined) {
+          let priorDate = originalDate ?? "";
+          if (!timeOfDayFrom(priorDate)) {
+            const [existing] = await payDb.select({ date: sheetPayments.date })
+              .from(sheetPayments)
+              .where(eq(sheetPayments.rowIndex, rowIndex));
+            priorDate = existing?.date ?? priorDate;
+          }
+          fields.date = preservePaymentTime(fields.date, priorDate);
+        }
+
         const updates: Record<string, unknown> = {};
         if (fields.paymentId !== undefined) updates.paymentId = fields.paymentId;
         if (fields.reference !== undefined) updates.reference = fields.reference;
@@ -1642,12 +1737,7 @@ export const appRouter = router({
         // If GAS fails, surface the error to the admin (do NOT update the DB).
         // A DB-only update would be silently reverted by the next 6-hour sync or
         // deployment startup sync, which does a full DELETE+INSERT from the Sheet.
-        if (!rowIndex || rowIndex < 2) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Cannot save: this payment is missing its Sheet row reference. Re-import payments from Sheets (Admin → Data → Import from Sheets) then try again.",
-          });
-        }
+        // (rowIndex was validated above, before the date lookup.)
         try {
           await appsScript.editPayment({
             rowIndex,

@@ -160,10 +160,16 @@ function toIsoDate(raw: string): string {
     const [, m, d, y] = mdyMatch;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  // Fallback: let JS parse and reformat
+  // Fallback: let JS parse and reformat.
+  // Read back LOCAL components, not toISOString(): free text like
+  // "1 March 2026" is parsed as local midnight, and in any timezone east of
+  // UTC toISOString() rolls that back to the previous calendar day.
   const date = new Date(raw);
   if (!isNaN(date.getTime())) {
-    return date.toISOString().slice(0, 10);
+    const y  = date.getFullYear();
+    const m  = String(date.getMonth() + 1).padStart(2, "0");
+    const d  = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   return raw;
 }

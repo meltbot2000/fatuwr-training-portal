@@ -37,8 +37,12 @@ Run through this after every Railway deployment. Full role-based test cases are 
 - [ ] Admin panel loads; all tabs visible
 - [ ] Members tab: search works, tap user → edit sheet opens
 - [ ] Payments tab loads
+- [ ] Payments tab → tap a payment → "Transfer received" shows the full timestamp (date **and** time)
+- [ ] Save that payment unchanged, reopen → timestamp is identical (the time is not zeroed)
 - [ ] Sessions tab: filter, add session, close session
 - [ ] Data tab: PnL table loads; Spreadsheet Import PIN gates correctly (PIN: 1987)
+- [ ] Data tab: attendee count on a session row matches its Attendees sheet (Sessions tab → tap card body)
+- [ ] Data tab: no session shows "0 attendees" alongside a non-zero revenue
 - [ ] "Migrate Glide photos" button visible (run if Glide URLs still present)
 
 ## Health

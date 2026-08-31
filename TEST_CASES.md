@@ -380,6 +380,10 @@ Last updated: 2026-04-20
 | 2 | Search by paymentId, reference, or email | Filtered | Admin, Helper |
 | 3 | Tap payment row | EditPaymentSheet opens | Admin only |
 | 4 | Edit paymentId, email, amount, date | Saved | Admin |
+| 5 | View "Transfer received" row | Read-only; shows full transfer timestamp, e.g. "30 August 2026, 9:41 pm" | Admin |
+| 6 | Payment with no time recorded (date only) | "Transfer received" shows date only + "No time recorded on this payment — date only." | Admin |
+| 7 | Edit any field and save, then reopen | "Transfer received" timestamp **unchanged** — the time survives the save | Admin |
+| 8 | Change the date and save, then reopen | New date, **original time-of-day kept** (hint under Date field states this) — see SYSTEM.md Bug 18 | Admin |
 
 ### TC-ADMIN-05 — Sessions tab (Admin only)
 | # | Action | Expected | Roles |
@@ -411,13 +415,18 @@ Last updated: 2026-04-20
 | # | Action | Expected | Roles |
 |---|---|---|---|
 | 1 | View Data tab | Overall PnL summary + per-session PnL table for past sessions | Admin |
-| 2 | Tap session row | EditSessionSheet opens | Admin |
-| 3 | Tap "Spreadsheet Import" | Collapsible expands | Admin |
-| 4 | Enter wrong PIN | Error "Incorrect PIN" | Admin |
-| 5 | Enter correct PIN (1987) | Import buttons revealed | Admin |
-| 6 | Tap "Import sessions" | Confirmation dialog; on confirm, sessions re-synced from Sheets | Admin |
-| 7 | Tap "Import all tabs" | Confirmation dialog; all 4 tables replaced | Admin |
-| 8 | Tap "Lock" | Panel re-locks, PIN cleared | Admin |
+| 2 | Attendee count on each session row | Matches the row count in that session's Attendees sheet (Sessions tab → tap card body). Derived live from sign-ups, **not** from `sheet_sessions.attendance` — see SYSTEM.md Bug 17 | Admin |
+| 3 | Session with sign-ups but a legacy free-text date ("1 March 2026") | Counts correctly — date normalisation matches mixed formats | Admin |
+| 4 | Session with revenue > $0 | Never shows "0 attendees"; attendance and revenue describe the same sign-up rows | Admin |
+| 5 | Future session with no sign-ups | "0 attendees", $0 revenue | Admin |
+| 6 | Trial Membership / Membership Fee sign-ups exist | Never counted against any session's attendance | Admin |
+| 7 | Tap session row | EditSessionSheet opens | Admin |
+| 8 | Tap "Spreadsheet Import" | Collapsible expands | Admin |
+| 9 | Enter wrong PIN | Error "Incorrect PIN" | Admin |
+| 10 | Enter correct PIN (1987) | Import buttons revealed | Admin |
+| 11 | Tap "Import sessions" | Confirmation dialog; on confirm, sessions re-synced from Sheets | Admin |
+| 12 | Tap "Import all tabs" | Confirmation dialog; all 4 tables replaced | Admin |
+| 13 | Tap "Lock" | Panel re-locks, PIN cleared | Admin |
 
 ---
 
