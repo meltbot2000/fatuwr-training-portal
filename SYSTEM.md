@@ -596,6 +596,7 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 
 ### Deployment
 - Push to `main` → Railway auto-deploys.
+- **`pnpm` is pinned in the `Dockerfile` (`pnpm@10.4.1`) and must stay in step with `packageManager` in `package.json`.** It was unpinned until 2026-09-01, so `npm install -g pnpm` pulled whatever was newest at build time. A pnpm release then added strict verification of the `packageManager` identity against the lockfile, and `pnpm-lock.yaml` has no `@pnpm/exe.*` entry — every build started failing with `ERR_PNPM_PNPM_ENGINE_IDENTITY_UNVERIFIABLE` with **no repo change to explain it**. If builds ever fail again at `pnpm install --frozen-lockfile` with nothing relevant in the diff, suspect the toolchain, not the code: the failing step runs *before* `COPY . .`, so application code cannot be the cause.
 - Every deploy triggers: `syncTab("payments")` after 5s (startup sync).
 - Schema changes: run `pnpm db:push` after deploy.
 - Check Railway logs for `[Sync]` entries.
