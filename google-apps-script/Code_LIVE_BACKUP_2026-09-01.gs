@@ -2,42 +2,6 @@
  * FATUWR Training Portal — Google Apps Script
  * Sheet ID: 19Vxpj2AoJizVwhkSxEtV70yKDlWMyrfQGDIu6k6RSRM
  *
- * v17 changes (2026-09-01):
- *   Rebased on the LIVE editor source, not the repo's Code.gs. The repo file had
- *   drifted well behind the deployed script: the live version already carries the
- *   doPost shared-secret check, editPaymentRow (v13 + its Bug 16 patches), the
- *   v14 heartbeat and the v16 B1 reference resolution — none of which the repo's
- *   Code.gs contained. Verified against the deployment by probe: "editPayment"
- *   answers correctly, so payment EDITING was never broken.
- *
- *   - NEW addPaymentRow() + doPost "addPayment" route. The admin "+ Add payment"
- *     button wrote DB-only, with no Sheet row and no rowIndex, so the row was
- *     erased by the next syncTab("payments") DELETE+INSERT. Probe confirmed the
- *     deployment answers "Unknown action: addPayment" — the route never existed.
- *   - NEW deletePaymentRow() + doPost "deletePayment" route. Soft delete: zeroes
- *     col D and attaches a note. Deliberately NOT deleteRow() — removing a row
- *     shifts every rowIndex below it, invalidating every cached rowIndex in the
- *     DB and making the next edit write to the WRONG payment. Zeroing makes the
- *     row vanish from the app via the existing amount===0 skip in
- *     fetchSheetsPayments(), while keeping the raw Maybank email body in col A.
- *   - editPaymentRow() now REJECTS a zero amount. Saving 0 would drop the row
- *     from the DB and leave it unreachable from the UI. Clearing a payment is
- *     deletePaymentRow's job now.
- *   - appendPaymentRow() (the 1-min Maybank cron path) takes the SAME script lock
- *     as addPaymentRow. GAS locks are cooperative: a lock held by only one of two
- *     writers is a no-op, and the cron could otherwise append between the admin's
- *     appendRow and getLastRow, returning a row number belonging to a real bank
- *     payment — which a later edit would then overwrite.
- *   - New payment dates are written as real Date objects, never strings. Col C
- *     holds genuine date values (verified: serial 46022.729 = "12/31/2025 17:30:00").
- *   - REMOVED dead Gmail add-on code: buildAddOnHomepage, onNewPaymentEmail,
- *     createPaymentTrigger, deletePaymentTrigger, TRIGGER_MODE. Near-real-time
- *     Gmail delivery needs an add-on deployment that was never done; the 1-min
- *     time-based cron is the actual mechanism. Verified no trigger references
- *     them (Triggers panel holds only processMaybankEmails and gasHeartbeat).
- *   - doGet reports v17. The string had been stuck at "v7" since April, which is
- *     what made the repo/editor drift invisible.
- *
  * v9 changes (2026-04-18):
  *   - Gmail Add-on support: added buildAddOnHomepage() so the manifest can declare
  *     this script as a Gmail Add-on. Once deployed as an add-on (test deployment),
@@ -140,7 +104,7 @@ var TAB_PAYMENTS = "Payments";
 // ─── Entry points ─────────────────────────────────────────────────────────────
 
 function doGet(e) {
-  return jsonResponse({ status: "ok", message: "FATUWR GAS v17 running" });
+  return jsonResponse({ status: "ok", message: "FATUWR GAS v7 running" });
 }
 
 function doPost(e) {
@@ -167,8 +131,6 @@ function doPost(e) {
     if (action === "closeSession")       return closeSession(params);
     if (action === "addMembershipSignup") return addMembershipSignup(params);
     if (action === "editPayment")         return editPaymentRow(params);
-    if (action === "addPayment")          return addPaymentRow(params);
-    if (action === "deletePayment")       return deletePaymentRow(params);
 
     return jsonResponse({ status: "error", message: "Unknown action: " + action });
 
@@ -609,160 +571,6 @@ function closeSession(params) {
   return jsonResponse({ status: "error", message: "Session not found" });
 }
 
-// ─── Admin payment writes (v17) ───────────────────────────────────────────────
-//
-// The Sheet is the source of truth for payments. These write the Sheet FIRST;
-// the server awaits the result and only mirrors to the DB on success. A DB-only
-// write is erased by the next syncTab("payments"), which does a full
-// DELETE + INSERT of sheet_payments from the Sheet.
-//
-// Neither calls notifyRailway("payments") — see Bug 16. The Sheets API can serve
-// pre-flush cached values for seconds after a GAS write, so an immediate Sheet→DB
-// sync reads stale cells and reverts the change. editPaymentRow already follows
-// this rule (flush, no notify); these match it.
-
-var _paymentTz = null;
-
-// The spreadsheet's timezone (Asia/Singapore). Dates must be built against this,
-// not Session.getScriptTimeZone() — if the two differ, a payment written near
-// midnight lands on the adjacent calendar day.
-function paymentTimeZone() {
-  if (!_paymentTz) _paymentTz = SpreadsheetApp.openById(SHEET_ID).getSpreadsheetTimeZone();
-  return _paymentTz;
-}
-
-// Coerces an incoming date to a real Date for writing to col C, or null if there
-// is nothing meaningful to write.
-//
-// Col C holds genuine date values, so we setValue() a Date object rather than a
-// string. A string would be re-parsed using the SPREADSHEET's locale, which
-// silently swaps month and day in any non-US locale. (This sheet is en_US, so
-// today a string would work — but that is a property of the sheet's settings,
-// not of this code, and it should not be load-bearing.)
-function toPaymentDate(value) {
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-  var str = String(value == null ? "" : value).trim();
-  if (!str) return null;
-
-  var m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);              // YYYY-MM-DD
-  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-
-  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (m) {                                                         // M/D/YYYY [HH:MM:SS]
-    return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]),
-                    Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0));
-  }
-
-  var loose = new Date(str);
-  return isNaN(loose.getTime()) ? null : loose;
-}
-
-// Renders a Date in the canonical sheet format, in the spreadsheet's timezone.
-// Returned to the server so the DB stores exactly the string the next sync will
-// read back out of the Sheet, instead of the raw "YYYY-MM-DD" the client sent.
-function formatPaymentDate(date) {
-  if (!(date instanceof Date) || isNaN(date.getTime())) return "";
-  return Utilities.formatDate(date, paymentTimeZone(), "M/d/yyyy HH:mm:ss");
-}
-
-/**
- * Append a manually-entered payment to the Payments tab.
- *
- * Returns the new row's 1-based sheet row number as `rowIndex`, and the exact
- * date string written as `date`, so the server can mirror both. rowIndex is the
- * only stable handle to a payment row — sheet_payments.id is an auto-increment
- * that is reassigned on every sync cycle.
- */
-function addPaymentRow(params) {
-  var amount = Number(params.amount);
-  if (!amount || isNaN(amount)) {
-    return jsonResponse({ status: "error", message: "amount is required and must be non-zero" });
-  }
-
-  var dateVal   = toPaymentDate(params.date);
-  var reference = params.reference == null ? "" : String(params.reference);
-  var paymentId = params.paymentId == null ? "" : String(params.paymentId);
-  var email     = params.email     == null ? "" : String(params.email);
-
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(20000);
-  } catch (e) {
-    return jsonResponse({ status: "error", message: "Sheet is busy, nothing was written. Please try again." });
-  }
-
-  try {
-    var sheet = getSheet(TAB_PAYMENTS);
-    sheet.appendRow([
-      "[Added manually via admin portal]", // col A — no raw email body exists
-      "",                                  // col B — no subject
-      dateVal || "",                       // col C — real Date, not a string
-      amount,                              // col D
-      reference,                           // col E
-      paymentId,                           // col F
-      email,                               // col G
-    ]);
-    SpreadsheetApp.flush();
-
-    var rowIndex = sheet.getLastRow();
-    Logger.log("[addPaymentRow] appended row " + rowIndex +
-               " amount=" + amount + " paymentId=" + paymentId + " email=" + email);
-
-    return jsonResponse({
-      status: "success",
-      rowIndex: rowIndex,
-      date: formatPaymentDate(dateVal),
-    });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/**
- * Remove a payment from the app by zeroing col D and attaching a note.
- *
- * Deliberately NOT sheet.deleteRow(). Deleting a row shifts every row below it up
- * by one, so every rowIndex cached in sheet_payments below that point becomes
- * off-by-one, and the next admin edit would write to the WRONG payment until a
- * sync re-derived them. Zeroing keeps every rowIndex stable permanently.
- *
- * fetchSheetsPayments() skips amount===0 rows, so the payment disappears from the
- * DB and the app on the next sync while the Sheet keeps the row — including the
- * raw Maybank email body in col A, the only forensic record of a real transfer.
- * Reversible by restoring the amount in the Sheet.
- */
-function deletePaymentRow(params) {
-  var rowIndex = Number(params.rowIndex);
-  if (!rowIndex || rowIndex < 2) {
-    return jsonResponse({ status: "error", message: "rowIndex must be >= 2 (row 1 is the header)" });
-  }
-
-  var sheet   = getSheet(TAB_PAYMENTS);
-  var lastRow = sheet.getLastRow();
-  if (rowIndex > lastRow) {
-    return jsonResponse({
-      status: "error",
-      message: "rowIndex " + rowIndex + " out of range (sheet has " + lastRow + " rows)"
-    });
-  }
-
-  var cell = sheet.getRange(rowIndex, 4);
-  var was  = cell.getValue();
-  if (Number(was) === 0) {
-    // Already cleared — treat as success so a retry is harmless.
-    return jsonResponse({ status: "success", alreadyDeleted: true });
-  }
-
-  cell.setValue(0);
-  cell.setNote("Removed via admin portal on " +
-               Utilities.formatDate(new Date(), paymentTimeZone(), "yyyy-MM-dd HH:mm:ss") +
-               " — original amount " + was);
-  SpreadsheetApp.flush();
-
-  Logger.log("[deletePaymentRow] row " + rowIndex + " zeroed (was " + was + ")");
-  return jsonResponse({ status: "success", previousAmount: Number(was) });
-}
-
 // ─── Payment email processing ─────────────────────────────────────────────────
 //
 // processMaybankEmails() is called by the 1-minute time-based trigger and
@@ -968,37 +776,17 @@ function appendPaymentRow(parsed) {
   // GAS-side lookup: find User row whose col A (PaymentID) matches the OTHR reference
   var userInfo = lookupUserByPaymentRef(parsed.othr);
 
-  // Take the SAME script lock addPaymentRow uses. GAS locks are cooperative — a
-  // lock held by only one of two writers protects nothing. Without this, an append
-  // here can land between the admin's appendRow and getLastRow, so the admin's
-  // payment is recorded against THIS row's number and a later edit overwrites this
-  // real bank payment. The lookup above stays outside the lock: it makes a
-  // UrlFetch call and must not hold the sheet while it waits.
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(30000);
-  } catch (e) {
-    // Couldn't get the lock — leave the message unprocessed. The Gmail label is
-    // only moved after a successful append, so the next cron tick retries it.
-    Logger.log("[appendPaymentRow] lock timeout — deferring to next run");
-    throw new Error("Could not acquire sheet lock");
-  }
+  sheet.appendRow([
+    parsed.body,          // [0] col A — Maybank Payment Message (raw body)
+    parsed.subject,       // [1] col B — Subject
+    parsed.date,          // [2] col C — Date
+    parsed.amount,        // [3] col D — Amount
+    parsed.othr,          // [4] col E — OTHR Message (reference text)
+    userInfo.paymentId,   // [5] col F — PaymentID Match (GAS-resolved)
+    userInfo.email,       // [6] col G — Email (GAS-resolved)
+  ]);
 
-  try {
-    sheet.appendRow([
-      parsed.body,          // [0] col A — Maybank Payment Message (raw body)
-      parsed.subject,       // [1] col B — Subject
-      parsed.date,          // [2] col C — Date
-      parsed.amount,        // [3] col D — Amount
-      parsed.othr,          // [4] col E — OTHR Message (reference text)
-      userInfo.paymentId,   // [5] col F — PaymentID Match (GAS-resolved)
-      userInfo.email,       // [6] col G — Email (GAS-resolved)
-    ]);
-    SpreadsheetApp.flush();
-    Logger.log("appendPaymentRow — othr=" + parsed.othr + " → paymentId=" + userInfo.paymentId + " email=" + userInfo.email);
-  } finally {
-    lock.releaseLock();
-  }
+  Logger.log("appendPaymentRow — othr=" + parsed.othr + " → paymentId=" + userInfo.paymentId + " email=" + userInfo.email);
 }
 
 /**
@@ -1103,6 +891,135 @@ function saveProcessedIds(idsObj) {
   } catch (e) {
     Logger.log("[saveProcessedIds] Failed to save: " + e);
   }
+}
+
+// ─── Payment trigger ──────────────────────────────────────────────────────────
+//
+// TWO MODES — set TRIGGER_MODE below before running createPaymentTrigger():
+//
+//   "addon"  → Gmail Add-on mode (RECOMMENDED — near real-time, fires on delivery)
+//              Requires this script to be deployed as a Gmail Add-on first.
+//              See GMAIL ADD-ON SETUP below.
+//
+//   "timer"  → Time-based fallback — processMaybankEmails() runs every 1 minute.
+//              Works in any regular script with no extra setup.
+//              Use this if you haven't deployed the add-on yet.
+//
+// GMAIL ADD-ON SETUP (one-time, ~5 minutes):
+//   1. In the Apps Script editor, go to Project Settings (⚙) →
+//      check "Show 'appsscript.json' manifest file in editor"
+//   2. Replace the contents of appsscript.json with the manifest below.
+//   3. Deploy → New deployment → Type: Gmail Add-on → Description: "FATUWR"
+//      → Deploy. Copy the Deployment ID shown.
+//   4. In Gmail: Settings (⚙) → Get add-ons → search for your deployment
+//      OR go to https://mail.google.com → side panel → + (get add-ons) →
+//      use the deployment ID to install the test deployment.
+//   5. Back in the script editor, set TRIGGER_MODE = "addon" below, then run
+//      createPaymentTrigger(). The trigger now fires within seconds of delivery.
+//
+// REQUIRED appsscript.json MANIFEST:
+// {
+//   "timeZone": "Asia/Singapore",
+//   "exceptionLogging": "STACKDRIVER",
+//   "runtimeVersion": "V8",
+//   "oauthScopes": [
+//     "https://www.googleapis.com/auth/gmail.readonly",
+//     "https://www.googleapis.com/auth/gmail.labels",
+//     "https://www.googleapis.com/auth/gmail.modify",
+//     "https://www.googleapis.com/auth/spreadsheets",
+//     "https://www.googleapis.com/auth/script.external_request",
+//     "https://www.googleapis.com/auth/script.scriptapp"
+//   ],
+//   "addOns": {
+//     "common": {
+//       "name": "FATUWR Payment Processor",
+//       "logoUrl": "https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_32dp.png",
+//       "useLocaleFromApp": true,
+//       "homepageTrigger": { "runFunction": "buildAddOnHomepage" }
+//     },
+//     "gmail": {
+//       "homepageTrigger": { "runFunction": "buildAddOnHomepage" }
+//     }
+//   }
+// }
+
+// ── Set this before running createPaymentTrigger() ────────────────────────────
+var TRIGGER_MODE = "timer"; // "addon" | "timer"
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal Gmail Add-on homepage card — required by the manifest.
+ * Returns a simple "running" status card; the add-on has no interactive UI.
+ */
+function buildAddOnHomepage(e) {
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle("FATUWR Payment Processor"))
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(CardService.newTextParagraph().setText("Payment email processing is active. New Maybank PayNow emails are processed automatically."))
+    )
+    .build();
+}
+
+/**
+ * Handler called by the forGmail().onFiltersMatched() trigger (add-on mode only).
+ * Delegates directly to processMaybankEmails().
+ */
+function onNewPaymentEmail(e) {
+  Logger.log("onFiltersMatched trigger fired");
+  try {
+    processMaybankEmails();
+  } catch (err) {
+    Logger.log("Error in onNewPaymentEmail: " + err.message);
+  }
+}
+
+/**
+ * Creates the payment trigger.
+ * In "addon" mode: installs forGmail().onFiltersMatched() — fires on email delivery.
+ * In "timer" mode: installs a time-based trigger every 1 minute.
+ * Safe to re-run — removes any existing payment triggers first.
+ */
+function createPaymentTrigger() {
+  // Remove any existing payment triggers
+  var existing = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < existing.length; i++) {
+    var fn = existing[i].getHandlerFunction();
+    if (fn === "processMaybankEmails" || fn === "onNewPaymentEmail") {
+      ScriptApp.deleteTrigger(existing[i]);
+      Logger.log("Removed existing trigger: " + fn);
+    }
+  }
+
+  if (TRIGGER_MODE === "addon") {
+    ScriptApp.newTrigger("onNewPaymentEmail")
+      .forGmail()
+      .onFiltersMatched()
+      .create();
+    Logger.log("Add-on trigger created — onNewPaymentEmail fires on email delivery");
+  } else {
+    ScriptApp.newTrigger("processMaybankEmails")
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+    Logger.log("Time-based trigger created — processMaybankEmails runs every 1 minute");
+  }
+}
+
+/**
+ * Removes all payment-related triggers (both handler names).
+ */
+function deletePaymentTrigger() {
+  var existing = ScriptApp.getProjectTriggers();
+  var removed = 0;
+  for (var i = 0; i < existing.length; i++) {
+    var fn = existing[i].getHandlerFunction();
+    if (fn === "processMaybankEmails" || fn === "onNewPaymentEmail") {
+      ScriptApp.deleteTrigger(existing[i]);
+      removed++;
+    }
+  }
+  Logger.log("Removed " + removed + " payment trigger(s)");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1399,20 +1316,6 @@ function editPaymentRow(params) {
 
   if (!rowIndex || rowIndex < 2) {
     return jsonResponse({ status: "error", message: "rowIndex must be >= 2 (row 1 is the header)" });
-  }
-
-  // Reject a zeroed amount. fetchSheetsPayments() skips amount===0 rows, so
-  // saving 0 here would drop the row from the DB entirely and leave it
-  // unreachable from the UI — there would be no row left to edit back.
-  // Clearing a payment is deletePaymentRow's job.
-  if (amount !== undefined && amount !== null) {
-    var amtCheck = Number(amount);
-    if (!amtCheck || isNaN(amtCheck)) {
-      return jsonResponse({
-        status: "error",
-        message: "Amount must be non-zero. To remove this payment, use Delete instead."
-      });
-    }
   }
 
   var sheet   = getSheet(TAB_PAYMENTS);

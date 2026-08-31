@@ -129,3 +129,17 @@ export function editPayment(payload: {
 }) {
   return gasPost("editPayment", payload);
 }
+
+export function addPayment(payload: {
+  paymentId?: string;
+  email?: string;
+  reference?: string;
+  amount: number;
+  date?: string;
+}) {
+  return gasPost("addPayment", payload);
+}
+
+export function deletePayment(payload: { rowIndex: number }) {
+  return gasPost("deletePayment", payload);
+}

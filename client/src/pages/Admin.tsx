@@ -650,7 +650,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
                 </Button>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-center text-muted-foreground">This will permanently remove the payment record.</p>
+                  <p className="text-xs text-center text-muted-foreground">This removes the payment from the app. The row is kept in the Payments sheet with a note, so it can be restored there if needed.</p>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -662,7 +662,7 @@ function EditPaymentSheet({ open, onOpenChange, payment, onDone }: EditPaymentSh
                     </Button>
                     <Button
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                      onClick={() => deleteMutation.mutate({ id: payment.id })}
+                      onClick={() => deleteMutation.mutate({ id: payment.id, rowIndex: payment.rowIndex })}
                       disabled={isPending}
                     >
                       {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm delete"}

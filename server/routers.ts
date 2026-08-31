@@ -1665,13 +1665,59 @@ export const appRouter = router({
         }
         const payDb = await db.getDb();
         if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        await payDb.insert(sheetPayments).values({
-          paymentId: input.paymentId,
-          reference: input.reference,
-          amount: input.amount,
-          date: input.date,
-          email: input.email,
-        });
+
+        // Sheet is the source of truth for payments — append there FIRST.
+        // A DB-only insert has no Sheet row and no rowIndex, so the next
+        // syncTab("payments") DELETE+INSERT erases it. That was the original bug:
+        // the payment appeared in the admin list and silently vanished later.
+        let rowIndex: number;
+        let sheetDate: string;
+        try {
+          const res = await appsScript.addPayment({
+            paymentId: input.paymentId,
+            email:     input.email,
+            reference: input.reference,
+            amount:    input.amount,
+            date:      input.date,
+          });
+          rowIndex  = Number(res.rowIndex);
+          sheetDate = String(res.date ?? input.date);
+          if (!Number.isFinite(rowIndex) || rowIndex < 2) {
+            throw new Error("GAS did not return a valid sheet rowIndex");
+          }
+        } catch (e: any) {
+          console.error("[GAS] addPayment failed:", e?.message);
+          // Only claim the payment was not recorded when we actually know that.
+          // An aborted or network-failed call may have completed inside GAS,
+          // leaving a real Sheet row; telling the admin "not recorded" there makes
+          // them re-enter it and double-credit the member.
+          const ambiguous = e?.name === "AbortError" || e?.name === "TypeError";
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: ambiguous
+              ? "Lost contact with the Sheet before getting a reply. The payment MAY have been recorded — check Admin → Payments before entering it again."
+              : `Failed to save to Sheet: ${e?.message}. The payment was not recorded.`,
+          });
+        }
+
+        // Sheet has the row. Mirror to DB, storing the date string GAS actually
+        // wrote so the DB matches what the next sync will read back.
+        try {
+          await payDb.insert(sheetPayments).values({
+            rowIndex,
+            paymentId: input.paymentId,
+            reference: input.reference,
+            amount: input.amount,
+            date: sheetDate,
+            email: input.email,
+          });
+        } catch (e: any) {
+          console.error("[DB] addPayment mirror failed:", e?.message);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Saved to the Sheet but not to the app database. It will appear automatically within 6 hours — do NOT enter it again.",
+          });
+        }
         return { success: true };
       }),
 
@@ -1762,14 +1808,37 @@ export const appRouter = router({
       }),
 
     deletePayment: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.number(), rowIndex: z.number().optional() }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.clubRole !== "Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         }
         const payDb = await db.getDb();
         if (!payDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        await payDb.delete(sheetPayments).where(eq(sheetPayments.id, input.id));
+
+        // Sheet is the source of truth — clear it there FIRST. A DB-only delete is
+        // undone by the next syncTab("payments"), so the payment would silently
+        // reappear hours later and re-credit the member.
+        // Target rowIndex, never id: sheet_payments.id is reassigned on every
+        // DELETE+INSERT sync cycle, so a stale id can point at a different payment.
+        const { rowIndex } = input;
+        if (!rowIndex || rowIndex < 2) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Cannot delete: this payment is missing its Sheet row reference. Re-import payments from Sheets (Admin → Data → Import from Sheets) then try again.",
+          });
+        }
+        try {
+          await appsScript.deletePayment({ rowIndex });
+        } catch (e: any) {
+          console.error("[GAS] deletePayment failed:", e?.message);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Failed to remove from Sheet: ${e?.message}. The payment was not deleted.`,
+          });
+        }
+        // GAS zeroed the Sheet row; drop the DB mirror by rowIndex.
+        await payDb.delete(sheetPayments).where(eq(sheetPayments.rowIndex, rowIndex));
         return { success: true };
       }),
 
