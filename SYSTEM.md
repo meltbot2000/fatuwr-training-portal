@@ -732,9 +732,11 @@ Use **Playwright**. Priority flows: full login, session sign-up, admin add sessi
 The repo tells you what has been *written*, never what is *deployed*. Melanie deploys GAS by hand, so the newest `.gs` file here can sit undeployed for days.
 
 ```bash
-curl -s "$GOOGLE_APPS_SCRIPT_URL"
+curl -sL "$(grep '^GOOGLE_APPS_SCRIPT_URL=' .env | cut -d= -f2-)"
 # → {"status":"ok","message":"FATUWR GAS v17 running"}
 ```
+
+`GOOGLE_APPS_SCRIPT_URL` is **not** exported in a plain shell — it lives in `.env` (and in Railway's env vars), so `curl -s "$GOOGLE_APPS_SCRIPT_URL"` fails with "blank argument where content is expected". Read it from `.env` as above. `-L` is required: GAS `/exec` URLs 302-redirect to `googleusercontent.com`, and without it the body comes back empty.
 
 `doGet` returns the version string, so this is a one-second check. **Run it before diagnosing any payment-write bug** — "the code is right but the behaviour is wrong" is almost always a stale deployment, not a logic error. Bump the string in `doGet` in every new version so it stays useful.
 
