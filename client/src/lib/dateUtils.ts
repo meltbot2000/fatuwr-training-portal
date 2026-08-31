@@ -81,7 +81,7 @@ export function formatDisplayDate(str: string): string {
  * component instead of discarding it.
  *
  * A time of exactly 00:00:00 is treated as "no time recorded", not as
- * midnight: it is what GAS normalisePaymentDate() writes when a date-only
+ * midnight: it is what lands in col C when a date-only
  * value is saved, so it is a normalisation artefact rather than a real
  * transfer time.
  */

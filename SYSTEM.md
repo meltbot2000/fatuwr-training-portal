@@ -722,10 +722,10 @@ Use **Playwright**. Priority flows: full login, session sign-up, admin add sessi
 | `Code_v11_2026-04-26.gs` | 2026-04-26 | OAuth validity check + alert email; both Maybank labels → Maybank_Done2; appendPaymentRow in try-catch |
 | `Code_v12_2026-05-03.gs` | 2026-05-03 | Added `editPaymentRow()` (col F paymentId + col G email); `notifyRailway("payments")` in editPaymentRow; `notifyRailway("payments")` in processMaybankEmails when newCount > 0 |
 | `Code_v13_2026-05-04.gs` | 2026-05-04 | `editPaymentRow` expanded to write ALL 5 columns (C date, D amount, E reference, F paymentId, G email); doGet returns v13 |
-| `Code_v14_2026-05-07.gs` | 2026-05-07 | `gasHeartbeat()` + `createHeartbeatTrigger()` / `deleteHeartbeatTrigger()` — 30-min health beat to `/api/health/gas-heartbeat`. **Branched from the pre-v13 `Code.gs`, silently dropping `editPaymentRow` and the `editPayment` doPost route** (see v17). |
+| `Code_v14_2026-05-07.gs` | 2026-05-07 | `gasHeartbeat()` + `createHeartbeatTrigger()` / `deleteHeartbeatTrigger()` — 30-min health beat to `/api/health/gas-heartbeat`. **The repo file was branched from the pre-v13 `Code.gs`, dropping `editPaymentRow` and the `editPayment` doPost route from the repo lineage.** This did NOT affect production — the live Apps Script editor was maintained by hand and kept `editPaymentRow` throughout. The loss was repo-only (see v17). |
 | `Code_v15_2026-06-03.gs` | 2026-06-03 | Maintenance release; no payment-path changes. |
 | `Code_v16_2026-06-28.gs` | 2026-06-28 | `lookupUserByPaymentRef()` resolves the PayNow reference against the live Railway DB (`GET /api/resolve-payment-ref`) before falling back to the Sheet User tab — fixes payments not matching for users created since the last manual sheet sync. Sheet lookup kept as fallback. |
-| `Code_v17_2026-09-01.gs` | 2026-09-01 | **Restored `editPaymentRow()` + the `editPayment` doPost route** (lost in the v14 branch — the live script had answered "Unknown action: editPayment" since 2026-05-07, so every admin payment edit failed). **New `addPaymentRow()` + `addPayment` route** so "+ Add payment" appends to the Sheet first and returns a real `rowIndex`. Neither calls `notifyRailway()` — see Bug 16. Adds `normalisePaymentDate()`. |
+| `Code_v17_2026-09-01.gs` | 2026-09-01 | **Rebased on the LIVE editor source, not the repo's `Code.gs`** — the repo had drifted behind the deployed script (see below). **New `addPaymentRow()` + `addPayment` route** so "+ Add payment" appends to the Sheet first and returns a real `rowIndex`; **new `deletePaymentRow()` + `deletePayment` route** (soft delete — zeroes col D and adds a note, never `deleteRow()`, which would shift every `rowIndex` below it). `editPaymentRow()` now rejects a zero amount. `appendPaymentRow()` takes the same script lock as `addPaymentRow` (GAS locks are cooperative — one-sided locking is a no-op). New dates written as `Date` objects, not strings. Removed dead Gmail add-on code. `doGet` reports v17. Pre-change live source preserved as `Code_LIVE_BACKUP_2026-09-01.gs`. |
 
 ### Which version is actually LIVE — check, do not assume
 
@@ -742,6 +742,31 @@ curl -sL "$(grep '^GOOGLE_APPS_SCRIPT_URL=' .env | cut -d= -f2-)"
 
 As of 2026-09-01: `Code_v17_2026-09-01.gs` exists in the repo. Confirm with the curl above whether it is live before trusting `editPayment` / `addPayment` to work.
 
-**The v14 regression is the cautionary tale for this whole section.** v14 was branched from `Code.gs` rather than from `Code_v13_*.gs`, because `Code_v13_*.gs` had never been mirrored back into `Code.gs`. Three months of failing payment edits followed, with the failure visible only as a toast. When cutting a new version, branch from the **highest-numbered** file, not from `Code.gs`.
+### The 2026-09-01 investigation — three lessons, and one wrong turn
+
+**There are THREE places the script can differ, not two:** the repo, the Apps Script *editor*, and the deployed *web-app version*. They drift independently.
+
+- **Triggers** (`processMaybankEmails`, `gasHeartbeat`) execute the **latest editor code**.
+- **`/exec`** — every `doPost` the server makes — is served by the **pinned deployment version**, frozen until someone runs *Deploy → Manage deployments → New version*.
+
+On 2026-09-01 the deployment was still **version 5, cut 2026-05-04**. Saving in the editor had never updated it. That is why payment-email parsing and the heartbeat worked fine while `addPayment` did not exist on `/exec`.
+
+**The repo was the stale artifact, not the editor.** `Code.gs` in this repo lacked the `doPost` shared-secret check, `editPaymentRow`, and the Bug 16 patches — all of which the live editor had. Reasoning from the repo produced a confident, wrong diagnosis: that `editPayment` had been failing in production since May. **It never was.** A probe against the deployment settled it in seconds:
+
+```bash
+# Guard returns before any write, so this is safe against production.
+# Needs the token — doPost validates the APPS_SCRIPT_SECRET shared secret.
+# Use node/tsx, NOT curl -L: curl downgrades POST to GET on a 302 and you get HTML.
+{"action":"editPayment","token":"<APPS_SCRIPT_SECRET>","rowIndex":0}
+# → "rowIndex must be >= 2"  = route exists and works
+# → "Unknown action: ..."     = route missing from the DEPLOYMENT
+```
+
+**Lessons:**
+1. **Never diagnose GAS from the repo.** Copy the live editor source out and diff it before concluding anything. `Code.gs` here is only as current as the last person who remembered to mirror it.
+2. **Probe the deployment before theorising.** Every write action has a guard that rejects `rowIndex: 0` before touching the Sheet, so an existence check costs nothing.
+3. **Pasting into the editor is not deploying.** Always cut a New version, then confirm with the `curl` above.
+
+**When cutting a new version, branch from the LIVE editor source, not from `Code.gs` and not from the highest-numbered file.** Mirror into `Code.gs` only after deploying, so `Code.gs` always means "what is live".
 
 **Never edit live GAS files in place. Always create a new versioned file.**

@@ -6,7 +6,7 @@ import { extractTimeOfDay, parseAnyDateTime, formatDateTimeDisplay } from "@/lib
 //
 // Payment dates in col C carry the real transfer timestamp. The admin edit form
 // is an <input type="date"> and can only send "YYYY-MM-DD"; without this the
-// GAS normalisePaymentDate() stamps the row 00:00:00 and the time is lost.
+// the Sheet stores a date-only col C as midnight and the time is lost.
 
 describe("timeOfDayFrom", () => {
   it("reads the time from the GAS payment format", () => {

@@ -121,7 +121,7 @@ function toIsoDate(raw: string): string {
  * timestamp ("M/D/YYYY HH:MM:SS", written by GAS formatDateTime from the
  * Maybank email's send time).  The admin edit form is an <input type="date">,
  * so it can only send back a bare "YYYY-MM-DD" — writing that straight through
- * makes GAS normalisePaymentDate() stamp the row "M/D/YYYY 00:00:00" and the
+ * makes the Sheet stores a date-only col C as midnight and the
  * transfer time is gone for good.
  *
  * Re-attach the time-of-day already on the row so a date correction (or an
@@ -1753,7 +1753,7 @@ export const appRouter = router({
 
         // The edit form's <input type="date"> can only hand back "YYYY-MM-DD".
         // Re-attach the transfer time already on the row before it reaches the
-        // Sheet, otherwise GAS normalisePaymentDate() stamps it 00:00:00 and the
+        // Sheet, otherwise the Sheet stores a date-only col C as midnight and the
         // timestamp is lost.
         //
         // Prefer originalDate (the value the client rendered) over a fresh DB
