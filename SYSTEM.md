@@ -69,7 +69,7 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 
 | Component | Service | Notes |
 |---|---|---|
-| App hosting | Railway | Auto-deploys from GitHub `main`. Dockerfile: pnpm install → pnpm build → `node dist/index.js` |
+| App hosting | Railway | **Live: http://fatuwr.up.railway.app** (project `motivated-nature`, env `production`). Auto-deploys from GitHub `main`. Dockerfile: pnpm install → pnpm build → `node dist/index.js` |
 | Database | Railway MySQL | `DATABASE_URL` env var |
 | Image storage | Cloudflare R2 | S3-compatible; free tier (10 GB, 1M requests, zero egress) |
 | Email (OTP) | Resend | `RESEND_API_KEY`, `RESEND_API_FROM` |
@@ -595,7 +595,13 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 - **Weekly silent disconnect pattern:** triggers stop firing with no errors in the execution log, roughly every 7 days. Root cause is the OAuth consent screen being in "Testing" status (default for unverified personal-Gmail apps using sensitive Gmail scopes) — Google expires refresh tokens after 7 days in that state. Symptom: `processMaybankEmails` and `gasHeartbeat` both stop, no failures preceding, heartbeat alert fires. Fix: open the script editor, run any function, grant consent again. The trigger entries themselves are not deleted — they just can't authorize. Do not assume code/handler failure when this pattern appears.
 
 ### Deployment
-- Push to `main` → Railway auto-deploys.
+- Push to `main` → Railway auto-deploys. **Live URL: http://fatuwr.up.railway.app** — health check at `/api/health` returns `{"status":"ok","timestamp":...}`.
+- **Confirming a deploy without the Railway dashboard** (the local `railway` CLI login expires often): Railway reports each build to GitHub as a deployment, so read it with `gh`:
+  ```bash
+  gh api repos/meltbot2000/fatuwr-training-portal/deployments --jq '.[0] | "\(.sha[0:7]) \(.created_at)"'
+  gh api repos/meltbot2000/fatuwr-training-portal/deployments/<id>/statuses --jq '.[] | "\(.created_at) \(.state)"'
+  ```
+  Look for state `success`. A build typically takes ~2 minutes.
 - **`pnpm` is pinned in the `Dockerfile` (`pnpm@10.4.1`) and must stay in step with `packageManager` in `package.json`.** It was unpinned until 2026-09-01, so `npm install -g pnpm` pulled whatever was newest at build time. A pnpm release then added strict verification of the `packageManager` identity against the lockfile, and `pnpm-lock.yaml` has no `@pnpm/exe.*` entry — every build started failing with `ERR_PNPM_PNPM_ENGINE_IDENTITY_UNVERIFIABLE` with **no repo change to explain it**. If builds ever fail again at `pnpm install --frozen-lockfile` with nothing relevant in the diff, suspect the toolchain, not the code: the failing step runs *before* `COPY . .`, so application code cannot be the cause.
 - Every deploy triggers: `syncTab("payments")` after 5s (startup sync).
 - Schema changes: run `pnpm db:push` after deploy.

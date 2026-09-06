@@ -1,5 +1,18 @@
 # Deployment Guide — Railway.app
 
+**Live app: http://fatuwr.up.railway.app** (Railway project `motivated-nature`, environment `production`)
+
+Deploys are automatic: every push to GitHub `main` triggers a Railway build. There is
+no CI workflow in the repo. To confirm a deploy landed without the Railway dashboard:
+
+```bash
+gh api repos/meltbot2000/fatuwr-training-portal/deployments --jq '.[0].id'
+```
+
+then pass that id to `.../deployments/<id>/statuses` and look for state `success`.
+
+---
+
 ## Prerequisites
 
 - Code pushed to a GitHub repository
@@ -71,7 +84,7 @@ This creates the `users` and `otp_codes` tables.
 
 ### 7. Verify
 
-1. Visit `https://your-app.railway.app/api/health` — should return `{ "status": "ok", "timestamp": "..." }`
+1. Visit http://fatuwr.up.railway.app/api/health — should return `{ "status": "ok", "timestamp": "..." }`
 2. Test the full login flow: enter email → receive OTP → verify → land on home page
 3. Check the Railway logs for any errors
 
