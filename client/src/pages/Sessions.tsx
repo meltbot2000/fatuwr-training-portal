@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
+import DebtBanner from "@/components/DebtBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Calendar, AlertTriangle } from "lucide-react";
@@ -94,6 +95,9 @@ export default function Sessions() {
             </div>
           </Link>
         )}
+
+        {/* Outstanding balance warning / block notice */}
+        {!authLoading && isAuthenticated && <DebtBanner />}
 
         {isLoading && (
           <div className="space-y-3">

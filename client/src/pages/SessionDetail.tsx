@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
+import DebtBanner from "@/components/DebtBanner";
 import EditSignupSheet from "@/components/EditSignupSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -185,6 +186,9 @@ export default function SessionDetail() {
               </Link>
             </div>
           )}
+
+          {/* Outstanding balance warning / block notice — shown just above the Sign up button */}
+          {isAuthenticated && !mySignup && <DebtBanner />}
 
           {/* 5. Sign up button — full width, primary. 16px gap below Splits. */}
           <div className="mb-6">
