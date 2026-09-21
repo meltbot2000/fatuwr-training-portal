@@ -4,7 +4,7 @@
 const CONTENT = `
 <p>Last updated: 21 September 2026</p>
 
-<p>This policy explains what the FATUWR Training Portal collects and why. The portal is run by FATUWR for its members and trial participants.</p>
+<p>This policy explains what the FATUWR app collects and why. The app is run by FATUWR for its members and newbie session participants.</p>
 
 <h2>What we collect</h2>
 
@@ -17,13 +17,13 @@ const CONTENT = `
 
 <p><strong>Profile details you give us.</strong> Your name, and optionally your phone number, date of birth and profile photo. These are used to identify you within the club (for example on session sign-up lists) and to manage membership.</p>
 
-<p><strong>Your activity in the portal.</strong> The training sessions you sign up for, and your membership status.</p>
+<p><strong>Your activity in the app.</strong> The training sessions you sign up for, and your membership status.</p>
 
 <h2>How we use and share it</h2>
 
 <p>Your data is used only to run the club's training sign-ups, membership and payment records. We do not sell it, and we do not use it for advertising.</p>
 
-<p>It is stored with the services that run the portal (our hosting provider, database and the club's Google account) and is visible to club administrators. We do not share it with anyone else.</p>
+<p>It is stored with the services that run the app (our hosting provider, database and the club's Google account) and is visible to club administrators. We do not share it with anyone else.</p>
 
 <h2>Deleting your data</h2>
 
