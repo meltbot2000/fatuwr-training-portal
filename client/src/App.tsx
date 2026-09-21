@@ -26,16 +26,19 @@ import MerchDetail from "./pages/MerchDetail";
 import FunResourcesResources from "./pages/FunResourcesResources";
 import FunResourcesVideos from "./pages/FunResourcesVideos";
 import NewToClub from "./pages/NewToClub";
+import Privacy from "./pages/Privacy";
 
 const NO_NAV_PATHS = ["/login"];
+// Reachable without signing in (Google OAuth consent screen links to /privacy)
+const PUBLIC_PATHS = ["/login", "/privacy"];
 
 function AppShell() {
   const [location] = useLocation();
   const { isAuthenticated, loading } = useAuth();
-  const showNav = isAuthenticated && !NO_NAV_PATHS.includes(location);
+  const showNav = isAuthenticated && !NO_NAV_PATHS.includes(location) && location !== "/privacy";
 
   // Redirect unauthenticated users to landing/login screen for all app routes
-  if (!loading && !isAuthenticated && location !== "/login") {
+  if (!loading && !isAuthenticated && !PUBLIC_PATHS.includes(location)) {
     return <Redirect to="/login" />;
   }
 
@@ -63,6 +66,7 @@ function AppShell() {
         <Route path="/fun-resources/resources" component={FunResourcesResources} />
         <Route path="/fun-resources/videos" component={FunResourcesVideos} />
         <Route path="/newbie" component={NewToClub} />
+        <Route path="/privacy" component={Privacy} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

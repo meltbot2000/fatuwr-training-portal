@@ -308,7 +308,7 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-white/25 text-[11px] mt-5">FATUWR Training Portal</p>
+        <p className="text-center text-white/25 text-[11px] mt-5">FATUWR Training Portal · <a href="/privacy" className="underline">Privacy Policy</a></p>
       </div>
     </div>
   );
