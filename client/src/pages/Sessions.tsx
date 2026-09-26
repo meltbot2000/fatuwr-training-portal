@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { Calendar, AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
 import { parseAnyDate } from "@/lib/dateUtils";
+import { poolImage } from "@/lib/poolImages";
 
 const MAX_SESSIONS = 6;
 
@@ -128,6 +129,7 @@ export default function Sessions() {
             {visibleSessions.map((session) => {
               const isClosed = session.isClosed && session.isClosed.trim().length > 0;
               const signupCount = (session as any).signupCount ?? 0;
+              const imgSrc = poolImage(session.pool, session.poolImageUrl);
 
               return (
                 <Link
@@ -136,12 +138,14 @@ export default function Sessions() {
                 >
                   <div className="rounded-2xl overflow-hidden active:scale-[0.99] transition-transform">
                     <div className="relative h-48 overflow-hidden">
-                      {session.poolImageUrl ? (
+                      {imgSrc ? (
                         <img
-                          src={session.poolImageUrl}
+                          src={imgSrc}
                           alt={`${session.pool} pool`}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          width={480}
+                          height={192}
                           onError={(e) => {
                             const el = e.target as HTMLImageElement;
                             el.style.display = "none";

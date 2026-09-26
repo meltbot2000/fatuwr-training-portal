@@ -532,15 +532,26 @@ export const appRouter = router({
           signupCounts[key] = (signupCounts[key] ?? 0) + Number(row.count);
         }
       }
-      // venueCost/revenue are the club's finances, and nothing outside the admin screens
-      // renders them from this list. This endpoint is public, so they are staff-only.
+      // Exactly what the session card renders (client/src/pages/Sessions.tsx), not the
+      // whole row: this was sending 42 sessions x 23 fields and the screen shows nine
+      // fields of six sessions. It also stopped shipping `attendance`, the dead column
+      // SYSTEM.md §5 says never to read, and venueCost/revenue — club finances on a
+      // PUBLIC endpoint. Whitelist, not denylist: a new column on the Sheet is private
+      // here until someone adds it on purpose.
       const isStaff = ctx.user?.clubRole === "Admin" || ctx.user?.clubRole === "Helper";
       return sessions.map(s => ({
-        ...s,
-        venueCost: isStaff ? s.venueCost : undefined,
-        revenue:   isStaff ? s.revenue   : undefined,
+        rowId: s.rowId,
+        pool: s.pool,
+        day: s.day,
+        trainingDate: s.trainingDate,
+        trainingTime: s.trainingTime,
+        isClosed: s.isClosed,
+        notes: s.notes,
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
         signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${(s.pool ?? "").trim()}`] ?? 0,
+        // Staff-only, and only because the admin screens read them off a session object.
+        venueCost: isStaff ? s.venueCost : undefined,
+        revenue:   isStaff ? s.revenue   : undefined,
       }));
     }),
 
@@ -598,11 +609,12 @@ export const appRouter = router({
 
         // This procedure is PUBLIC — a signed-out visitor can reach it and the URL is in
         // the JS bundle — so it must not hand out anything a visitor should not have.
-        //   staff (Admin/Helper): everything; the admin edit sheet and Splits need it.
+        //   staff (Admin/Helper): everything; the admin edit sheet needs it.
         //   signed-in member: full detail of THEIR OWN row (they need it to spot
         //     themselves in the roster and to edit their own sign-up), plus everyone
         //     else's name, activity and photo, which is all the roster displays.
-        //   signed out: names, activity and photos only.
+        //   signed out: NO roster at all. Names plus faces of identifiable people is not
+        //     something a stranger with the URL should get; the count is enough.
         // Redacted contact fields come back as "" and fees as 0: that is deliberate
         // redaction, not data — never total actualFees off a non-staff response.
         const viewerEmail = (ctx.user?.email || "").toLowerCase().trim();
@@ -613,7 +625,8 @@ export const appRouter = router({
           venueCost: isStaff ? session.venueCost : undefined,
           revenue:   isStaff ? revenue : undefined,
           pnl:       isStaff ? pnl : undefined,
-          signups: signups.map(su => {
+          signupCount: signups.length,
+          signups: !ctx.user ? [] : signups.map(su => {
             const suEmail = (su.email || "").toLowerCase().trim();
             const isSelf = !!viewerEmail && suEmail === viewerEmail;
             const maySeeDetail = isStaff || isSelf;

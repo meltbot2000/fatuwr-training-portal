@@ -122,21 +122,29 @@ describe("sessions.list", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].trainingDate).toBe("31 March 2026");
     expect(sessions[0].pool).toBe("MGS");
-    expect(sessions[0].memberFee).toBe(10);
-    expect(sessions[0].nonMemberFee).toBe(17);
+    // The list ships only what the card renders — fees come from sessions.detail.
+    expect(sessions[0].poolImageUrl).toBe("https://drive.google.com/thumbnail?id=abc123&sz=w800");
+    expect((sessions[0] as any).memberFee).toBeUndefined();
   });
 });
 
 describe("sessions.detail", () => {
-  it("returns session detail with signups", async () => {
-    const ctx = createPublicContext();
-    const caller = appRouter.createCaller(ctx);
+  it("returns session detail with signups to a signed-in member", async () => {
+    const caller = appRouter.createCaller(createAuthContext());
     const detail = await caller.sessions.detail({ rowId: "row-1" });
 
     expect(detail.trainingDate).toBe("31 March 2026");
     expect(detail.pool).toBe("MGS");
     expect(detail.signups).toHaveLength(1);
     expect(detail.signups[0].name).toBe("John");
+  });
+
+  it("withholds the roster from a signed-out visitor but still reports the count", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const detail = await caller.sessions.detail({ rowId: "row-1" });
+
+    expect(detail.signups).toEqual([]);
+    expect(detail.signupCount).toBe(1);
   });
 
   it("throws NOT_FOUND for invalid rowId", async () => {

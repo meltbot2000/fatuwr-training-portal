@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Link, useParams } from "wouter";
 import { AlertTriangle, Pencil, ChevronRight } from "lucide-react";
 import { EditSessionSheet } from "@/components/EditSessionSheet";
+import { poolImage } from "@/lib/poolImages";
 import { toast } from "sonner";
 
 function getInitials(name: string): string {
@@ -120,7 +121,9 @@ export default function SessionDetail() {
   const mySignup = userEmail
     ? session.signups?.find(s => (s.email || "").toLowerCase().trim() === userEmail)
     : undefined;
-  const signupCount = session.signups?.length ?? 0;
+  // Server-side count: the roster itself is withheld from signed-out visitors, so the
+  // length of `signups` is not the attendance.
+  const signupCount = (session as any).signupCount ?? session.signups?.length ?? 0;
   const userCanEdit = !!mySignup && !isClosed && !sessionStarted;
 
   return (
@@ -131,9 +134,9 @@ export default function SessionDetail() {
       <main className="mx-auto max-w-[480px]" style={{ paddingBottom: "calc(10rem + env(safe-area-inset-bottom, 0px))" }}>
         {/* 1. Hero image */}
         <div className="relative h-48 overflow-hidden">
-          {session.poolImageUrl ? (
+          {poolImage(session.pool, session.poolImageUrl) ? (
             <img
-              src={session.poolImageUrl}
+              src={poolImage(session.pool, session.poolImageUrl)}
               alt={`${session.pool} pool`}
               className="w-full h-full object-cover"
               onError={(e) => {

@@ -91,36 +91,50 @@ const signup = (name: string, email: string) => ({
 
 beforeEach(() => { imageQueries.length = 0; signups = []; });
 
+function memberCtx(email: string): TrpcContext {
+  return {
+    user: {
+      id: 1, openId: "email_x", email, name: "X", loginMethod: "email", role: "user",
+      memberStatus: "Member",
+      createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+    },
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: { clearCookie: vi.fn(), cookie: vi.fn() } as unknown as TrpcContext["res"],
+  } as unknown as TrpcContext;
+}
+
+// Images are only returned to signed-in viewers now, so these run as a member who is not
+// in the session (so nothing is treated as "self").
 describe("sessions.detail profile images", () => {
   it("prefers users.image over the legacy sheet_users image", async () => {
     signups = [signup("Ann", "ann@example.com")];
-    const detail = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const detail = await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     expect(detail.signups[0].image).toBe("https://r2/ann-live.jpg");
   });
 
   it("finds an image via sheet_users.userEmail when the primary email differs", async () => {
     signups = [signup("Bob", "bob@example.com")];
-    const detail = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const detail = await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     expect(detail.signups[0].image).toBe("https://dead-glide/bob.jpg");
   });
 
   it("asks only for this session's attendees, never the whole table", async () => {
     signups = [signup("Ann", "ann@example.com")];
-    await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     expect(imageQueries.length).toBe(2);
     expect(imageQueries.every(q => q.hasWhere)).toBe(true);
   });
 
   it("makes no image query at all for a session with no sign-ups", async () => {
     signups = [];
-    const detail = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const detail = await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     expect(detail.signups).toEqual([]);
     expect(imageQueries).toEqual([]);
   });
 
   it("gives a blank-email attendee no image, and never someone else's", async () => {
     signups = [signup("Ann", "ann@example.com"), signup("Walk-in", "")];
-    const detail = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const detail = await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     const byName = Object.fromEntries(detail.signups.map(s => [s.name, s.image]));
     expect(byName["Walk-in"]).toBe("");
     expect(byName["Ann"]).toBe("https://r2/ann-live.jpg");
@@ -128,7 +142,7 @@ describe("sessions.detail profile images", () => {
 
   it("keeps each attendee's own image", async () => {
     signups = [signup("Ann", "ann@example.com"), signup("Bob", "bob@example.com")];
-    const detail = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const detail = await appRouter.createCaller(memberCtx("nobody@example.com")).sessions.detail({ rowId: "row-1" });
     const byName = Object.fromEntries(detail.signups.map(s => [s.name, s.image]));
     expect(byName["Ann"]).toBe("https://r2/ann-live.jpg");
     expect(byName["Bob"]).toBe("https://dead-glide/bob.jpg");
@@ -159,17 +173,23 @@ describe("sessions.detail redaction", () => {
     createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
   });
 
-  it("gives a signed-out visitor names only — no emails, ids, payment refs or fees", async () => {
+  it("gives a signed-out visitor NO roster at all — not even names", async () => {
     signups = ATTENDEES;
     const d = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
-    expect(d.signups.map(s => s.name)).toEqual(["Ann", "Zed"]);
-    for (const s of d.signups) {
-      expect(s.email).toBe("");
-      expect(s.paymentId).toBe("");
-      expect(s.id).toBeNull();
-      expect(s.actualFees).toBe(0);
-      expect(s.memberOnTrainingDate).toBe("");
-    }
+    expect(d.signups).toEqual([]);
+    // ...but the count still shows, so the card reads "2 signed up".
+    expect(d.signupCount).toBe(2);
+  });
+
+  it("redacts other members' details for a signed-in member", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(member("ann@example.com")).sessions.detail({ rowId: "row-1" });
+    const zed = d.signups.find(s => s.name === "Zed")!;
+    expect(zed.email).toBe("");
+    expect(zed.paymentId).toBe("");
+    expect(zed.id).toBeNull();
+    expect(zed.actualFees).toBe(0);
+    expect(zed.memberOnTrainingDate).toBe("");
   });
 
   it("hides the club's finances from a signed-out visitor", async () => {
@@ -217,9 +237,9 @@ describe("sessions.detail redaction", () => {
     }
   });
 
-  it("keeps showing everyone's photo — the roster is meant to display those", async () => {
+  it("still shows photos to signed-in members", async () => {
     signups = ATTENDEES;
-    const d = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    const d = await appRouter.createCaller(member("ann@example.com")).sessions.detail({ rowId: "row-1" });
     expect(d.signups.find(s => s.name === "Ann")!.image).toBe("https://r2/ann-live.jpg");
   });
 });
@@ -267,11 +287,19 @@ describe("sessions.list redaction", () => {
     }
   });
 
-  it("keeps the fields members actually need", async () => {
+  it("keeps the nine fields the card renders, and nothing else", async () => {
     const list = await appRouter.createCaller(publicContext()).sessions.list();
+    expect(Object.keys(list[0]).sort()).toEqual([
+      "day", "isClosed", "notes", "pool", "poolImageUrl", "revenue", "rowId",
+      "signupCount", "trainingDate", "trainingTime", "venueCost",
+    ]);
     expect(list[0].pool).toBe("CCAB");
-    expect(list[0].memberFee).toBe(13);
     expect(list[0].trainingDate).toBe("1 October 2026");
     expect(typeof list[0].signupCount).toBe("number");
+    // Fees, attendance, rowIndex, trainingObjective, signUpCloseTime and rainOff are no
+    // longer shipped: the card does not render them. `attendance` is the dead column.
+    expect((list[0] as any).memberFee).toBeUndefined();
+    expect((list[0] as any).attendance).toBeUndefined();
+    expect((list[0] as any).trainingObjective).toBeUndefined();
   });
 });
