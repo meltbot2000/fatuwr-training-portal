@@ -70,12 +70,37 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 | Component | Service | Notes |
 |---|---|---|
 | App hosting | Railway | **Live: http://fatuwr.up.railway.app** (project `motivated-nature`, env `production`). Auto-deploys from GitHub `main`. Dockerfile: pnpm install → pnpm build → `node dist/index.js` |
-| Database | Railway MySQL | `DATABASE_URL` env var |
+| Database | Railway MySQL | **Singapore, in the app's own Railway project**, reached privately at `mysql.railway.internal` (`DATABASE_URL` = `${{MySQL.MYSQL_URL}}`). Moved 2026-09-26 from a US West MySQL in a separate project that was reached over the public `*.rlwy.net` proxy — every query crossed the Pacific at ~239ms. Now ~1ms. **Never put a `*.rlwy.net` URL in the app's `DATABASE_URL`.** |
 | Image storage | Cloudflare R2 | S3-compatible; free tier (10 GB, 1M requests, zero egress) |
 | Email (OTP) | Resend | `RESEND_API_KEY`, `RESEND_API_FROM` |
 | Payment emails | Google Apps Script | Gmail-based; 1-min cron trigger on `processMaybankEmails`. Only calls `/api/sync` when new payment rows are written. |
 | Alert email | Resend → SendGrid fallback → console.error | `sendAlertEmail()` in `server/email.ts`; sends to tanmelanie@gmail.com, fatuwr@gmail.com, fatuwrevents@gmail.com |
-| Backup | SMTP/Resend | Daily CSV email to fatuwrevents@gmail.com at 23:59 SGT |
+| Backup | SMTP/Resend | Daily CSV email to fatuwrevents@gmail.com at 23:59 SGT. `startDailyBackup()` recomputes the delay to the next 23:59 SGT **on every boot**, so redeploys reschedule rather than postpone it. |
+| Healthcheck | `/api/health/db` | `railway.toml`. Does a real `SELECT 1` and returns 503 on failure, so **a deployment that cannot reach the database does not replace a working one**. `/api/health` still exists (no DB work) for uptime monitors. |
+
+### Client delivery (rebuilt 2026-09-26)
+- **Dev tooling is excluded from production builds** (`vite.config.ts`, keyed on
+  `command === "build"`). `vite-plugin-manus-runtime` was injecting an inline `<script>` of
+  366,770 characters — a second complete copy of React — into `index.html`, which cannot be
+  cached, so every app open parsed and executed it before the real bundle ran.
+  `jsxLocPlugin` was stamping `data-loc` onto every element. index.html: 367.9KB → 1.06KB.
+  **`server/_core/vite.ts` must resolve the config export before spreading it** — it is a
+  function now, and spreading a function yields `{}`, which silently breaks `npm run dev`.
+- **Content-hashed assets are served `immutable, max-age=1y`**; `index.html` is `no-cache`
+  plus `Surrogate-Control: no-store` (Railway's Fastly layer keys off the latter). Never
+  add a `client/public/assets/` directory — those files are unhashed and would inherit the
+  year-long cache.
+- **API responses are gzipped** (`compression` middleware). They were going out
+  uncompressed while the edge compressed only static files: `sessions.list` was 14,141
+  bytes of plain JSON, now 568.
+- **React Query defaults** (`client/src/main.tsx`): 30s staleTime, no refetch on window
+  focus, one retry. The session screens override this with `staleTime: 0` and
+  `refetchOnWindowFocus: true`, because a roster is what people actually watch — affordable
+  because the server-side cache makes that re-fetch ~39ms and 393 bytes.
+- Inter is **self-hosted** from `client/src/assets/fonts` (SIL OFL), and pool photos from
+  `client/src/assets/pools`, so both are same-origin and inherit the year-long cache. Pool
+  photos previously came from `drive.google.com`, which 302s to a second host and marks the
+  result `private, no-cache` — two cross-origin round trips per card, never cached.
 
 ### Required environment variables
 
@@ -355,6 +380,16 @@ Fully DB-primary. Never touch Sheets. `videos` includes a `notes` text column.
 | Environment config | `server/_core/env.ts` |
 | OTP + alert email | `server/email.ts` — `sendOtpEmail()` for OTP; `sendAlertEmail(subject, text)` for alerts |
 
+### Database migration / maintenance scripts
+| File | Purpose |
+|---|---|
+| `scripts/dump-database.ts` | Full logical dump (SHOW CREATE TABLE + batched INSERTs), `dateStrings` so timestamps round-trip |
+| `scripts/restore-database.ts` | Restore into `NEW_DATABASE_URL`; refuses to target the source host; verifies row counts |
+| `scripts/verify-migration.ts` | Row-by-row hash of DB-primary tables, money reconciliation for payments, live AUTO_INCREMENT vs each table's own MAX(pk), derived figures |
+| `scripts/catch-up-new-database.ts` | Replays rows written during a cutover window; per-row error handling; **excludes payments by design** |
+| `scripts/apply-declared-indexes.ts` | Creates the indexes `drizzle/schema.ts` declares (idempotent) |
+| `ROLLBACK.md` | Cutover checklist and rollback procedure |
+
 ### Client — utilities & components
 
 | Concern | File |
@@ -446,7 +481,10 @@ If a sign-up or payment row has a `paymentId`, ownership is by paymentId **only*
 Both `toIsoDate()` helpers (`routers.ts`, `googleSheets.ts`) fall back to `new Date(raw)` for free-text dates like `"1 March 2026"`. JS parses that as **local** midnight. `toISOString().slice(0,10)` then converts to UTC, which in any timezone east of UTC (SGT is UTC+8) rolls the date back one day — so every seeded session keys to the wrong date and matches zero sign-ups. Railway runs in UTC so production was unaffected, but local dev and tests silently produced wrong counts. Both helpers now read back `getFullYear()/getMonth()/getDate()`. **Never reintroduce `toISOString()` in a date-normalisation path.**
 
 ### Payment transfer timestamp
-`sheet_payments.date` holds the real bank-transfer timestamp as `"M/D/YYYY HH:MM:SS"` (GAS `formatDateTime`, taken from the Maybank email's send time). All 459 live rows carry a genuine time.
+`sheet_payments.date` holds the real bank-transfer timestamp as `"M/D/YYYY HH:MM:SS"` (GAS `formatDateTime`, taken from the Maybank email's send time). Nearly all live rows carry a genuine time — as of 2026-09-26 there are 521 rows and
+**three** carry a date with no time (`rowIndex` 444, 462, 470). The "all 459 rows" claim
+that stood here was both stale and slightly wrong; anything parsing this column must
+tolerate a missing time.
 
 - **Display:** `formatDateTimeDisplay()` / `parseAnyDateTime()` / `extractTimeOfDay()` in `dateUtils.ts`. `parseAnyDate()` still deliberately discards the time — it is for timezone-safe date comparison, not display.
 - **A time of exactly `00:00:00` means "no time recorded", not midnight.** It is what GAS `normalisePaymentDate()` writes when a date-only value is saved, i.e. a normalisation artefact. All three helpers treat it as absent.
@@ -487,8 +525,48 @@ JS `null` can silently become the string `"null"` when crossing system boundarie
 ### Trial membership — fee rate determined by SESSION DATE
 What matters for fee calculation is whether the **training session's date** falls within the user's trial period — not whether the user is Trial at the moment they sign up. Implemented in `getMembershipOnTrainingDate()` in `feeUtils.ts`.
 
-### 60-second sessions cache
-`getSessions()` caches results for 60 seconds. `clearSessionsCache()` is called after every session mutation.
+### In-process caches (rewritten 2026-09-26)
+Three caches in `server/googleSheets.ts`, all in module scope, so a redeploy empties them:
+
+| cache | TTL | holds |
+|---|---|---|
+| `_sessionsCacheData` | 60s | `getSessions()` |
+| `_signupsCache` | 3 min | one entry per `pool\|sessionDate` roster |
+| `_paymentsCacheData` | 60s | `getPayments()` |
+
+`clearSessionsCache()` busts the first two and is called from **13 write paths** (sign-up
+submit/edit/delete, the three admin equivalents, membership deletion, rain-off, session
+mutations, the signups sync). `clearPaymentsCache()` busts the third on every payment write
+and in `runSync`. The TTLs are a backstop, not the freshness mechanism — which is why they
+are safe at these lengths, **and why they assume a single app instance**. Drop the roster
+TTL back to 30s if the service is ever scaled past one replica.
+
+The duplicate check in `signups.submit` and `checkDuplicate` pass `{ fresh: true }` so a
+cached roster can never decide whether a sign-up is a duplicate.
+
+Boot pre-warms the connection, `getSessions()` and the next three sessions' rosters
+(`warmDb()` in `server/sync.ts`), because every deploy empties the caches and the first
+member through would otherwise pay for the cold read.
+
+### Session reads: pool AND date in SQL, guarded (2026-09-26)
+`getSignUpsForSession()` filters both the pool and the date in SQL — an index lookup on
+`idx_sheet_signups_pool_date` — but **only while a cached probe confirms every sign-up row
+with a pool stores an ISO date** (2,019 of 2,019 at the time of writing; the non-ISO dates
+all belong to membership rows, which carry no pool). If one oddly formatted row ever
+appears, or the probe errors, the whole-pool read returns automatically and logs why. The
+JS date comparison still runs on whatever comes back, so the SQL filter can only narrow
+what the database sends, never change what counts as a match. See Bug 1 for why this is
+guarded rather than assumed.
+
+### Public endpoints return redacted data (2026-09-26)
+`sessions.list` and `sessions.detail` are `publicProcedure`, and their URLs ship in the JS
+bundle, so the login wall in front of those screens is client-side only. They now return:
+staff (Admin|Helper) everything; a signed-in member their OWN row in full plus everyone
+else's name, activity and photo; a signed-out visitor **no roster at all**, just
+`signupCount`. Venue cost, revenue and P&L are staff-only on both. `sessions.list` is a
+field whitelist, so a new column on the Sheet stays private until someone adds it
+deliberately. `sessions.detail` spreads the whole session row, so staff-only fields there
+must be explicitly overridden — omitting a key leaves the spread's value in place.
 
 ---
 
@@ -568,13 +646,66 @@ Always edit/delete sign-ups by `id` (DB PK). Matching by `email + pool + date` c
 ### Bug 18: Payment edit destroyed the transfer timestamp (fixed 2026-09-01)
 **Root cause:** The edit form's `<input type="date">` can only return `"YYYY-MM-DD"`. GAS `normalisePaymentDate()` expands a bare ISO date to `"M/D/YYYY 00:00:00"` — so saving a payment for *any* reason (fixing a typo'd reference, re-matching a paymentId) rewrote col C and threw away the bank's transfer time. Latent since v13 and about to start biting: `editPaymentRow` was missing from the live script from v14 until v17, so every edit failed outright rather than corrupting data.
 **Fix:** (1) `preservePaymentTime()` on the server re-attaches the row's time-of-day, emitting canonical `"M/D/YYYY HH:MM:SS"` — which `normalisePaymentDate()` passes through untouched. The time comes from the client's `originalDate` (DB read only as fallback), so a concurrent payments sync cannot cause the very data loss being fixed. (2) EditPaymentSheet shows the full timestamp, seconds included, in a read-only "Transfer received" row so the admin can see what they are reconciling against.
-**Verified against live data:** all 459 payment rows round-trip through open → save-unchanged → reopen with zero time loss, zero date drift, and idempotent re-saves, under UTC, SGT and a negative-offset timezone.
+**Verified against live data (2026-09-01, when there were 459 rows):** all payment rows round-trip through open → save-unchanged → reopen with zero time loss, zero date drift, and idempotent re-saves, under UTC, SGT and a negative-offset timezone.
 **Lesson:** An `<input type="date">` is a lossy round-trip for any value that carries a time. Either show and preserve the time explicitly, or do not let the control write that field.
 
 ### Bug 19: toIsoDate shifted free-text dates back a day outside UTC (fixed 2026-09-01)
 **Root cause:** `new Date("1 March 2026")` yields local midnight; `.toISOString().slice(0,10)` then converts to UTC and returns `"2026-02-28"` in SGT. 148 of 155 sessions store free-text dates, so in any non-UTC environment every one of them keyed to the wrong day and matched zero sign-ups.
 **Why it was invisible:** Railway runs in UTC. The bug only surfaced in local dev and in the unit test written for Bug 17.
 **Fix:** Both `toIsoDate()` helpers read back local `getFullYear()/getMonth()/getDate()`. No behaviour change on Railway.
+
+### Bug 20: Admins could double-book themselves and be billed twice (fixed 2026-09-26)
+`signups.submit` exempted admins from its duplicate check, justified by a comment saying
+admins sign up "on behalf of others" — but submit always writes `ctx.user`'s own email, so
+it never could. Going back to the form to change a session type produced a SECOND charged
+row. The check now applies to everyone; admins add other attendees via `admin.addSignup`,
+which deliberately has no duplicate check (it is the patching route).
+
+### Bug 21: "First Timer" vs "First-timer" charged first-timers (fixed 2026-09-26)
+The sign-up form wrote `First Timer` while the edit sheet and the Splits page expected
+`First-timer`. Two effects: a first-timer fell into Splits' "Other" bucket, and opening
+their row in the admin edit sheet failed the exact-match test and preselected "Regular
+Training" — so saving it silently converted a free session into a charged one. Fees
+themselves were safe (`calculateFee` lowercases). `client/src/lib/activities.ts` now holds
+the canonical names and a normaliser; every screen goes through it, so what is stored no
+longer decides whether the UI understands the row.
+
+### Bug 22: Member PII and club finances were public (fixed 2026-09-26)
+An unauthenticated curl of `sessions.detail` returned 24 attendees with name, email,
+paymentId and fee, plus venueCost, revenue and pnl. Also found in the same sweep:
+`GET /api/test-email` was completely unauthenticated and sent REAL mail from the club's
+domain using the genuine login-code template to any address in the query string;
+`announcements.list` returned `createdBy` (two admins' personal emails); `videos.add` was
+`protectedProcedure` with no role check while `videos.delete` required Admin|Helper;
+`sessions.refresh` was a public cache-buster. All closed.
+
+### Bug 23: The declared indexes did not exist (fixed 2026-09-26)
+All eleven indexes in `drizzle/schema.ts` were absent from the live database — PRIMARY keys
+only. The migrations never applied them, so any reasoning of the form "this WHERE clause
+will use an index" was false. Created by hand with `scripts/apply-declared-indexes.ts`
+(idempotent). **A declared index is not a live index — verify with `SHOW INDEX`.** Same
+class of trap as a stale GAS deployment.
+
+### Bug 24: The healthcheck could not tell a working database from a dead one (fixed 2026-09-26)
+`railway.toml` pointed at `/api/health`, which answers from process memory. A deploy with
+an unreachable database would have passed within seconds, Railway would have killed the
+working container, and members would have been silently logged out
+(`authenticateRequest` returns null on a DB error) while sessions and rosters fell back to
+the STALE Sheet — looking, from outside, like a working app. Now `/api/health/db`.
+
+### Bug 25: Copying payments between databases doubles every balance (caught before it shipped, 2026-09-26)
+During the database move, an id-based replay reported all 520 `sheet_payments` rows as
+"new". They were not: both databases held the same rows and the same total. `runSync` does
+a full DELETE + INSERT from the Sheet and the auto-increment keeps climbing, so after any
+sync every row looks new by id. Applying it would have inserted 520 duplicates and doubled
+every member's recorded payments. **Never copy payment rows between databases. Verify them
+by count and SUM(amount) and let a sync repopulate the table.**
+
+### Bug 26: mysql2 shifts TIMESTAMP columns by the local timezone (caught before it shipped, 2026-09-26)
+A dump/restore moved every timestamp 8 hours earlier, because mysql2 parses TIMESTAMP
+columns into JS Dates using the client machine's timezone and the dump re-serialised them
+as UTC. Row counts matched throughout — only a row-by-row hash caught it. All migration
+scripts now connect with `dateStrings: true`.
 
 ---
 
