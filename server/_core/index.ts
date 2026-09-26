@@ -125,14 +125,18 @@ async function startServer() {
       return;
     }
     try {
-      // Primary: full member roster (sheet_users). Fallback: auth users table —
-      // covers members who paid before their first app login.
-      const roster = await resolveDb.select().from(sheetUsers);
+      // Primary: member roster (sheet_users). Fallback: auth users table — covers
+      // members who paid before their first app login.
+      // Only the three columns this lookup reads: it used to pull every column of every
+      // row, profile images included, on every payment GAS resolves.
+      const roster = await resolveDb
+        .select({ paymentId: sheetUsers.paymentId, email: sheetUsers.email, userEmail: sheetUsers.userEmail })
+        .from(sheetUsers);
       let hit = roster.find(u => (u.paymentId || "").toLowerCase().trim() === needle);
       let paymentId = hit ? (hit.paymentId || "").trim() : "";
       let email = hit ? (hit.email || hit.userEmail || "").toLowerCase().trim() : "";
       if (!paymentId) {
-        const authUsers = await resolveDb.select().from(users);
+        const authUsers = await resolveDb.select({ paymentId: users.paymentId, email: users.email }).from(users);
         const hit2 = authUsers.find(u => (u.paymentId || "").toLowerCase().trim() === needle);
         if (hit2) {
           paymentId = (hit2.paymentId || "").trim();
