@@ -40,8 +40,10 @@ const TABLES: [string, string][] = [
 
 async function main() {
   const apply = process.argv.includes("--apply");
-  const old = await mysql.createConnection(process.env.DATABASE_URL as string);
-  const nw = await mysql.createConnection(process.env.NEW_DATABASE_URL as string);
+  // dateStrings: copying rows between databases must not reinterpret TIMESTAMP columns
+  // through this machine's timezone — that shifted every timestamp by 8 hours.
+  const old = await mysql.createConnection({ uri: process.env.DATABASE_URL as string, dateStrings: true });
+  const nw = await mysql.createConnection({ uri: process.env.NEW_DATABASE_URL as string, dateStrings: true });
 
   console.log(apply ? "APPLYING\n" : "DRY RUN — nothing will be written\n");
   let totalMissing = 0;

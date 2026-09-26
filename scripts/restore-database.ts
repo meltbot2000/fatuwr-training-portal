@@ -51,7 +51,7 @@ async function main() {
   console.log(`  from: ${hostOf(source)}`);
   console.log(`  into: ${hostOf(target)}\n`);
 
-  const conn = await mysql.createConnection({ uri: target, multipleStatements: true });
+  const conn = await mysql.createConnection({ uri: target, multipleStatements: true, dateStrings: true });
   const started = Date.now();
   await conn.query(sql);
   console.log(`restored in ${Date.now() - started}ms\n`);
@@ -59,7 +59,7 @@ async function main() {
   const targetCounts = await rowCounts(conn);
   await conn.end();
 
-  const src = await mysql.createConnection(source);
+  const src = await mysql.createConnection({ uri: source, dateStrings: true });
   const sourceCounts = await rowCounts(src);
   await src.end();
 

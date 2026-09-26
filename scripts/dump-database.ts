@@ -26,7 +26,11 @@ function quote(v: unknown): string {
 
 async function main() {
   const out = process.argv[2] || `fatuwr-dump-${new Date().toISOString().slice(0, 10)}.sql`;
-  const c = await mysql.createConnection(process.env.DATABASE_URL as string);
+  // dateStrings: mysql2 would otherwise parse TIMESTAMP columns into JS Dates using THIS
+  // machine's timezone, and re-serialising them as UTC shifted every timestamp by 8 hours
+  // on restore (caught by verify-migration.ts, 2026-09-26). Reading them as the strings
+  // MySQL formats means they round-trip byte for byte.
+  const c = await mysql.createConnection({ uri: process.env.DATABASE_URL as string, dateStrings: true });
 
   const [tableRows] = await c.query<any[]>(
     "SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type='BASE TABLE' ORDER BY table_name",
