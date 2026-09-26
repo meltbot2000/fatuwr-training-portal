@@ -19,7 +19,17 @@ export default function SignUpForm() {
 
   const { data: session, isLoading } = trpc.sessions.detail.useQuery(
     { rowId: rowId || "" },
-    { enabled: !!rowId }
+    {
+      enabled: !!rowId,
+      // The roster is the thing people actually watch ("who's coming tonight?"), so it is
+      // always re-fetched when the screen opens or the app comes back to the foreground,
+      // rather than inheriting the global 30s staleTime. That is affordable precisely
+      // because of the server-side cache: the response is 393 bytes and ~39ms when the
+      // roster is already cached, and the cache is cleared by every sign-up, edit and
+      // deletion, so a re-fetch shows the change immediately without touching the DB.
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    }
   );
 
   const [activity, setActivity] = useState<Activity>("Regular Training");
