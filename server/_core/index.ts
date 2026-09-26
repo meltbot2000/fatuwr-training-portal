@@ -290,7 +290,17 @@ async function startServer() {
     }
     const mysql = await import("mysql2/promise");
     const configured = process.env.DATABASE_URL || "";
-    const internal = configured.replace(/@[^/]+\//, "@mysql.railway.internal:3306/");
+    // Railway's internal hostname comes from the SERVICE name, so try the plausible ones.
+    // Still no input accepted: this list is fixed, and every candidate is a *.railway.internal
+    // name, which only resolves inside a project's own private network.
+    const candidates = [
+      "mysql.railway.internal",
+      "skillful-imagination.railway.internal",
+      "skillfulimagination.railway.internal",
+      "mysql-skillful-imagination.railway.internal",
+      process.env.RAILWAY_PRIVATE_DOMAIN || "",
+    ].filter(Boolean);
+    const internalUrl = (host: string) => configured.replace(/@[^/]+\//, `@${host}:3306/`);
     const probe = async (url: string) => {
       const started = Date.now();
       try {
@@ -309,10 +319,13 @@ async function startServer() {
         return { ok: false, error: e?.code || e?.message, afterMs: Date.now() - started };
       }
     };
+    const internalResults: Record<string, unknown> = {};
+    for (const host of candidates) internalResults[host] = await probe(internalUrl(host));
     res.json({
       host: configured.split("@")[1]?.split("/")[0] ?? "(unset)",
+      thisServicePrivateDomain: process.env.RAILWAY_PRIVATE_DOMAIN ?? "(not set)",
       viaConfiguredUrl: await probe(configured),
-      viaInternalUrl: await probe(internal),
+      viaInternalCandidates: internalResults,
     });
   });
 
