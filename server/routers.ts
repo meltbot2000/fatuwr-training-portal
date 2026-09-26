@@ -586,7 +586,7 @@ export const appRouter = router({
             memberOnTrainingDate: su.memberOnTrainingDate,
             paymentId: su.paymentId,
             actualFees: su.actualFees,
-            image: imageByEmail[su.email.toLowerCase().trim()] || "",
+            image: imageByEmail[(su.email || "").toLowerCase().trim()] || "",
           })),
         };
       }),

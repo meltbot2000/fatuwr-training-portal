@@ -51,8 +51,19 @@ vi.mock("./googleSheets", () => ({
       signUpCloseTime: "",
     },
   ]),
+  // Shaped like a real row: every field the resolver reads is present, and email is
+  // always a string (the DB mapper and the Sheets fallback both coalesce null -> "").
   getSignUpsForSession: vi.fn().mockResolvedValue([
-    { name: "John", activity: "Regular Training" },
+    {
+      id: 1,
+      name: "John",
+      email: "john@example.com",
+      paymentId: "john",
+      activity: "Regular Training",
+      memberOnTrainingDate: "Member",
+      baseFee: 10,
+      actualFees: 10,
+    },
   ]),
   findUserByEmail: vi.fn().mockResolvedValue(null),
   convertDriveUrl: vi.fn().mockImplementation((url: string) => {

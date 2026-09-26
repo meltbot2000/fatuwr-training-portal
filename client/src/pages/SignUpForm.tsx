@@ -55,8 +55,17 @@ export default function SignUpForm() {
     }
   }, [submitted, navigate]);
 
+  const utils = trpc.useUtils();
+
   const submitMutation = trpc.signups.submit.useMutation({
-    onSuccess: (data) => { setSubmitted(true); toast.success(data.message); },
+    onSuccess: (data) => {
+      setSubmitted(true);
+      toast.success(data.message);
+      // Refresh the session so going back shows "You're signed up" rather than a
+      // cached "Sign up" button, which invites a second sign-up for the same session.
+      utils.sessions.detail.invalidate({ rowId: rowId || "" });
+      utils.sessions.list.invalidate();
+    },
     onError: (error) => { toast.error(error.message || "Failed to sign up"); },
   });
 
