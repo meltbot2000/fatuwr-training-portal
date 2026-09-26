@@ -284,14 +284,17 @@ describe("sessions.list redaction", () => {
     for (const role of ["Admin", "Helper"]) {
       const list = await appRouter.createCaller(staff(role)).sessions.list();
       expect(list[0].venueCost).toBe(100);
+      expect(Object.keys(list[0])).toContain("revenue");
     }
   });
 
   it("keeps the nine fields the card renders, and nothing else", async () => {
     const list = await appRouter.createCaller(publicContext()).sessions.list();
+    // Nine keys for a non-staff viewer: the staff-only pair is omitted outright rather
+    // than sent as undefined, because superjson records every undefined in a meta block.
     expect(Object.keys(list[0]).sort()).toEqual([
-      "day", "isClosed", "notes", "pool", "poolImageUrl", "revenue", "rowId",
-      "signupCount", "trainingDate", "trainingTime", "venueCost",
+      "day", "isClosed", "notes", "pool", "poolImageUrl", "rowId",
+      "signupCount", "trainingDate", "trainingTime",
     ]);
     expect(list[0].pool).toBe("CCAB");
     expect(list[0].trainingDate).toBe("1 October 2026");

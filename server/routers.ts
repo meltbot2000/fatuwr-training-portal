@@ -550,8 +550,9 @@ export const appRouter = router({
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
         signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${(s.pool ?? "").trim()}`] ?? 0,
         // Staff-only, and only because the admin screens read them off a session object.
-        venueCost: isStaff ? s.venueCost : undefined,
-        revenue:   isStaff ? s.revenue   : undefined,
+        // Spread rather than `: undefined` — superjson records every undefined value in a
+        // meta block, which cost 2,512 bytes of a 14KB response for two unused fields.
+        ...(isStaff ? { venueCost: s.venueCost, revenue: s.revenue } : {}),
       }));
     }),
 
@@ -622,6 +623,8 @@ export const appRouter = router({
         return {
           ...session,
           poolImageUrl: convertDriveUrl(session.poolImageUrl),
+          // Explicit overrides, NOT a conditional spread: `...session` above already put
+          // venueCost in the object, so omitting the key would leave the real value there.
           venueCost: isStaff ? session.venueCost : undefined,
           revenue:   isStaff ? revenue : undefined,
           pnl:       isStaff ? pnl : undefined,

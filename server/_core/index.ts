@@ -14,6 +14,7 @@ import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
 import { sheetSessions, sheetSignups, sheetPayments, sheetUsers, users } from "../../drizzle/schema";
 import { ENV } from "./env";
+import compression from "compression";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -37,6 +38,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // API responses were going out uncompressed — verified against production: a
+  // sessions.list response was 14,141 bytes of plain JSON with no content-encoding, while
+  // Railway's edge does gzip the static assets. Every tRPC call paid full price, on every
+  // refetch. No endpoint streams (no SSE, no res.write), so this is safe everywhere.
+  app.use(compression());
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
