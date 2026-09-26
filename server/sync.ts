@@ -30,7 +30,7 @@ import {
   clearSessionsCache,
   clearPaymentsCache,
 } from "./googleSheets";
-import { sql, eq, and, lte, ne } from "drizzle-orm";
+import { sql, eq, and, lte, ne, inArray } from "drizzle-orm";
 
 export type SyncTab = "sessions" | "payments" | "signups" | "users";
 
@@ -216,6 +216,22 @@ function parseAnyDateServer(str: string): Date | null {
  * trialEndDate is in the past and who is still marked as "Trial".
  * Runs at startup and every 24 hours.
  */
+/**
+ * Establish the MySQL connection at boot. `SELECT 1` is the cheapest way to make the pool
+ * actually dial out; without it the pool exists but connects on the first real query.
+ */
+async function warmDb(): Promise<void> {
+  const started = Date.now();
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.execute(sql`SELECT 1`);
+    console.log(`[DB] Connection warmed in ${Date.now() - started}ms`);
+  } catch (err: any) {
+    console.warn("[DB] Warm-up failed (will connect on first request):", err?.message);
+  }
+}
+
 async function expireTrialMemberships(): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -239,14 +255,14 @@ async function expireTrialMemberships(): Promise<void> {
       return;
     }
 
-    // Update in batches of 100 to avoid huge IN clauses
+    // One UPDATE per batch of 100 — this used to loop and issue one UPDATE per member.
+    // At ~250ms per round trip to the Railway MySQL, 40 expired trials meant 10 seconds of
+    // serialised writes during boot, while the first visitor was already waiting.
     for (let i = 0; i < expiredIds.length; i += 100) {
       const batch = expiredIds.slice(i, i + 100);
-      for (const id of batch) {
-        await db.update(sheetUsers)
-          .set({ memberStatus: "Non-Member" })
-          .where(eq(sheetUsers.id, id));
-      }
+      await db.update(sheetUsers)
+        .set({ memberStatus: "Non-Member" })
+        .where(inArray(sheetUsers.id, batch));
     }
     console.log(`[TrialExpiry] Expired ${expiredIds.length} trial membership(s) → Non-Member`);
   } catch (err: any) {
@@ -260,18 +276,29 @@ const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;  // 6 hours (fallback only — GAS 
 const DAY_MS           = 24 * 60 * 60 * 1000; // 24 hours
 
 export function startBackgroundSync(): void {
+  // Open the DB connection now rather than on the first request. drizzle() builds the pool
+  // lazily, so before this the first visitor after every deploy paid the MySQL connect
+  // (~1s on this link) on top of their query. Same single connection either way — it just
+  // happens while nobody is waiting.
+  void warmDb();
+
   // Seed DB-primary tables from Sheets if empty (fresh deployment / first run)
   // Stagger to avoid hammering Sheets API at once
   setTimeout(() => seedIfEmpty("sessions").catch(console.error), 2_000);
   setTimeout(() => seedIfEmpty("signups").catch(console.error),  3_000);
   setTimeout(() => seedIfEmpty("users").catch(console.error),    4_000);
 
-  // Regular sync for Sheets-managed tabs only (payments)
-  setTimeout(() => syncTab("payments").catch(console.error), 5_000);
+  // Regular sync for Sheets-managed tabs only (payments). Deliberately late: it is a full
+  // DELETE + INSERT of the table and it runs on every boot, i.e. after every deploy —
+  // exactly when the first members are opening the app. Nothing depends on it finishing
+  // early (the GAS webhook is the real-time path; this is the 6-hour fallback).
+  setTimeout(() => syncTab("payments").catch(console.error), 20_000);
   setInterval(() => syncTab("payments").catch(console.error), SYNC_INTERVAL_MS);
 
-  // Expire trial memberships at startup, then once every 24 hours
-  setTimeout(() => expireTrialMemberships().catch(console.error), 6_000);
+  // Expire trial memberships at startup, then once every 24 hours. Also pushed back: a
+  // membership that expired overnight does not need to be reclassified in the first
+  // seconds of a deploy.
+  setTimeout(() => expireTrialMemberships().catch(console.error), 25_000);
   setInterval(() => expireTrialMemberships().catch(console.error), DAY_MS);
 
   // GAS health monitor — hourly in-memory timestamp check; alerts if the GAS
