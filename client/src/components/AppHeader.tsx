@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { getStoredToken } from "@/main";
 import { Link, useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 
@@ -14,7 +15,12 @@ export default function AppHeader({ title = "FATUWR", showBack = false, backPath
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const { data: profile } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
+    // Gated on the stored token, which is synchronous, NOT on isAuthenticated — that only
+    // becomes true after auth.me resolves, so this fired as a SECOND sequential round trip
+    // on every screen with a header. Same tick means httpBatchLink puts it in the same
+    // HTTP request as auth.me. (Still gated: without a token there is nobody to fetch, and
+    // an unauthorized response would bounce the user to /login.)
+    enabled: !!getStoredToken(),
     staleTime: 5 * 60 * 1000, // cache for 5 min — no need to re-fetch on every nav
   });
   const avatarImage = profile?.image || "";

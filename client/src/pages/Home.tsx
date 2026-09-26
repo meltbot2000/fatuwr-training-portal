@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { getStoredToken } from "@/main";
 import { Link, useLocation } from "wouter";
 import { Plus, Loader2, GripVertical } from "lucide-react";
 import AnnouncementSheet from "@/components/AnnouncementSheet";
@@ -15,7 +16,12 @@ export default function Home() {
   const isAdmin = clubRole === "Admin";
 
   const { data: profile } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
+    // Gated on the stored token, which is synchronous, NOT on isAuthenticated — that only
+    // becomes true after auth.me resolves, so this fired as a SECOND sequential round trip
+    // on every screen with a header. Same tick means httpBatchLink puts it in the same
+    // HTTP request as auth.me. (Still gated: without a token there is nobody to fetch, and
+    // an unauthorized response would bounce the user to /login.)
+    enabled: !!getStoredToken(),
     staleTime: 5 * 60 * 1000,
   });
   const avatarImage = profile?.image || "";
