@@ -27,6 +27,8 @@ import {
   fetchSheetsPayments,
   fetchSheetsSignups,
   fetchSheetsUsers,
+  clearSessionsCache,
+  clearPaymentsCache,
 } from "./googleSheets";
 import { sql, eq, and, lte, ne } from "drizzle-orm";
 
@@ -67,12 +69,14 @@ async function runSync(tab: SyncTab, db: NonNullable<Awaited<ReturnType<typeof g
       await tx.delete(sheetPayments);
       if (rows.length) await tx.insert(sheetPayments).values(rows);
     });
+    clearPaymentsCache(); // the in-process payments cache now holds deleted rows
   } else if (tab === "signups") {
     const rows = await fetchSheetsSignups();
     await db.transaction(async (tx) => {
       await tx.delete(sheetSignups);
       if (rows.length) await tx.insert(sheetSignups).values(rows);
     });
+    clearSessionsCache(); // cached attendee lists now hold deleted row ids
   } else if (tab === "users") {
     const rows = await fetchSheetsUsers();
     await db.transaction(async (tx) => {

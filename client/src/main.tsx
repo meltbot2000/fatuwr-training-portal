@@ -7,7 +7,19 @@ import superjson from "superjson";
 import App from "./App";
 import "./index.css";
 
-const queryClient = new QueryClient();
+// Defaults matter a lot here: a bare QueryClient uses staleTime 0 + refetchOnWindowFocus,
+// so every navigation and every tab refocus refetched everything — and with reads that can
+// take 20s on a bad DB connection, the default 3 retries turned one slow request into four.
+// Mutations explicitly invalidate what they change, so a short staleTime is safe.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

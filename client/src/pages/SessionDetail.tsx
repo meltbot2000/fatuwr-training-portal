@@ -36,7 +36,7 @@ export default function SessionDetail() {
   const { rowId } = useParams<{ rowId: string }>();
   const { user, isAuthenticated } = useAuth();
 
-  const { data: session, isLoading, error } = trpc.sessions.detail.useQuery(
+  const { data: session, isLoading, error, refetch } = trpc.sessions.detail.useQuery(
     { rowId: rowId || "" },
     { enabled: !!rowId }
   );
@@ -83,12 +83,25 @@ export default function SessionDetail() {
   }
 
   if (error || !session) {
+    // A slow or dropped request is NOT a missing session. Saying "Session not found" for
+    // any failure sent us hunting a data bug when the real cause was a 30s DB read.
+    const reallyMissing = error?.data?.code === "NOT_FOUND" || (!error && !session);
     return (
       <div className="min-h-screen bg-[#111111]">
         <AppHeader title="Session" showBack backPath="/" />
         <main className="mx-auto max-w-[480px] px-4 py-16 text-center">
           <AlertTriangle className="w-10 h-10 text-white/30 mx-auto mb-3" />
-          <p className="text-[13px] text-white/50">Session not found</p>
+          <p className="text-[13px] text-white/50">
+            {reallyMissing ? "Session not found" : "Couldn't load this session. Check your connection and try again."}
+          </p>
+          {!reallyMissing && (
+            <button
+              onClick={() => refetch()}
+              className="mt-4 px-5 py-2 rounded-full border-[1.5px] border-[#2196F3] text-[#2196F3] text-[15px] font-medium"
+            >
+              Try again
+            </button>
+          )}
           <Link href="/">
             <button className="mt-4 px-5 py-2 rounded-full border-[1.5px] border-white/20 text-white/60 text-[15px] font-medium">
               Back to sessions

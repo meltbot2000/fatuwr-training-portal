@@ -467,12 +467,23 @@ function dbUserToUserRow(r: any): UserRow {
   };
 }
 
-// ─── 60-second in-process sessions cache ─────────────────────────────────────
-// Only sessions are cached — other data (payments, signups, users) is never cached here.
-// Busted by clearSessionsCache() which is called after any session mutation.
+// ─── 60-second in-process caches ─────────────────────────────────────────────
+// Reads are the app's bottleneck: bulk transfer over the Railway MySQL connection is
+// bimodal (same query, same bytes: ~1.2s on a good TCP connection, 10-20s on a bad
+// one), so the fix that actually helps is not fetching the same rows again.
+// All three caches are busted by clearSessionsCache() / clearPaymentsCache(), which
+// run after every mutation that could change what they hold.
 let _sessionsCacheData: SessionRow[] | null = null;
 let _sessionsCacheExpiry = 0;
 const SESSIONS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+// Per-session sign-up lists, keyed `pool|sessionDate` exactly as callers pass them.
+const _signupsCache = new Map<string, { data: SignUpRow[]; expiry: number }>();
+const SIGNUPS_CACHE_TTL_MS = 30 * 1000; // 30 seconds — shorter: attendee lists move
+
+let _paymentsCacheData: PaymentRow[] | null = null;
+let _paymentsCacheExpiry = 0;
+const PAYMENTS_CACHE_TTL_MS = 60 * 1000;
 
 export async function getSessions(): Promise<SessionRow[]> {
   // Return cached data if still fresh
@@ -630,24 +641,51 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
   ) || null;
 }
 
-export async function getSignUpsForSession(sessionDate: string, pool: string): Promise<SignUpRow[]> {
+export async function getSignUpsForSession(
+  sessionDate: string,
+  pool: string,
+  opts: { fresh?: boolean } = {},
+): Promise<SignUpRow[]> {
   const poolNorm = pool.toLowerCase().trim();
+  const cacheKey = `${poolNorm}|${sessionDate}`;
+  if (!opts.fresh) {
+    const hit = _signupsCache.get(cacheKey);
+    // Hand out a copy: a caller that sorted the array in place would otherwise corrupt
+    // the cache for everyone else. Cheap — sessions hold at most ~26 people.
+    if (hit && Date.now() < hit.expiry) return hit.data.slice();
+  }
   try {
     const db = await getDb();
     if (db) {
-      // Full scan with JS date normalisation — required because dateOfTraining values
-      // exist in mixed formats ("2026-04-26", "26 April 2026", "26/04/2026") across
-      // seeded and app-written rows. An exact WHERE match on a normalised date would
-      // silently drop rows stored in a different format (caused a critical sign-up
-      // display bug 2026-04-25). Correctness over index performance here.
-      const allSignups = await db.select().from(sheetSignups);
-      if (allSignups.length > 0) {
-        return allSignups
-          .filter(s =>
-            datesMatch(s.dateOfTraining ?? "", sessionDate) &&
-            (s.pool ?? "").toLowerCase().trim() === poolNorm
-          )
-          .map(dbSignupToSignupRow);
+      // THE DATE STAYS A JS COMPARISON. dateOfTraining is stored in mixed formats
+      // ("2026-04-26", "26 April 2026", "29/04/2026") while sheet_sessions.trainingDate
+      // is 100% free text ("4 January 2026") — verified, 155/155 rows. The two sides
+      // never match as strings, so an exact WHERE on the date silently drops rows. That
+      // caused a critical sign-up display bug on 2026-04-25 (SYSTEM.md §9 Bug 1).
+      // DO NOT "finish the job" by pushing the date into SQL.
+      //
+      // The POOL is safe to push down: values are exact ('CCAB', 'MGS', 'Queenstown',
+      // '') with no casing, whitespace or unicode variants, and filtering it in SQL
+      // cuts the transfer by 32-70% per session. The JS pool check below still runs,
+      // because the column's collation is accent-insensitive and SQL would match
+      // 'CCÁB' where the JS comparison does not.
+      const rows = await db.select().from(sheetSignups).where(eq(sheetSignups.pool, pool.trim()));
+      const matched = rows
+        .filter(s =>
+          datesMatch(s.dateOfTraining ?? "", sessionDate) &&
+          (s.pool ?? "").toLowerCase().trim() === poolNorm
+        )
+        .map(dbSignupToSignupRow);
+      // An empty result means "nobody signed up for this session" — a normal state for
+      // every future session and every new pool. It must NOT fall through to the Sheet:
+      // the Sheet is stale for sign-ups (CLAUDE.md), so doing so would resurrect deleted
+      // sign-ups and run the duplicate check against stale data. Only a genuinely empty
+      // TABLE (cold start before the first sync) justifies the Sheets fallback.
+      if (matched.length > 0 || !(await isSignupsTableEmpty(db))) {
+        if (!opts.fresh) {
+          _signupsCache.set(cacheKey, { data: matched, expiry: Date.now() + SIGNUPS_CACHE_TTL_MS });
+        }
+        return matched;
       }
     }
   } catch (e) {
@@ -659,6 +697,16 @@ export async function getSignUpsForSession(sessionDate: string, pool: string): P
     datesMatch(s.dateOfTraining, sessionDate) &&
     s.pool.toLowerCase().trim() === poolNorm
   );
+}
+
+/**
+ * Is sheet_signups genuinely empty (cold start), as opposed to simply having no rows
+ * for the pool/user we asked about? One row, one column — cheap enough to run only on
+ * the empty-result path.
+ */
+async function isSignupsTableEmpty(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<boolean> {
+  const probe = await db.select({ id: sheetSignups.id }).from(sheetSignups).limit(1);
+  return probe.length === 0;
 }
 
 function datesMatch(date1: string, date2: string): boolean {
@@ -679,11 +727,17 @@ function datesMatch(date1: string, date2: string): boolean {
 //   [5]  PaymentID Match  matched name/handle, or "#N/A" if unmatched
 //   [6]  Email         matched user email, or "#N/A"/absent for carry-over rows
 export async function getPayments(): Promise<PaymentRow[]> {
+  if (_paymentsCacheData && Date.now() < _paymentsCacheExpiry) return _paymentsCacheData.slice();
   try {
     const db = await getDb();
     if (db) {
       const rows = await db.select().from(sheetPayments);
-      if (rows.length > 0) return rows.map(dbPaymentToPaymentRow);
+      if (rows.length > 0) {
+        const result = rows.map(dbPaymentToPaymentRow);
+        _paymentsCacheData   = result;
+        _paymentsCacheExpiry = Date.now() + PAYMENTS_CACHE_TTL_MS;
+        return result;
+      }
     }
   } catch (e) {
     console.warn("[Sheets] DB read failed for payments, falling back to Sheets API:", (e as any)?.message);
@@ -726,9 +780,10 @@ export async function getAllSignupsByEmail(
       if (rows.length > 0) {
         allSignups = rows.map(dbSignupToSignupRow);
       } else {
-        // No rows at all — fall back to full Sheets fetch
-        const allRows = await db.select().from(sheetSignups);
-        allSignups = allRows.length > 0 ? allRows.map(dbSignupToSignupRow) : await fetchSheetsSignups();
+        // "No rows for this user" is the normal state for every new member, and it used
+        // to trigger a full SELECT * of sheet_signups (~285KB) on their every page load.
+        // Only a genuinely empty table means we should consult the Sheet.
+        allSignups = (await isSignupsTableEmpty(db)) ? await fetchSheetsSignups() : [];
       }
     } else {
       allSignups = await fetchSheetsSignups();
@@ -759,10 +814,21 @@ export async function getAllSignupsByEmail(
   }));
 }
 
-/** Bust the 60-second in-process sessions cache. Called after any session mutation. */
+/**
+ * Bust the in-process sessions AND per-session sign-up caches. Called after any session
+ * or sign-up mutation, so an attendee list never shows a stale roster to the person who
+ * just changed it.
+ */
 export function clearSessionsCache(): void {
   _sessionsCacheData   = null;
   _sessionsCacheExpiry = 0;
+  _signupsCache.clear();
+}
+
+/** Bust the 60-second payments cache. Called after any payment write and after a sync. */
+export function clearPaymentsCache(): void {
+  _paymentsCacheData   = null;
+  _paymentsCacheExpiry = 0;
 }
 
 export function convertDriveUrl(url: string): string {

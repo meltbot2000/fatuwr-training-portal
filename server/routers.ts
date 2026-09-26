@@ -82,12 +82,13 @@ import {
   findUserByEmail,
   convertDriveUrl,
   clearSessionsCache,
+  clearPaymentsCache,
 } from "./googleSheets";
 import * as appsScript from "./appsScript";
 import { syncTab, forceSyncTab } from "./sync";
 import { maybeUpload, replaceOldDriveFile, extractDriveFileId, deleteFromDrive, uploadToDrive, uploadBufferToR2, isDataUrl as isDriveDataUrl } from "./driveUpload";
 import { nanoid } from "nanoid";
-import { eq, and, sql, max, asc, or } from "drizzle-orm";
+import { eq, and, sql, max, asc, or, inArray } from "drizzle-orm";
 import { sheetSignups, sheetSessions, sheetUsers, sheetPayments, announcements, merchItems, videos, users, otpCodes } from "../drizzle/schema";
 
 /**
@@ -552,21 +553,38 @@ export const appRouter = router({
         const revenue = signups.reduce((sum, su) => sum + (su.actualFees ?? 0), 0);
         const pnl = revenue - (session.venueCost ?? 0);
 
-        // Batch-fetch profile images for all signed-up users.
-        // Primary source: users.image (local store). Fallback: sheetUsers.image (legacy Glide URLs).
+        // Profile images for the people in THIS session only — it used to read every row
+        // of sheet_users and users on every session open. Blank emails are excluded: 196
+        // sign-up rows have email '', and a blank key would hand one person's photo to
+        // every one of them.
+        const attendeeEmails = [...new Set(
+          signups.map(su => (su.email || "").toLowerCase().trim()).filter(Boolean)
+        )];
         let imageByEmail: Record<string, string> = {};
         try {
           const sessionDb = await db.getDb();
-          if (sessionDb) {
-            // Seed with sheetUsers legacy images first (lower priority)
-            const sheetUserRows = await sessionDb.select({ email: sheetUsers.email, userEmail: sheetUsers.userEmail, image: sheetUsers.image }).from(sheetUsers);
+          if (sessionDb && attendeeEmails.length > 0) {
+            // Both lookups in parallel — one round trip's worth of latency, not two.
+            // sheetUsers matches on EITHER of its two email columns, so it cannot be
+            // filtered on `email` alone.
+            const [sheetUserRows, authUserRows] = await Promise.all([
+              sessionDb
+                .select({ email: sheetUsers.email, userEmail: sheetUsers.userEmail, image: sheetUsers.image })
+                .from(sheetUsers)
+                .where(or(inArray(sheetUsers.email, attendeeEmails), inArray(sheetUsers.userEmail, attendeeEmails))),
+              sessionDb
+                .select({ email: users.email, image: users.image })
+                .from(users)
+                .where(inArray(users.email, attendeeEmails)),
+            ]);
+            // Order matters: seed with sheetUsers (legacy Glide URLs, many now dead),
+            // then let users.image overwrite it. Reversing this would revert several
+            // members' photos to a dead URL, silently.
             for (const u of sheetUserRows) {
               const img = u.image || "";
               if (img && u.email)     imageByEmail[u.email.toLowerCase().trim()]     = img;
               if (img && u.userEmail) imageByEmail[u.userEmail.toLowerCase().trim()] = img;
             }
-            // Overwrite with users.image (higher priority — locally stored photos)
-            const authUserRows = await sessionDb.select({ email: users.email, image: users.image }).from(users);
             for (const u of authUserRows) {
               if (u.image && u.email) imageByEmail[u.email.toLowerCase().trim()] = u.image;
             }
@@ -613,7 +631,8 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
-        const existingSignups = await getSignUpsForSession(input.sessionDate, input.sessionPool);
+        // `fresh: true` — never let a cached roster decide whether this is a duplicate.
+        const existingSignups = await getSignUpsForSession(input.sessionDate, input.sessionPool, { fresh: true });
 
         // The duplicate check applies to EVERYONE, admins included: this mutation always
         // writes ctx.user's own email (see the insert below), so it can never be a sign-up
@@ -751,7 +770,7 @@ export const appRouter = router({
       .input(z.object({ sessionDate: z.string(), sessionPool: z.string() }))
       .query(async ({ input, ctx }) => {
         const user = ctx.user;
-        const signups = await getSignUpsForSession(input.sessionDate, input.sessionPool);
+        const signups = await getSignUpsForSession(input.sessionDate, input.sessionPool, { fresh: true });
         const isSignedUp = signups.some(
           su => su.email.toLowerCase().trim() === (user.email || "").toLowerCase().trim()
         );
@@ -1260,6 +1279,7 @@ export const appRouter = router({
         if (fields.memberOnTrainingDate !== undefined) updates.memberOnTrainingDate = fields.memberOnTrainingDate;
         if (Object.keys(updates).length === 0) return { success: true };
         await sessDb.update(sheetSignups).set(updates).where(eq(sheetSignups.id, id));
+        clearSessionsCache(); // cached attendee list for this session is now stale
         return { success: true };
       }),
 
@@ -1295,6 +1315,7 @@ export const appRouter = router({
           actualFees: input.actualFees,
           memberOnTrainingDate: input.memberOnTrainingDate,
         });
+        clearSessionsCache();
         return { success: true };
       }),
 
@@ -1307,6 +1328,7 @@ export const appRouter = router({
         const sessDb = await db.getDb();
         if (!sessDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         await sessDb.delete(sheetSignups).where(eq(sheetSignups.id, input.id));
+        clearSessionsCache();
         return { success: true };
       }),
 
@@ -1362,6 +1384,7 @@ export const appRouter = router({
             .where(or(eq(sheetUsers.email, email), eq(sheetUsers.userEmail, email)));
         }
 
+        clearSessionsCache(); // a sheet_signups row was deleted
         return { success: true };
       }),
 
@@ -1718,6 +1741,7 @@ export const appRouter = router({
             message: "Saved to the Sheet but not to the app database. It will appear automatically within 6 hours — do NOT enter it again.",
           });
         }
+        clearPaymentsCache();
         return { success: true };
       }),
 
@@ -1804,6 +1828,7 @@ export const appRouter = router({
         // Use rowIndex (stable Sheet row number) not id — id changes on every
         // DELETE+INSERT sync cycle, so a stale client id would silently update 0 rows.
         await payDb.update(sheetPayments).set(updates).where(eq(sheetPayments.rowIndex, rowIndex));
+        clearPaymentsCache();
         return { success: true };
       }),
 
@@ -1839,6 +1864,7 @@ export const appRouter = router({
         }
         // GAS zeroed the Sheet row; drop the DB mirror by rowIndex.
         await payDb.delete(sheetPayments).where(eq(sheetPayments.rowIndex, rowIndex));
+        clearPaymentsCache();
         return { success: true };
       }),
 
