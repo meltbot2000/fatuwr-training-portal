@@ -3,4 +3,6 @@ builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "node dist/index.js"
-healthcheckPath = "/api/health"
+# Points at the DB-aware check on purpose: a deployment that cannot reach its database
+# must NOT replace a working one. /api/health still exists for uptime monitors and GAS.
+healthcheckPath = "/api/health/db"

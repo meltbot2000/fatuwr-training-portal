@@ -49,11 +49,29 @@ async function tableHash(c: mysql.Connection, table: string, key: string) {
   return { count: rows.length, hash: h.digest("hex").slice(0, 16) };
 }
 
+/**
+ * AUTO_INCREMENT positions, read LIVE.
+ *
+ * information_schema caches these for information_schema_stats_expiry seconds — 86400 on
+ * both of these servers — so the unqualified query returns values up to a day old. Three
+ * of them were stale enough to sit at or below MAX(pk), which is precisely the collision
+ * this check exists to catch: it was passing by luck, not by evidence.
+ */
 async function autoIncrement(c: mysql.Connection) {
+  await c.query("SET SESSION information_schema_stats_expiry = 0");
   const [rows] = await c.query<any[]>(
     "SELECT table_name AS t, auto_increment AS ai FROM information_schema.tables WHERE table_schema = DATABASE() AND auto_increment IS NOT NULL",
   );
   return Object.fromEntries(rows.map(r => [r.t ?? r.TABLE_NAME, Number(r.ai)]));
+}
+
+/** The real high-water mark, which is what the counter must stay ahead of. */
+async function maxPk(c: mysql.Connection, table: string) {
+  const key = table === "sheet_sessions" ? "rowIndex" : "id";
+  try {
+    const [r] = await c.query<any[]>(`SELECT IFNULL(MAX(\`${key}\`), 0) m FROM \`${table}\``);
+    return Number(r[0].m);
+  } catch { return 0; }
 }
 
 /** What members actually see: fees owed, session attendance, membership status. */
@@ -106,15 +124,17 @@ async function main() {
   console.log(`  total:             $${pa.total} vs $${pb.total}`);
   console.log(`  per-member totals: ${pa.refs} refs, ${pa.perMember} vs ${pb.perMember}  ${payOk ? "identical" : "*** DIFFERS ***"}`);
 
-  console.log("\nAUTO_INCREMENT — a counter that rewound would collide on the next insert\n");
+  console.log("\nAUTO_INCREMENT — the new counter must be AHEAD OF ITS OWN highest id\n");
   const aiOld = await autoIncrement(old), aiNew = await autoIncrement(nw);
   for (const table of Object.keys(aiOld).sort()) {
     const a = aiOld[table], b = aiNew[table] ?? 0;
-    // payments legitimately differ: the sync rewrites that table on each side independently
-    const tolerated = table === "sheet_payments" || table === "otp_codes";
-    const ok = b >= a || tolerated;
+    const highest = await maxPk(nw, table);
+    // The test that matters is against the NEW database's own data, not against the old
+    // counter: comparing the two counters tells you nothing about whether the next insert
+    // collides, and payments legitimately renumber on each side anyway.
+    const ok = b > highest;
     if (!ok) problems++;
-    console.log(`  ${table.padEnd(22)} old ${String(a).padStart(8)}   new ${String(b).padStart(8)}  ${ok ? (tolerated && b < a ? "ok (resynced table)" : "ok") : "*** NEW IS BEHIND ***"}`);
+    console.log(`  ${table.padEnd(22)} old ${String(a).padStart(8)}   new ${String(b).padStart(8)}   new max id ${String(highest).padStart(8)}  ${ok ? "ok" : "*** WOULD COLLIDE ***"}`);
   }
 
   console.log("\nDERIVED FIGURES — what the app computes at read time\n");

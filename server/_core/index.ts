@@ -14,6 +14,7 @@ import { startDailyBackup } from "../backup";
 import { getDb } from "../db";
 import { sheetSessions, sheetSignups, sheetPayments, sheetUsers, users } from "../../drizzle/schema";
 import { ENV } from "./env";
+import { sql } from "drizzle-orm";
 import compression from "compression";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -58,6 +59,27 @@ async function startServer() {
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Railway's healthcheck decides whether a new deployment replaces the running one, so it
+  // has to fail when the app cannot reach its database. /api/health answers "ok" from
+  // process memory: with a wrong DATABASE_URL the new container would pass within seconds,
+  // Railway would kill the old one, and members would be silently logged out
+  // (authenticateRequest returns null on a DB error) while sessions and rosters quietly
+  // fell back to the STALE Google Sheet. A failing healthcheck instead leaves the previous
+  // deployment serving, which is the correct outcome for an app that cannot work without
+  // its database.
+  app.get("/api/health/db", async (_req, res) => {
+    const started = Date.now();
+    try {
+      const db = await getDb();
+      if (!db) throw new Error("no database handle");
+      await db.execute(sql`SELECT 1`);
+      res.json({ status: "ok", dbMs: Date.now() - started });
+    } catch (err: any) {
+      console.error("[Health] database unreachable:", err?.message);
+      res.status(503).json({ status: "error", error: err?.message ?? "unreachable", afterMs: Date.now() - started });
+    }
   });
 
   // Header echo endpoint for debugging — protected by DEV_SECRET
