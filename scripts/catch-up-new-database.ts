@@ -15,16 +15,17 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 
-// Tables the app writes, in an order that is safe to insert sequentially.
-const TABLES = [
-  "users",
-  "sheet_users",
-  "sheet_sessions",
-  "sheet_signups",
-  "sheet_payments",
-  "announcements",
-  "videos",
-  "merch_items",
+// Tables the app writes, with the column that orders them. Everything auto-increments on
+// `id` except sheet_sessions, whose primary key is rowIndex (it mirrors the Sheet's rows).
+const TABLES: [string, string][] = [
+  ["users", "id"],
+  ["sheet_users", "id"],
+  ["sheet_sessions", "rowIndex"],
+  ["sheet_signups", "id"],
+  ["sheet_payments", "id"],
+  ["announcements", "id"],
+  ["videos", "id"],
+  ["merch_items", "id"],
 ];
 
 // otp_codes is deliberately excluded: codes are short-lived, and a member mid-login simply
@@ -38,13 +39,13 @@ async function main() {
   console.log(apply ? "APPLYING\n" : "DRY RUN — nothing will be written\n");
   let totalMissing = 0;
 
-  for (const table of TABLES) {
-    const [maxRow] = await nw.query<any[]>(`SELECT IFNULL(MAX(id), 0) m FROM \`${table}\``);
+  for (const [table, key] of TABLES) {
+    const [maxRow] = await nw.query<any[]>(`SELECT IFNULL(MAX(\`${key}\`), 0) m FROM \`${table}\``);
     const maxId = Number(maxRow[0].m);
-    const [missing] = await old.query<any[]>(`SELECT * FROM \`${table}\` WHERE id > ? ORDER BY id`, [maxId]);
+    const [missing] = await old.query<any[]>(`SELECT * FROM \`${table}\` WHERE \`${key}\` > ? ORDER BY \`${key}\``, [maxId]);
 
     if (missing.length === 0) {
-      console.log(`  ${table.padEnd(16)} up to date (max id ${maxId})`);
+      console.log(`  ${table.padEnd(16)} up to date (max ${key} ${maxId})`);
       continue;
     }
     totalMissing += missing.length;
