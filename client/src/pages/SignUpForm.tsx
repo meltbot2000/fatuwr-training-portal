@@ -11,7 +11,7 @@ function formatFee(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-type Activity = "Regular Training" | "Swims only" | "First Timer" | "Trainer";
+import { ACTIVITY_LABELS, type Activity } from "@/lib/activities";
 
 export default function SignUpForm() {
   const { rowId } = useParams<{ rowId: string }>();
@@ -147,8 +147,8 @@ export default function SignUpForm() {
   const ACTIVITY_OPTIONS: { value: Activity; label: string; fee: string }[] = [
     { value: "Regular Training", label: "Full training",  fee: formatFee(trainingFee) },
     { value: "Swims only",       label: "Swim only",      fee: formatFee(swimFee) },
-    { value: "First Timer",      label: "First timer",    fee: "$0.00" },
-    { value: "Trainer",          label: "Trainer",        fee: "$0.00" },
+    { value: "First Timer",      label: ACTIVITY_LABELS["First Timer"], fee: "$0.00" },
+    { value: "Trainer",          label: ACTIVITY_LABELS["Trainer"],     fee: "$0.00" },
   ];
 
   return (

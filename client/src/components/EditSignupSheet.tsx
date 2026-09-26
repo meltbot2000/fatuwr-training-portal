@@ -24,8 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const ACTIVITIES = ["Regular Training", "Swims only", "Trainer", "First-timer"] as const;
-type Activity = (typeof ACTIVITIES)[number];
+import { ACTIVITIES, ACTIVITY_LABELS, normaliseActivity, type Activity } from "@/lib/activities";
 
 function formatFee(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -67,8 +66,11 @@ export default function EditSignupSheet({
   const debtQuery = trpc.signups.myDebt.useQuery(undefined, { enabled: !isAdmin });
   const currentDebt = debtQuery.data?.debt ?? 0;
 
+  // normaliseActivity, not an exact match: a row stored as "First Timer" used to fail the
+  // membership test and preselect "Regular Training", so an admin opening the sheet and
+  // saving would silently convert a free first-timer into a charged session.
   const [activity, setActivity] = useState<Activity>(
-    (ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity
+    normaliseActivity(signup.activity) ?? "Regular Training"
   );
   const [name, setName] = useState(signup.name);
   const [memberStatus, setMemberStatus] = useState(signup.memberOnTrainingDate || "Non-Member");
@@ -78,7 +80,7 @@ export default function EditSignupSheet({
   // Reset all fields when the sheet opens or the signup changes (different user)
   useEffect(() => {
     if (!open) return;
-    setActivity((ACTIVITIES.includes(signup.activity as Activity) ? signup.activity : "Regular Training") as Activity);
+    setActivity(normaliseActivity(signup.activity) ?? "Regular Training");
     setName(signup.name);
     setMemberStatus(signup.memberOnTrainingDate || "Non-Member");
     setPaymentId(signup.paymentId || "");
@@ -230,7 +232,7 @@ export default function EditSignupSheet({
                     }`}
                   >
                     {/* Chip label — fs-content: 14px */}
-                    <span className="text-[14px] font-medium text-white leading-tight">{a}</span>
+                    <span className="text-[14px] font-medium text-white leading-tight">{ACTIVITY_LABELS[a]}</span>
                     {/* Price sub-label — fs-meta: 13px/400 */}
                     <span className={`text-[13px] mt-0.5 ${activity === a ? "text-white/80" : "text-[#888888]"}`}>
                       {formatFee(fee)}

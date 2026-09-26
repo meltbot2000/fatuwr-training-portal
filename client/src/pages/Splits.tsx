@@ -6,14 +6,13 @@ import { AlertTriangle, Copy } from "lucide-react";
 import { useParams } from "wouter";
 import { toast } from "sonner";
 
-const ACTIVITIES = ["Regular Training", "Swims only", "Trainer", "First-timer"] as const;
-type Activity = (typeof ACTIVITIES)[number];
+import { ACTIVITIES, ACTIVITY_LABELS, normaliseActivity, isAttendanceRow, type Activity } from "@/lib/activities";
 
 const ACTIVITY_COLORS: Record<Activity, string> = {
   "Regular Training": "bg-navy text-white",
   "Swims only": "bg-blue-500 text-white",
   "Trainer": "bg-amber-500 text-white",
-  "First-timer": "bg-green-500 text-white",
+  "First Timer": "bg-green-500 text-white",
 };
 
 async function copyToClipboard(text: string, label: string) {
@@ -59,23 +58,24 @@ export default function Splits() {
     );
   }
 
-  const signups = session.signups ?? [];
+  // Refund and membership rows live in the same table but are not people at the session —
+  // a rained-off session would otherwise list everyone twice.
+  const signups = (session.signups ?? []).filter(su => isAttendanceRow(su.activity));
 
-  // Group by activity
+  // Group by activity, normalising the spelling first: rows written before May 2026 say
+  // "First-timer" and newer ones say "First Timer", and both belong in the same bucket.
   const byActivity: Record<Activity, string[]> = {
     "Regular Training": [],
     "Swims only": [],
     "Trainer": [],
-    "First-timer": [],
+    "First Timer": [],
   };
   const uncategorised: string[] = [];
 
   for (const su of signups) {
-    if ((ACTIVITIES as readonly string[]).includes(su.activity)) {
-      byActivity[su.activity as Activity].push(su.name);
-    } else {
-      uncategorised.push(su.name);
-    }
+    const activity = normaliseActivity(su.activity);
+    if (activity) byActivity[activity].push(su.name);
+    else uncategorised.push(su.name);
   }
 
   const allNames = signups.map(s => s.name).filter(Boolean);
@@ -127,7 +127,7 @@ export default function Splits() {
                 className={`w-full flex items-center justify-between px-4 py-2.5 text-left ${ACTIVITY_COLORS[activity]} hover:opacity-90 transition-opacity`}
               >
                 <span className="font-semibold text-sm">
-                  {activity} ({names.length})
+                  {ACTIVITY_LABELS[activity]} ({names.length})
                 </span>
                 <Copy className="w-3.5 h-3.5 opacity-70 shrink-0" />
               </button>
