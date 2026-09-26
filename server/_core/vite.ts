@@ -58,10 +58,25 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Vite gives every asset a content hash (index-D1QrBWF4.js), so an asset URL can never
+  // change meaning — cache it for a year. Without this, express.static sends
+  // `Cache-Control: public, max-age=0` and every app open re-validates every asset before
+  // the app can render, which on a phone is a round trip per file each time.
+  app.use(
+    "/assets",
+    express.static(path.resolve(distPath, "assets"), {
+      immutable: true,
+      maxAge: "1y",
+    })
+  );
+
+  // index.html must NEVER be cached that way: it is what points at the current hashed
+  // bundle, so a stale copy pins the app to a deleted asset.
+  app.use(express.static(distPath, { index: false, maxAge: 0 }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

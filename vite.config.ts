@@ -150,10 +150,22 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// The Manus scaffolding plugins are development tooling and must not ship:
+//   - vitePluginManusRuntime injected an inline <script> of 366,770 characters — a second
+//     complete copy of React — into index.html. index.html cannot be cached (it is what
+//     names the current hashed bundle), so every single app open paid ~105KB gzipped for
+//     it before the real bundle started loading.
+//   - jsxLocPlugin stamps data-loc="client/src/pages/Login.tsx:82" onto every JSX element,
+//     which bloats both the bundle and the live DOM.
+//   - the debug collector only has a dev server to talk to.
+// Nothing in client/src reads window.__MANUS_*; the lone reference is a localStorage write
+// in useAuth that exists FOR the runtime, and is harmless without it.
+const devOnlyPlugins = () => [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
-export default defineConfig({
-  plugins,
+export default defineConfig(({ command }) => ({
+  plugins: command === "build"
+    ? [react(), tailwindcss()]
+    : [react(), tailwindcss(), ...devOnlyPlugins()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -167,6 +179,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // One 773KB bundle meant every code change invalidated the whole download. Split
+        // the dependencies out: they change rarely, so with the year-long cache on hashed
+        // assets a returning member re-downloads only the app chunk after a deploy.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/.test(id)) return "react";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,
@@ -184,4 +208,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
