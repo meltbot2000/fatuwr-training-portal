@@ -83,7 +83,9 @@ export default function EditSignupSheet({
     setMemberStatus(signup.memberOnTrainingDate || "Non-Member");
     setPaymentId(signup.paymentId || "");
     setActualFee(signup.actualFees?.toString() ?? "");
-  }, [open, signup.email]);
+    // Keyed on the row id, not the email: other people's emails come back redacted as ""
+    // from sessions.detail, so two different rows can share one email value.
+  }, [open, signup.id, signup.email]);
 
   const utils = trpc.useUtils();
   const refreshMutation = trpc.sessions.refresh.useMutation();

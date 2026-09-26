@@ -149,8 +149,8 @@ describe("sessions.detail", () => {
 
 describe("sessions.refresh", () => {
   it("clears the sessions cache", async () => {
-    const ctx = createPublicContext();
-    const caller = appRouter.createCaller(ctx);
+    // refresh is protected now — an anonymous caller must not be able to bust the caches
+    const caller = appRouter.createCaller(createAuthContext());
     const result = await caller.sessions.refresh();
 
     expect(result.success).toBe(true);

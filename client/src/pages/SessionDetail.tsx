@@ -114,7 +114,12 @@ export default function SessionDetail() {
 
   const isClosed = session.isClosed && session.isClosed.trim().length > 0;
   const sessionStarted = hasSessionStarted(session.trainingDate, session.trainingTime ?? "");
-  const mySignup = session.signups?.find(s => s.email.toLowerCase().trim() === userEmail);
+  // `userEmail` can be "" (users.email is nullable) and other people's emails are
+  // redacted to "" by sessions.detail — without the !!userEmail guard, "" === "" would
+  // make every attendee look like "me".
+  const mySignup = userEmail
+    ? session.signups?.find(s => (s.email || "").toLowerCase().trim() === userEmail)
+    : undefined;
   const signupCount = session.signups?.length ?? 0;
   const userCanEdit = !!mySignup && !isClosed && !sessionStarted;
 
@@ -240,7 +245,7 @@ export default function SessionDetail() {
               </p>
               <div className="bg-[#1E1E1E] rounded-xl divide-y divide-[#2C2C2C] overflow-hidden">
                 {session.signups.map((su, idx) => {
-                  const isMe = isAuthenticated && su.email.toLowerCase().trim() === userEmail;
+                  const isMe = isAuthenticated && !!userEmail && (su.email || "").toLowerCase().trim() === userEmail;
                   const tappable = isAdminUser || (isMe && userCanEdit);
                   return (
                     <button

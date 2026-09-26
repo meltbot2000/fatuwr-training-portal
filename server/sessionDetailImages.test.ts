@@ -24,7 +24,7 @@ let signups: any[] = [];
 
 vi.mock("./googleSheets", () => ({
   getSessions: vi.fn(async () => [SESSION]),
-  getUpcomingSessions: vi.fn(async () => []),
+  getUpcomingSessions: vi.fn(async () => [SESSION]),
   getSignUpsForSession: vi.fn(async () => signups),
   getAllSignupsByEmail: vi.fn(async () => []),
   getPayments: vi.fn(async () => []),
@@ -53,6 +53,10 @@ function chain(rows: any[], rec: { table: string; hasWhere: boolean }): any {
     then: p.then.bind(p), catch: p.catch.bind(p), finally: p.finally.bind(p),
     where: () => { rec.hasWhere = true; return chain(rows, rec); },
     limit: (n: number) => chain(rows.slice(0, n), rec),
+    // sessions.list aggregates signup counts in SQL
+    groupBy: () => chain(rows, rec),
+    orderBy: () => chain(rows, rec),
+    innerJoin: () => chain(rows, rec),
   };
 }
 
@@ -128,5 +132,146 @@ describe("sessions.detail profile images", () => {
     const byName = Object.fromEntries(detail.signups.map(s => [s.name, s.image]));
     expect(byName["Ann"]).toBe("https://r2/ann-live.jpg");
     expect(byName["Bob"]).toBe("https://dead-glide/bob.jpg");
+  });
+});
+
+/**
+ * sessions.detail is a PUBLIC procedure and its URL ships in the JS bundle, so what it
+ * returns is what a stranger can read. Verified 2026-09-26 that an unauthenticated curl
+ * returned 24 attendees with names, emails, paymentIds and fees plus venueCost/revenue/pnl.
+ */
+describe("sessions.detail redaction", () => {
+  const ATTENDEES = [
+    signup("Ann", "ann@example.com"),
+    { ...signup("Zed", "zed@example.com"), id: 99, paymentId: "zed", actualFees: 17, memberOnTrainingDate: "Non-Member" },
+  ];
+
+  function ctxFor(user: any): TrpcContext {
+    return {
+      user,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn(), cookie: vi.fn() } as unknown as TrpcContext["res"],
+    } as unknown as TrpcContext;
+  }
+  const member = (email: string, clubRole?: string) => ctxFor({
+    id: 1, openId: "email_x", email, name: "X", loginMethod: "email", role: "user",
+    memberStatus: "Member", ...(clubRole ? { clubRole } : {}),
+    createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+  });
+
+  it("gives a signed-out visitor names only — no emails, ids, payment refs or fees", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    expect(d.signups.map(s => s.name)).toEqual(["Ann", "Zed"]);
+    for (const s of d.signups) {
+      expect(s.email).toBe("");
+      expect(s.paymentId).toBe("");
+      expect(s.id).toBeNull();
+      expect(s.actualFees).toBe(0);
+      expect(s.memberOnTrainingDate).toBe("");
+    }
+  });
+
+  it("hides the club's finances from a signed-out visitor", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    expect(d.venueCost).toBeUndefined();
+    expect(d.revenue).toBeUndefined();
+    expect(d.pnl).toBeUndefined();
+  });
+
+  it("hides the club's finances from an ordinary signed-in member too", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(member("ann@example.com")).sessions.detail({ rowId: "row-1" });
+    expect(d.venueCost).toBeUndefined();
+    expect(d.revenue).toBeUndefined();
+  });
+
+  it("lets a member see their OWN row in full but not anyone else's", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(member("ann@example.com")).sessions.detail({ rowId: "row-1" });
+    const ann = d.signups.find(s => s.name === "Ann")!;
+    const zed = d.signups.find(s => s.name === "Zed")!;
+    // Own row: they need id + fee to edit it, and email to recognise themselves.
+    expect(ann.email).toBe("ann@example.com");
+    expect(ann.id).toBe(1);
+    expect(ann.actualFees).toBe(13);
+    // Someone else's row: name and activity only.
+    expect(zed.email).toBe("");
+    expect(zed.paymentId).toBe("");
+    expect(zed.actualFees).toBe(0);
+    expect(zed.id).toBeNull();
+  });
+
+  it("still gives staff everything — the admin sheet and Splits depend on it", async () => {
+    signups = ATTENDEES;
+    for (const role of ["Admin", "Helper"]) {
+      const d = await appRouter.createCaller(member("staff@example.com", role)).sessions.detail({ rowId: "row-1" });
+      const zed = d.signups.find(s => s.name === "Zed")!;
+      expect(zed.email).toBe("zed@example.com");
+      expect(zed.paymentId).toBe("zed");
+      expect(zed.actualFees).toBe(17);
+      expect(zed.id).toBe(99);
+      expect(d.venueCost).toBe(100);
+      expect(d.revenue).toBe(30);
+    }
+  });
+
+  it("keeps showing everyone's photo — the roster is meant to display those", async () => {
+    signups = ATTENDEES;
+    const d = await appRouter.createCaller(publicContext()).sessions.detail({ rowId: "row-1" });
+    expect(d.signups.find(s => s.name === "Ann")!.image).toBe("https://r2/ann-live.jpg");
+  });
+});
+
+/**
+ * sessions.list is public too, and it was returning venueCost on every session. Without
+ * these, deleting the redaction from the list endpoint breaks nothing in the suite.
+ */
+describe("sessions.list redaction", () => {
+  function listCtx(user: any): TrpcContext {
+    return {
+      user,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn(), cookie: vi.fn() } as unknown as TrpcContext["res"],
+    } as unknown as TrpcContext;
+  }
+  const staff = (role: string) => listCtx({
+    id: 1, openId: "email_s", email: "staff@example.com", name: "S", loginMethod: "email",
+    role: "user", memberStatus: "Member", clubRole: role,
+    createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+  });
+
+  it("hides venueCost and revenue from a signed-out visitor", async () => {
+    const list = await appRouter.createCaller(publicContext()).sessions.list();
+    expect(list).toHaveLength(1);
+    expect(list[0].venueCost).toBeUndefined();
+    expect(list[0].revenue).toBeUndefined();
+  });
+
+  it("hides them from an ordinary signed-in member", async () => {
+    const member = listCtx({
+      id: 2, openId: "email_m", email: "member@example.com", name: "M", loginMethod: "email",
+      role: "user", memberStatus: "Member",
+      createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+    });
+    const list = await appRouter.createCaller(member).sessions.list();
+    expect(list[0].venueCost).toBeUndefined();
+    expect(list[0].revenue).toBeUndefined();
+  });
+
+  it("still shows them to staff", async () => {
+    for (const role of ["Admin", "Helper"]) {
+      const list = await appRouter.createCaller(staff(role)).sessions.list();
+      expect(list[0].venueCost).toBe(100);
+    }
+  });
+
+  it("keeps the fields members actually need", async () => {
+    const list = await appRouter.createCaller(publicContext()).sessions.list();
+    expect(list[0].pool).toBe("CCAB");
+    expect(list[0].memberFee).toBe(13);
+    expect(list[0].trainingDate).toBe("1 October 2026");
+    expect(typeof list[0].signupCount).toBe("number");
   });
 });

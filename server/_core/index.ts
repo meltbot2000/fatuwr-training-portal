@@ -268,9 +268,17 @@ async function startServer() {
     }
   });
 
-  // Email diagnostic endpoint — sends a real test email and returns the result
-  // Usage: GET /api/test-email?to=youremail@example.com
+  // Email diagnostic endpoint — sends a real test email and returns the result.
+  // TOKEN REQUIRED: this sends genuine mail from the club's sending domain using the real
+  // login-code template, so unauthenticated it was a phishing primitive and a way to burn
+  // the reputation of the one email path login depends on.
+  // Usage: GET /api/test-email?to=youremail@example.com&token=APPS_SCRIPT_SECRET
   app.get("/api/test-email", async (req, res) => {
+    const { token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
     const to = (req.query.to as string) || "";
     if (!to || !to.includes("@")) {
       res.status(400).json({ error: "Provide ?to=your@email.com" });

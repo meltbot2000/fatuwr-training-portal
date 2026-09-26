@@ -43,10 +43,14 @@ export function useAuth(options?: UseAuthOptions) {
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    // Dev only: the sole reader of this key is the Manus runtime, which no longer ships to
+    // production (vite.config.ts). It was re-serialising the user object during render, in
+    // every component that calls useAuth.
+    if (import.meta.env.DEV) {
+      try {
+        localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data));
+      } catch { /* private mode / quota */ }
+    }
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,

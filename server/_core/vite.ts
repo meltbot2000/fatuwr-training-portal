@@ -13,8 +13,17 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // vite.config.ts exports a FUNCTION (it varies plugins by command), and spreading a
+  // function yields {} — no root, no @ alias, no React or Tailwind plugin, so the dev
+  // server would serve nothing. Resolve it first. `configFile: false` means Vite will not
+  // load and call it for us.
+  const resolvedViteConfig =
+    typeof viteConfig === "function"
+      ? await viteConfig({ command: "serve", mode: "development" })
+      : viteConfig;
+
   const vite = await createViteServer({
-    ...viteConfig,
+    ...resolvedViteConfig,
     configFile: false,
     server: serverOptions,
     appType: "custom",
@@ -77,6 +86,7 @@ export function serveStatic(app: Express) {
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Surrogate-Control", "no-store");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

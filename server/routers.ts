@@ -517,7 +517,7 @@ export const appRouter = router({
   }),
 
   sessions: router({
-    list: publicProcedure.query(async () => {
+    list: publicProcedure.query(async ({ ctx }) => {
       const sessions = await getUpcomingSessions();
       // Attach live signup counts from DB
       const sessionDb = await db.getDb();
@@ -532,8 +532,13 @@ export const appRouter = router({
           signupCounts[key] = (signupCounts[key] ?? 0) + Number(row.count);
         }
       }
+      // venueCost/revenue are the club's finances, and nothing outside the admin screens
+      // renders them from this list. This endpoint is public, so they are staff-only.
+      const isStaff = ctx.user?.clubRole === "Admin" || ctx.user?.clubRole === "Helper";
       return sessions.map(s => ({
         ...s,
+        venueCost: isStaff ? s.venueCost : undefined,
+        revenue:   isStaff ? s.revenue   : undefined,
         poolImageUrl: convertDriveUrl(s.poolImageUrl),
         signupCount: signupCounts[`${toIsoDate(s.trainingDate)}|${(s.pool ?? "").trim()}`] ?? 0,
       }));
@@ -541,7 +546,7 @@ export const appRouter = router({
 
     detail: publicProcedure
       .input(z.object({ rowId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const allSessions = await getSessions();
         const session = allSessions.find(s => s.rowId === input.rowId);
 
@@ -557,9 +562,9 @@ export const appRouter = router({
         // of sheet_users and users on every session open. Blank emails are excluded: 196
         // sign-up rows have email '', and a blank key would hand one person's photo to
         // every one of them.
-        const attendeeEmails = [...new Set(
+        const attendeeEmails = Array.from(new Set(
           signups.map(su => (su.email || "").toLowerCase().trim()).filter(Boolean)
-        )];
+        ));
         let imageByEmail: Record<string, string> = {};
         try {
           const sessionDb = await db.getDb();
@@ -591,25 +596,44 @@ export const appRouter = router({
           }
         } catch { /* non-fatal */ }
 
+        // This procedure is PUBLIC — a signed-out visitor can reach it and the URL is in
+        // the JS bundle — so it must not hand out anything a visitor should not have.
+        //   staff (Admin/Helper): everything; the admin edit sheet and Splits need it.
+        //   signed-in member: full detail of THEIR OWN row (they need it to spot
+        //     themselves in the roster and to edit their own sign-up), plus everyone
+        //     else's name, activity and photo, which is all the roster displays.
+        //   signed out: names, activity and photos only.
+        // Redacted contact fields come back as "" and fees as 0: that is deliberate
+        // redaction, not data — never total actualFees off a non-staff response.
+        const viewerEmail = (ctx.user?.email || "").toLowerCase().trim();
+        const isStaff = ctx.user?.clubRole === "Admin" || ctx.user?.clubRole === "Helper";
         return {
           ...session,
           poolImageUrl: convertDriveUrl(session.poolImageUrl),
-          revenue,
-          pnl,
-          signups: signups.map(su => ({
-            id: su.id ?? null,
-            name: su.name,
-            email: su.email,
-            activity: su.activity,
-            memberOnTrainingDate: su.memberOnTrainingDate,
-            paymentId: su.paymentId,
-            actualFees: su.actualFees,
-            image: imageByEmail[(su.email || "").toLowerCase().trim()] || "",
-          })),
+          venueCost: isStaff ? session.venueCost : undefined,
+          revenue:   isStaff ? revenue : undefined,
+          pnl:       isStaff ? pnl : undefined,
+          signups: signups.map(su => {
+            const suEmail = (su.email || "").toLowerCase().trim();
+            const isSelf = !!viewerEmail && suEmail === viewerEmail;
+            const maySeeDetail = isStaff || isSelf;
+            return {
+              id: maySeeDetail ? (su.id ?? null) : null,
+              name: su.name,
+              email: maySeeDetail ? su.email : "",
+              activity: su.activity,
+              memberOnTrainingDate: maySeeDetail ? su.memberOnTrainingDate : "",
+              paymentId: maySeeDetail ? su.paymentId : "",
+              actualFees: maySeeDetail ? su.actualFees : 0,
+              image: imageByEmail[suEmail] || "",
+            };
+          }),
         };
       }),
 
-    refresh: publicProcedure.mutation(async () => {
+    // Protected: its only caller is the edit sheet, and as a public mutation it let anyone
+    // bust the server's caches on demand.
+    refresh: protectedProcedure.mutation(async () => {
       clearSessionsCache();
       return { success: true };
     }),
@@ -1925,7 +1949,17 @@ export const appRouter = router({
     list: publicProcedure.query(async () => {
       const aDb = await db.getDb();
       if (!aDb) return [];
-      return aDb.select().from(announcements).orderBy(announcements.position);
+      // Explicit columns, not select(): this endpoint is public and `createdBy` holds the
+      // author's personal email address, which nothing in the client displays.
+      return aDb.select({
+        id: announcements.id,
+        title: announcements.title,
+        content: announcements.content,
+        imageUrl: announcements.imageUrl,
+        position: announcements.position,
+        createdAt: announcements.createdAt,
+        updatedAt: announcements.updatedAt,
+      }).from(announcements).orderBy(announcements.position);
     }),
 
     get: protectedProcedure
@@ -2168,9 +2202,14 @@ export const appRouter = router({
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        // Matches videos.delete: posting to the club feed is a staff action. Without this,
+        // any signed-in member could publish a link they then could not remove.
+        const addRole = (ctx.user as any).clubRole;
+        if (addRole !== "Admin" && addRole !== "Helper") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
         const vDb = await db.getDb();
         if (!vDb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-        const postedBy = (ctx.user as any).name || (ctx.user as any).email || "Unknown";
+        // Never fall back to the email here — videos.list is public.
+        const postedBy = (ctx.user as any).name || "FATUWR";
         const postedDate = new Date().toISOString().slice(0, 10);
         await vDb.insert(videos).values({
           title: input.title,
