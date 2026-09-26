@@ -121,6 +121,16 @@ export default function SignUpForm() {
     );
   }
 
+  // ── Already signed up? ───────────────────────────────────────
+  // Guards the back-button path: after a successful sign-up, navigating back to this
+  // form and confirming again would create a SECOND sign-up row for the same session.
+  // The server rejects it too (signups.submit), this just avoids the dead end.
+  const myEmail = (user?.email || "").toLowerCase().trim();
+  // (su.email can be null on legacy rows — never call .toLowerCase() on it directly)
+  const alreadySignedUp = !!myEmail && (session.signups ?? []).some(
+    su => (su.email || "").toLowerCase().trim() === myEmail
+  );
+
   // ── Activity options ─────────────────────────────────────────
   const trainingFee = calculateFee(session, membershipOnDate, "Regular Training");
   const swimFee    = calculateFee(session, membershipOnDate, "Swims only");
@@ -245,15 +255,32 @@ export default function SignUpForm() {
           </p>
         </div>
 
+        {/* Already signed up — no second sign-up; changes are made on the session screen */}
+        {alreadySignedUp && (
+          <div className="bg-[#1E1E1E] rounded-xl px-4 py-4 space-y-2">
+            <p className="text-[13px] text-[#888888] leading-snug">
+              You're already signed up for this session. To change your session type, open the
+              session and tap your name.
+            </p>
+            <Link href={`/session/${rowId}`}>
+              <button className="w-full h-[48px] rounded-full border-[1.5px] border-white/20 text-white text-[15px] font-medium">
+                Back to session
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* Submit — fs-primary: 15px/500 */}
-        <button
-          onClick={handleSubmit}
-          disabled={submitMutation.isPending || debtBlocking}
-          className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
-        >
-          {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          {submitMutation.isPending ? "Submitting…" : "Confirm sign up"}
-        </button>
+        {!alreadySignedUp && (
+          <button
+            onClick={handleSubmit}
+            disabled={submitMutation.isPending || debtBlocking}
+            className="w-full h-[48px] rounded-full bg-[#2196F3] text-white font-medium text-[15px] disabled:opacity-40 flex items-center justify-center gap-2 transition-opacity"
+          >
+            {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {submitMutation.isPending ? "Submitting…" : "Confirm sign up"}
+          </button>
+        )}
 
       </main>
     </div>

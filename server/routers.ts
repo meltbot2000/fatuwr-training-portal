@@ -613,18 +613,18 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ctx.user;
-        const isAdmin = (user as any).clubRole === "Admin";
         const existingSignups = await getSignUpsForSession(input.sessionDate, input.sessionPool);
 
-        // Admins add sign-ups on behalf of others — skip duplicate check so they can
-        // add multiple attendees for the same session (each will get correct paymentId via edit).
-        if (!isAdmin) {
-          const isDuplicate = existingSignups.some(
-            su => su.email.toLowerCase().trim() === (user.email || "").toLowerCase().trim()
-          );
-          if (isDuplicate) {
-            throw new TRPCError({ code: "CONFLICT", message: "You are already signed up for this session." });
-          }
+        // The duplicate check applies to EVERYONE, admins included: this mutation always
+        // writes ctx.user's own email (see the insert below), so it can never be a sign-up
+        // "on behalf of" someone else — admins add other attendees via admin.addSignup.
+        // Exempting admins let an admin double-book themselves by re-submitting the form,
+        // which billed them twice for one session (2026-09-26).
+        const isDuplicate = existingSignups.some(
+          su => su.email.toLowerCase().trim() === (user.email || "").toLowerCase().trim()
+        );
+        if (isDuplicate) {
+          throw new TRPCError({ code: "CONFLICT", message: "You are already signed up for this session." });
         }
 
         const signupDb = await db.getDb();
