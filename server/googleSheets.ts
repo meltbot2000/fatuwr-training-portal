@@ -13,7 +13,7 @@
  */
 
 import { google } from "googleapis";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { getDb } from "./db";
 import {
@@ -669,7 +669,17 @@ export async function getSignUpsForSession(
       // cuts the transfer by 32-70% per session. The JS pool check below still runs,
       // because the column's collation is accent-insensitive and SQL would match
       // 'CCÁB' where the JS comparison does not.
-      const rows = await db.select().from(sheetSignups).where(eq(sheetSignups.pool, pool.trim()));
+      // Fast path: pool AND date in SQL, which is an exact hit on idx_sheet_signups_pool_date
+      // (~20 rows, ~260ms). Slow path: pool only, date filtered in JS below — correct
+      // whatever the stored format, but it transfers every row for the pool.
+      const isoDate = toIsoDate(sessionDate);
+      const canMatchDateInSql =
+        /^\d{4}-\d{2}-\d{2}$/.test(isoDate) && (await signupDatesAreAllIso(db));
+      const rows = canMatchDateInSql
+        ? await db.select().from(sheetSignups).where(
+            and(eq(sheetSignups.pool, pool.trim()), eq(sheetSignups.dateOfTraining, isoDate)),
+          )
+        : await db.select().from(sheetSignups).where(eq(sheetSignups.pool, pool.trim()));
       const matched = rows
         .filter(s =>
           datesMatch(s.dateOfTraining ?? "", sessionDate) &&
@@ -697,6 +707,45 @@ export async function getSignUpsForSession(
     datesMatch(s.dateOfTraining, sessionDate) &&
     s.pool.toLowerCase().trim() === poolNorm
   );
+}
+
+// Is every training sign-up's date stored as ISO? If so, the date can be matched in SQL
+// and a session read becomes an index lookup of ~20 rows instead of a transfer of every
+// row for that pool (1,413 for CCAB). Verified 2026-09-26: 2,019 of 2,019 rows with a pool
+// are ISO; the only non-ISO dates belong to membership rows, which carry no pool.
+//
+// This is checked rather than assumed, because assuming it is exactly what caused the
+// 2026-04-25 sign-up bug (SYSTEM.md §9 Bug 1). If a single oddly-formatted row ever
+// appears, the slower whole-pool read comes back automatically and says so in the log.
+// App writes always normalise through toIsoDate(), including the Sheets re-seed, so only
+// an unparseable date in the Sheet or a hand-edit can break it — hence a 10-minute recheck
+// rather than a one-off at boot.
+let _isoDatesOnly: boolean | null = null;
+let _isoDatesOnlyExpiry = 0;
+const ISO_PROBE_TTL_MS = 10 * 60 * 1000;
+
+async function signupDatesAreAllIso(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+): Promise<boolean> {
+  if (_isoDatesOnly !== null && Date.now() < _isoDatesOnlyExpiry) return _isoDatesOnly;
+  try {
+    const result: any = await db.execute(sql`
+      SELECT COUNT(*) AS n FROM sheet_signups
+      WHERE TRIM(pool) <> '' AND dateOfTraining NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    `);
+    const rows = Array.isArray(result) ? result[0] : result?.rows ?? result;
+    const n = Number((Array.isArray(rows) ? rows[0] : rows)?.n ?? 0);
+    _isoDatesOnly = n === 0;
+    _isoDatesOnlyExpiry = Date.now() + ISO_PROBE_TTL_MS;
+    if (!_isoDatesOnly) {
+      console.warn(`[Sheets] ${n} sign-up row(s) have a non-ISO dateOfTraining — falling back to the whole-pool read so none are missed. Normalise them to YYYY-MM-DD to restore the fast path.`);
+    }
+    return _isoDatesOnly;
+  } catch (e) {
+    // Never let the probe decide against correctness: on any error, take the safe path.
+    console.warn("[Sheets] ISO date probe failed, using the whole-pool read:", (e as any)?.message);
+    return false;
+  }
 }
 
 /**

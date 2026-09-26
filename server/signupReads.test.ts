@@ -1,4 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterAll } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterAll, afterEach } from "vitest";
+
+vi.useFakeTimers({ shouldAdvanceTime: true });
 
 /**
  * Reads of sheet_signups: what gets filtered where, and when the Google Sheet may be
@@ -12,7 +14,22 @@ import { describe, expect, it, vi, beforeEach, afterAll } from "vitest";
  *     runs the duplicate check against stale data. Only a genuinely empty TABLE may.
  */
 
-type Recorded = { cols: string[] | null; hasWhere: boolean; hasLimit: boolean };
+type Recorded = { cols: string[] | null; hasWhere: boolean; hasLimit: boolean; params: unknown[] };
+
+/**
+ * Pull the bound values out of a drizzle condition so a test can assert WHAT was filtered,
+ * not merely that something was. Without this the fake cannot tell the indexed
+ * pool+date query apart from the whole-pool read.
+ */
+function collectParams(node: any, out: unknown[] = []): unknown[] {
+  if (node == null || typeof node !== "object") return out;
+  if ("value" in node && typeof node.value !== "object") out.push(node.value);
+  for (const key of ["queryChunks", "chunks", "params"]) {
+    if (Array.isArray(node[key])) for (const child of node[key]) collectParams(child, out);
+  }
+  if (Array.isArray(node)) for (const child of node) collectParams(child, out);
+  return out;
+}
 const queries: Recorded[] = [];
 let tableRows: any[] = [];
 // When set, a WHERE-filtered query yields this instead of every row — lets a test say
@@ -26,15 +43,25 @@ function chain(rows: any[], rec: Recorded): any {
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
-    where: () => { rec.hasWhere = true; return chain(filteredRows ?? rows, rec); },
+    where: (pred: any) => {
+      rec.hasWhere = true;
+      rec.params.push(...collectParams(pred));
+      return chain(filteredRows ?? rows, rec);
+    },
     limit: (n: number) => { rec.hasLimit = true; return chain(rows.slice(0, n), rec); },
   };
 }
 
+// How many rows the ISO-format probe reports. 0 => every stored date is ISO => the fast
+// indexed path is allowed.
+let nonIsoRowCount = 0;
+let probeRan = 0;
+
 const fakeDb = {
+  execute: async () => { probeRan++; return [[{ n: nonIsoRowCount }], []]; },
   select: (cols?: Record<string, unknown>) => ({
     from: () => {
-      const rec: Recorded = { cols: cols ? Object.keys(cols) : null, hasWhere: false, hasLimit: false };
+      const rec: Recorded = { cols: cols ? Object.keys(cols) : null, hasWhere: false, hasLimit: false, params: [] };
       queries.push(rec);
       return chain(tableRows, rec);
     },
@@ -72,7 +99,11 @@ beforeEach(() => {
   queries.length = 0;
   tableRows = ROWS;
   filteredRows = null;
+  nonIsoRowCount = 0;
+  probeRan = 0;
   clearSessionsCache();
+  // the ISO probe caches for 10 minutes, so each test needs a fresh module state
+  vi.setSystemTime(new Date(Date.now() + 11 * 60 * 1000));
 });
 
 describe("getSignUpsForSession", () => {
@@ -152,5 +183,44 @@ describe("getAllSignupsByEmail", () => {
     expect(rows).toEqual([]);
     const unbounded = queries.filter(q => !q.hasWhere && !q.hasLimit);
     expect(unbounded).toEqual([]);
+  });
+});
+
+describe("getSignUpsForSession — how the date gets filtered", () => {
+  it("matches pool AND date in SQL when every stored date is ISO", async () => {
+    nonIsoRowCount = 0;
+    const rows = await getSignUpsForSession("1 October 2026", "CCAB", { fresh: true });
+    expect(rows.map(r => r.name).sort()).toEqual(["Ann", "Bob"]);
+    // The indexed path: both the pool and the normalised date are bound into the query,
+    // so the DB returns ~20 rows instead of every row for the pool.
+    const params = queries.flatMap(q => q.params);
+    expect(params).toContain("CCAB");
+    expect(params).toContain("2026-10-01");
+    expect(probeRan).toBeGreaterThan(0);
+  });
+
+  it("falls back to the whole-pool read when any row's date is not ISO", async () => {
+    nonIsoRowCount = 3;
+    const rows = await getSignUpsForSession("1 October 2026", "CCAB", { fresh: true });
+    // Same answer — the JS date comparison still runs and still catches "1 October 2026".
+    expect(rows.map(r => r.name).sort()).toEqual(["Ann", "Bob"]);
+    const params = queries.flatMap(q => q.params);
+    expect(params).toContain("CCAB");
+    expect(params).not.toContain("2026-10-01");
+  });
+
+  it("takes the safe path for a session date it cannot normalise", async () => {
+    nonIsoRowCount = 0;
+    await getSignUpsForSession("sometime next week", "CCAB", { fresh: true });
+    const params = queries.flatMap(q => q.params);
+    expect(params).toContain("CCAB");
+    expect(params).not.toContain("sometime next week");
+  });
+
+  it("caches the probe instead of running it on every read", async () => {
+    await getSignUpsForSession("1 October 2026", "CCAB", { fresh: true });
+    const after = probeRan;
+    await getSignUpsForSession("3 October 2026", "MGS", { fresh: true });
+    expect(probeRan).toBe(after);
   });
 });
