@@ -30,6 +30,7 @@ import {
   clearSessionsCache,
   clearPaymentsCache,
   getSessions,
+  prewarmUpcomingRosters,
 } from "./googleSheets";
 import { sql, eq, and, lte, ne, inArray } from "drizzle-orm";
 
@@ -235,6 +236,8 @@ async function warmDb(): Promise<void> {
     const t = Date.now();
     await getSessions();
     console.log(`[DB] Sessions cache warmed in ${Date.now() - t}ms`);
+    // ...and the rosters of the next few sessions, which is what members open next.
+    await prewarmUpcomingRosters(3);
   } catch (err: any) {
     console.warn("[DB] Warm-up failed (will connect on first request):", err?.message);
   }

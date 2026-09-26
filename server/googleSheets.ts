@@ -479,7 +479,14 @@ const SESSIONS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 // Per-session sign-up lists, keyed `pool|sessionDate` exactly as callers pass them.
 const _signupsCache = new Map<string, { data: SignUpRow[]; expiry: number }>();
-const SIGNUPS_CACHE_TTL_MS = 30 * 1000; // 30 seconds — shorter: attendee lists move
+// 3 minutes, not 30 seconds. Every write that can change a roster calls
+// clearSessionsCache() — sign-up, edit, delete, the admin equivalents, rain-off and the
+// signups sync — so this TTL is a backstop, not the freshness mechanism. The only case it
+// governs is a second app instance changing a roster this one has cached; measurements
+// indicate a single instance (repeated cached reads are consistently ~39ms, with none of
+// the cold misses a second instance would cause). Drop it back to 30s if this is ever
+// scaled past one replica.
+const SIGNUPS_CACHE_TTL_MS = 3 * 60 * 1000;
 
 let _paymentsCacheData: PaymentRow[] | null = null;
 let _paymentsCacheExpiry = 0;
@@ -861,6 +868,26 @@ export async function getAllSignupsByEmail(
     ...s,
     email: s.email || normalizedEmail,
   }));
+}
+
+/**
+ * Fill the roster cache for the next few sessions. Every deploy empties the caches, so
+ * without this the first member to open the upcoming session pays the cold read — and that
+ * is exactly the session everyone opens. Bounded to a handful: rosters for sessions months
+ * out would expire unused.
+ */
+export async function prewarmUpcomingRosters(count = 3): Promise<void> {
+  try {
+    const upcoming = (await getUpcomingSessions()).slice(0, count);
+    for (const session of upcoming) {
+      await getSignUpsForSession(session.trainingDate, session.pool);
+    }
+    if (upcoming.length > 0) {
+      console.log(`[Sheets] Pre-warmed rosters for the next ${upcoming.length} session(s)`);
+    }
+  } catch (e) {
+    console.warn("[Sheets] Roster pre-warm failed (reads will just be cold):", (e as any)?.message);
+  }
 }
 
 /**

@@ -274,6 +274,48 @@ async function startServer() {
     }
   });
 
+  // TEMPORARY diagnostic — remove once the private-networking question is settled.
+  // Answers one thing: can this container reach the database over Railway's private
+  // network? Private networking only exists within a project+environment, so a successful
+  // connection to mysql.railway.internal proves the app and the database share one, and
+  // the timings show what switching DATABASE_URL would buy. No input is accepted: the
+  // internal URL is derived from the configured one by swapping host and port, so the
+  // credentials never leave the container and nothing external can steer it.
+  // GET /api/dev/db-latency?token=APPS_SCRIPT_SECRET
+  app.get("/api/dev/db-latency", async (req, res) => {
+    const { token } = req.query as Record<string, string>;
+    if (!token || token !== ENV.appsScriptSecret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const mysql = await import("mysql2/promise");
+    const configured = process.env.DATABASE_URL || "";
+    const internal = configured.replace(/@[^/]+\//, "@mysql.railway.internal:3306/");
+    const probe = async (url: string) => {
+      const started = Date.now();
+      try {
+        const conn = await mysql.createConnection(url);
+        const connectMs = Date.now() - started;
+        const times: number[] = [];
+        for (let i = 0; i < 5; i++) {
+          const t = Date.now();
+          await conn.query("SELECT 1");
+          times.push(Date.now() - t);
+        }
+        await conn.end();
+        times.sort((a, b) => a - b);
+        return { ok: true, connectMs, selectOneMs: times, medianMs: times[2] };
+      } catch (e: any) {
+        return { ok: false, error: e?.code || e?.message, afterMs: Date.now() - started };
+      }
+    };
+    res.json({
+      host: configured.split("@")[1]?.split("/")[0] ?? "(unset)",
+      viaConfiguredUrl: await probe(configured),
+      viaInternalUrl: await probe(internal),
+    });
+  });
+
   // Email diagnostic endpoint — sends a real test email and returns the result.
   // TOKEN REQUIRED: this sends genuine mail from the club's sending domain using the real
   // login-code template, so unauthenticated it was a phishing primitive and a way to burn
