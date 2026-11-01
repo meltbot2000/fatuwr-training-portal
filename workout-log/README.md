@@ -40,6 +40,12 @@ when an admin adds someone, and on the admin "Sync now" button.
 Training data. Syncs for one person never overlap (they share a run), and a portal blip
 or a database deadlock gets one automatic retry before it is recorded as a failure.
 
+**Dashboard stats** (for the selected chip): **Team** shows the average trainings and extra
+workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
+The averages are coloured against `TARGETS` in `src/stats.ts`: trainings must be **above 2** a
+week and extra workouts **at least 1**. "Per week" means the total divided by the weeks
+elapsed in the period, with a minimum of 1 week.
+
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.
 

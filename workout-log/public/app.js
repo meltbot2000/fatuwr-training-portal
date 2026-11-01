@@ -174,8 +174,8 @@ async function renderDashboard() {
   if (data.period !== state.period) { state.period = data.period; saveState(); }
   const daysLeft = daysBetween(data.today, c.competitionDate);
   const rows = data.rows;
-  const totT = rows.reduce((a, r) => a + r.trainings, 0);
-  const totW = rows.reduce((a, r) => a + r.workouts, 0);
+  const mine = rows.find((r) => r.member.id === me.member.id);
+  const T = data.targets;
   const max = Math.max(1, ...rows.map((r) => r.trainings + r.workouts));
   const failing = rows.filter((r) => r.syncError).length;
   const oldestSync = rows.map((r) => r.syncedAt).filter(Boolean).sort()[0];
@@ -184,17 +184,32 @@ async function renderDashboard() {
   view.innerHTML = `
     ${competitions.length > 1 ? `<div style="margin-bottom:12px"><label for="comp">Competition</label>
       <select id="comp">${competitions.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${esc(x.name)} · ${fmtDate(x.competitionDate, true)}</option>`).join("")}</select></div>` : ""}
-    <div class="card" style="padding-bottom:12px">
-      <div class="row spread"><div><div class="name" style="font-size:17px;font-weight:600">${esc(c.name)}</div>
-        <div class="meta">${fmtDate(c.competitionDate, true)} · prep from ${fmtDate(c.startDate, true)}</div></div></div>
-    </div>
-    <div class="tiles">
-      <div class="tile"><div class="num">${daysLeft >= 0 ? daysLeft : "Done"}</div><div class="lbl">${daysLeft >= 0 ? (daysLeft === 1 ? "day to go" : "days to go") : fmtDate(c.competitionDate)}</div></div>
-      <div class="tile"><div class="num">${totT}</div><div class="lbl">trainings</div></div>
-      <div class="tile"><div class="num">${totW}</div><div class="lbl">extra workouts</div></div>
+    <div class="card row spread" style="align-items:center">
+      <div style="min-width:0"><div class="name" style="font-size:17px;font-weight:600">${esc(c.name)}</div>
+        <div class="meta">${fmtDate(c.competitionDate, true)} · prep from ${fmtDate(c.startDate, true)}</div></div>
+      <div class="countdown">${daysLeft >= 0
+        ? `<div class="num">${daysLeft}</div><div class="lbl">${daysLeft === 1 ? "day to go" : "days to go"}</div>`
+        : `<div class="lbl">Done</div>`}</div>
     </div>
     <div class="chips" role="group" aria-label="Period" style="margin-bottom:12px">
-      ${data.periods.map((o) => `<button class="chip" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}" ${o.disabled ? 'disabled title="Not started yet"' : ""}>${esc(o.label)}</button>`).join("")}
+      ${data.periods.map((o) => `<button class="chip${o.upcoming ? " upcoming" : ""}" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}">${esc(o.label)}</button>`).join("")}
+    </div>
+    ${data.weeks === null ? `<div class="banner" style="background:var(--card);color:var(--text-2)">This period starts ${fmtDate(data.range.from, true)}. Nothing to show yet.</div>` : ""}
+    <div class="statrow">
+      <h3>Team <span class="meta">· per person, ${esc(rangeText)}</span></h3>
+      <div class="tiles cols2">
+        ${tile(fmtAvg(data.team.avgTrainingsPerWeek), "Avg trainings / week")}
+        ${tile(fmtAvg(data.team.avgWorkoutsPerWeek), "Avg extra workouts / week")}
+      </div>
+    </div>
+    <div class="statrow">
+      <h3>Individual <span class="meta">· ${esc(me.member.name)}</span></h3>
+      ${mine ? `<div class="tiles cols4">
+        ${tile(mine.trainings, "Trainings")}
+        ${tile(mine.workouts, "Extra workouts")}
+        ${tile(fmtAvg(mine.avgTrainingsPerWeek), "Avg trainings / week", target(mine.avgTrainingsPerWeek, (v) => v > T.trainingsPerWeekAbove, `target: above ${T.trainingsPerWeekAbove}`))}
+        ${tile(fmtAvg(mine.avgWorkoutsPerWeek), "Avg extra / week", target(mine.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin, `target: ${T.workoutsPerWeekMin}+`))}
+      </div>` : `<p class="meta">You're not in this squad, so there are no individual numbers.</p>`}
     </div>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
@@ -207,8 +222,26 @@ async function renderDashboard() {
   view.insertAdjacentHTML("beforeend", accountFooter());
   bindSignOut();
   $("#comp")?.addEventListener("change", (e) => { state.competitionId = Number(e.target.value); saveState(); route(); });
-  view.querySelectorAll("[data-period]").forEach((b) => (b.onclick = () => { state.period = b.dataset.period; saveState(); route(); }));
+  // Switch period in place: no "Loading…" flash, no jump back to the top.
+  view.querySelectorAll("[data-period]").forEach((b) => (b.onclick = async () => {
+    const y = window.scrollY;
+    state.period = b.dataset.period; saveState();
+    view.querySelectorAll("[data-period]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    try { await renderDashboard(); } catch (e) { toast(e.message); }
+    window.scrollTo(0, y);
+  }));
   bindTooltips();
+}
+
+const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
+function tile(value, label, status = "") {
+  return `<div class="tile${status ? " " + status.cls : ""}"><div class="num">${esc(value)}</div><div class="lbl">${esc(label)}</div>${status ? `<div class="target">${status.html}</div>` : ""}</div>`;
+}
+/** Green/red against a target — always with ✓/✗ and the target in words, never colour alone. */
+function target(v, ok, text) {
+  if (v === null || v === undefined) return "";
+  const pass = ok(v);
+  return { cls: pass ? "good" : "bad", html: `${pass ? "✓" : "✗"} ${esc(text)}` };
 }
 
 function boardRow(r, max) {

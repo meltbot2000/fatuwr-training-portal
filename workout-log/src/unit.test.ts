@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { issueToken, verifyToken } from "./auth";
 import { addDays, todaySgt } from "./config";
-import { buildDashboard, parsePeriod, periodOptions, periodRange } from "./stats";
+import { buildDashboard, parsePeriod, periodOptions, periodRange, summarise, weeksElapsed } from "./stats";
 import { BadRequest, workoutInput } from "./validate";
 
 const SECRET = "x".repeat(40);
@@ -36,13 +36,14 @@ describe("dates", () => {
     expect(periodRange("2026-12", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-12-01", to: "2026-12-15" }); // capped at today
     expect(periodRange("2027-02", "2027-03-30", "2026-11-01")).toEqual({ from: "2027-02-01", to: "2027-02-28" });
     expect(periodRange("2026-12", "2027-03-30", "2026-11-01").to).toBe("2026-12-31");             // year rollover
+    expect(periodRange("2027-02", "2026-11-05", "2026-11-01")).toEqual({ from: "2027-02-01", to: "2027-02-28" }); // future month: whole span
   });
   it("offers Since prep start, Since <year>, then Nov–Mar for the Amager Cup", () => {
     const opts = periodOptions("2026-11-01", "2027-04-10", "2026-12-02");
     expect(opts.map(o => o.label)).toEqual(["Since prep start", "Since 2026", "Nov", "Dec", "Jan", "Feb", "Mar"]);
-    expect(opts.filter(o => o.disabled).map(o => o.label)).toEqual(["Jan", "Feb", "Mar"]);
+    expect(opts.filter(o => o.upcoming).map(o => o.label)).toEqual(["Jan", "Feb", "Mar"]);
     expect(parsePeriod("2026-12", opts)).toBe("2026-12");
-    expect(parsePeriod("2027-02", opts)).toBe("prep"); // not started yet
+    expect(parsePeriod("2027-02", opts)).toBe("2027-02"); // upcoming months are selectable
     expect(parsePeriod("all", opts)).toBe("prep");     // retired choice
     expect(parsePeriod(undefined, opts)).toBe("prep");
   });
@@ -162,5 +163,21 @@ describe("clip (sync never fails on an over-long portal value)", () => {
     expect(clip("Sunday", 256)).toBe("Sunday");
     expect(clip(null, 10)).toBe("");
     expect(clip(undefined, 10)).toBe("");
+  });
+});
+
+describe("weekly averages", () => {
+  it("averages over elapsed weeks, at least one, none for a future range", () => {
+    expect(weeksElapsed({ from: "2026-11-01", to: "2026-11-14" }, "2026-11-14")).toBe(2);
+    expect(weeksElapsed({ from: "2026-11-01", to: "2026-11-02" }, "2026-11-02")).toBe(1);      // floor of one week
+    expect(weeksElapsed({ from: "2026-11-01", to: "2026-11-30" }, "2026-11-14")).toBe(2);      // month in progress
+    expect(weeksElapsed({ from: "2027-02-01", to: "2027-02-28" }, "2026-11-14")).toBeNull();   // not started
+  });
+  it("team average is per person per week", () => {
+    // 3 people, 2 weeks: 6 + 4 + 2 = 12 trainings → 4 per person → 2.0/week
+    expect(summarise([{ trainings: 6, workouts: 2 }, { trainings: 4, workouts: 0 }, { trainings: 2, workouts: 1 }], 2))
+      .toEqual({ weeks: 2, team: { avgTrainingsPerWeek: 2, avgWorkoutsPerWeek: 0.5 } });
+    expect(summarise([], 2).team).toEqual({ avgTrainingsPerWeek: null, avgWorkoutsPerWeek: null });
+    expect(summarise([{ trainings: 1, workouts: 1 }], null).team.avgTrainingsPerWeek).toBeNull();
   });
 });

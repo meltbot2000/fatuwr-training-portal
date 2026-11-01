@@ -6,7 +6,7 @@ import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, perWeek, summarise, TARGETS, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -300,7 +300,17 @@ export function createApp() {
     const rows = buildDashboard(
       members.map(m => ({ id: m.id, name: m.name, image: m.image, syncedAt: m.trainings_synced_at, syncError: m.trainings_sync_error })),
       trainings, workouts, range);
-    res.json({ competition: competitionDto(comp), periods, period, range, today, rows });
+    const weeks = weeksElapsed(range, today);
+    const withAvgs = rows.map(r => ({
+      ...r,
+      avgTrainingsPerWeek: perWeek(r.trainings, weeks),
+      avgWorkoutsPerWeek: perWeek(r.workouts, weeks),
+    }));
+    res.json({
+      competition: competitionDto(comp), periods, period, range, today,
+      ...summarise(rows, weeks), targets: TARGETS,
+      rows: withAvgs,
+    });
   }));
 
   // Per-person detail behind a dashboard row: every training and workout in the period.
