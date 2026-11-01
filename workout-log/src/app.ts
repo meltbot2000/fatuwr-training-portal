@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
+import { clearSessionCookie, hasAccess, requireAdmin, requireViewer, setSessionCookie } from "./auth";
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
@@ -113,14 +113,18 @@ export function createApp() {
     await upsertMember(member, { loggedIn: true, isAdmin });
     // Fresh attendance for squad members; don't make the login wait for it.
     if (await viewerCanLog(member.id, todaySgt())) syncMember(member.id).catch(() => {});
-    res.json({ token: issueToken(member.id) });
+    res.json({ token: setSessionCookie(res, member.id) });
   }));
+
+  app.post("/api/auth/logout", (_req, res) => { clearSessionCookie(res); res.json({ ok: true }); });
 
   // Everything below needs a signed-in portal member.
   app.use("/api", requireViewer);
 
   app.get("/api/me", wrap(async (req, res) => {
     const v = req.viewer!;
+    // Opening the app renews the login (cookie + a fresh token for the page to store).
+    const token = setSessionCookie(res, v.id);
     const today = todaySgt();
     const squads = await query<CompetitionRow>(
       `SELECT c.* FROM competitions c JOIN squad_members s ON s.competition_id = c.id
@@ -131,6 +135,7 @@ export function createApp() {
       squads: squads.map(competitionDto),
       workoutTypes: WORKOUT_TYPES,
       today,
+      token,
     });
   }));
 

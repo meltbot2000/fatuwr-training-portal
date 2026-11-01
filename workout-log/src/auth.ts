@@ -64,9 +64,48 @@ export async function hasAccess(memberId: number, isAdmin: boolean): Promise<boo
   return !!row;
 }
 
-export async function requireViewer(req: Request, res: Response, next: NextFunction) {
+/**
+ * The login also lives in a cookie the SERVER sets (HttpOnly). iOS Safari caps cookies
+ * written by page JavaScript to 7 days and clears a home-screen app's localStorage after
+ * a while; a server-set first-party cookie keeps its full lifetime. It is renewed on
+ * every app open (/api/me), so only 90 days of not opening the app signs someone out.
+ *
+ * CSRF: the cookie is SameSite=Strict, so another site can't make the browser send it.
+ */
+export const SESSION_COOKIE = "wl_session";
+const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function cookiePath() { return `${config.basePath}/`; }
+
+export function setSessionCookie(res: Response, memberId: number): string {
+  const token = issueToken(memberId);
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true, sameSite: "strict", secure: config.isProduction,
+    path: cookiePath(), maxAge: SESSION_MAX_AGE_MS,
+  });
+  return token;
+}
+
+export function clearSessionCookie(res: Response) {
+  res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: "strict", secure: config.isProduction, path: cookiePath() });
+}
+
+function readCookie(req: Request, name: string): string {
+  for (const part of (req.headers.cookie || "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) { try { return decodeURIComponent(v.join("=")); } catch { return ""; } }
+  }
+  return "";
+}
+
+/** Bearer header first; the session cookie if that's missing or no longer valid. */
+export function viewerIdFrom(req: Request): number | null {
   const h = req.headers.authorization || "";
-  const id = verifyToken(h.startsWith("Bearer ") ? h.slice(7) : "");
+  return verifyToken(h.startsWith("Bearer ") ? h.slice(7) : "") ?? verifyToken(readCookie(req, SESSION_COOKIE));
+}
+
+export async function requireViewer(req: Request, res: Response, next: NextFunction) {
+  const id = viewerIdFrom(req);
   if (!id) { res.status(401).json({ error: "not_signed_in" }); return; }
   try {
     const [m] = await query<{ id: number; name: string; image: string | null; club_role: string; is_admin: number }>(

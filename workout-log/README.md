@@ -63,10 +63,12 @@ right. Saving a workout shows a wiggling Puff.
 
 ## On phones (home-screen web app)
 
-- **Staying signed in:** the login token is kept in localStorage *and* in a cookie
-  (path `/amager/`). iOS clears a home-screen app's localStorage after a while, which used
-  to sign people out. The token is now restored from the cookie, the same fix the portal
-  uses. The server only reads the Bearer header, never the cookie.
+- **Staying signed in:** login sets an **HttpOnly, SameSite=Strict cookie from the server**
+  (`wl_session`, path `/amager/`, 90 days), renewed every time the app opens (`/api/me`), so
+  only 90 days without opening it signs someone out. The server accepts the Bearer token or
+  this cookie. Page storage alone wasn't enough: iOS clears a home-screen app's
+  localStorage, and Safari caps cookies written by page JavaScript at 7 days. Removing the
+  home-screen icon still wipes its storage, so re-adding it means signing in once more.
 - **Getting new versions:** assets are served as `app.js?v=<hash>`. The app asks
   `/api/version` whenever it's reopened and reloads itself if a new version is live.
   Pull down at the top of the page to reload by hand (home-screen app only).

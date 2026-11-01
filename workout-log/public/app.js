@@ -111,9 +111,16 @@ async function route() {
   if (route.last && route.last !== hash) route.navigated = true;
   route.last = hash;
   $("#tooltip").hidden = true; // its anchor is about to be removed, so pointerleave won't fire
-  if (!getToken() && hash !== "#/login") { location.hash = "#/login"; return; }
-  if (getToken() && !me && hash !== "#/login") {
-    try { me = await api("/me"); } catch (e) { if (getToken()) view.innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+  // Even with nothing stored on the page, the server's session cookie may still sign us
+  // in (iOS can wipe page storage), so always ask before showing the login screen.
+  if (!me && hash !== "#/login") {
+    try {
+      me = await api("/me");
+      if (me.token) setToken(me.token); // renewed on every open
+    } catch (e) {
+      if (location.hash !== "#/login") view.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+      return;
+    }
   }
   const nav = $("#nav");
   nav.hidden = hash === "#/login";
@@ -343,7 +350,8 @@ function accountFooter() {
     · <button class="link" id="signout" style="font-size:13px">Sign out</button></p>`;
 }
 function bindSignOut() {
-  $("#signout")?.addEventListener("click", () => {
+  $("#signout")?.addEventListener("click", async () => {
+    try { await fetch("api/auth/logout", { method: "POST" }); } catch {}
     setToken(null); me = null;
     try { localStorage.removeItem("wl_email"); } catch {}
     location.hash = "#/login";
