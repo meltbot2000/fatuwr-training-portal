@@ -401,7 +401,7 @@ async function renderPuff() {
         const range = next ? (t.from === 0 ? `under ${next.from * 100}%` : `${t.from * 100}–${next.from * 100 - 1}%`) : `${t.from * 100}%+`;
         return `<div class="${t.key === d.mood ? "on" : ""}">${puffImg(t.key, 52)}${esc(t.label.replace("!", ""))}<br>${range}</div>`;
       }).join("")}</div>
-      <p class="rule"><b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of 4 per person (3 trainings + 1 extra workout). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
+      <p class="rule"><b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of ${d.perPerson.trainings + d.perPerson.workouts} per person (${d.perPerson.trainings} trainings + ${d.perPerson.workouts} extra workout). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
       ${me.canLog ? `<a class="btn full" href="#/log" style="text-align:center;text-decoration:none">+ Log a workout</a>` : ""}
     </section>
 

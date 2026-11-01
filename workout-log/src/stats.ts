@@ -186,12 +186,12 @@ export function buildDashboard(
 // ── Puff ─────────────────────────────────────────────────────────────────────────
 /**
  * Puff's mood = how the whole squad did over the LAST 7 DAYS (rolling, so Puff doesn't
- * fall asleep every Monday): sessions logged ÷ team goal, where the goal is 4 per person
- * a week — 3 regular trainings (the "above 2" target) + 1 extra workout.
+ * fall asleep every Monday): sessions logged ÷ team goal, where the goal is 3 per person
+ * a week — 2 regular trainings + 1 extra workout (the club's team goal, set 2026-11-02).
  */
 export const PUFF = {
   windowDays: 7,
-  trainingsPerPerson: 3,
+  trainingsPerPerson: 2,
   workoutsPerPerson: 1,
   // mood thresholds on sessions ÷ goal
   moods: [
@@ -238,6 +238,7 @@ export function puffSummary(
   const mood = [...PUFF.moods].reverse().find(m => pct >= m.from)!;
   return {
     window: win, goal, sessions, pct: Math.round(pct * 100) / 100,
+    perPerson: { trainings: PUFF.trainingsPerPerson, workouts: PUFF.workoutsPerPerson },
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,
     thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),
