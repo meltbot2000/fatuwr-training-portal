@@ -1,4 +1,4 @@
-# FATUWR Comp Prep (workout log)
+# Puff: FATUWR competition prep (workout log)
 
 A separate small app for squads preparing for a competition:
 
@@ -42,7 +42,9 @@ or a database deadlock gets one automatic retry before it is recorded as a failu
 
 **Dashboard stats** (for the selected chip): **Team** shows the average trainings and extra
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
-The averages are coloured against `TARGETS` in `src/stats.ts`: trainings must be **2 or more** a
+The averages are coloured against the competition's **weekly targets**, set per competition in
+Admin (default 2 trainings and 1 extra workout; `competitions.target_trainings` /
+`target_workouts`). Puff's team goal uses the same targets. Trainings must be **at least the target** a
 week and extra workouts **at least 1**. "Per week" means the total divided by the weeks
 elapsed in the period, with a minimum of 1 week.
 
@@ -53,7 +55,8 @@ Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings a
 
 The second tab. **Puff** (artwork in `public/puff/`, see `design/README.md`) shows the
 whole squad's mood over the **last 7 days, rolling**: sessions logged (regular trainings
-plus extra workouts) ÷ a team goal of 3 per person (2 trainings + 1 extra). Under 40% is
+plus extra workouts) ÷ a team goal of the competition's weekly targets per person (default
+2 trainings + 1 extra). Under 40% is
 snoozing, 40–79% cruising, 80–99% puffed up, 100%+ sparkly (`PUFF` in `src/stats.ts`).
 
 **The tank:** one fish per squad member. Glowing and puffed means they met both weekly

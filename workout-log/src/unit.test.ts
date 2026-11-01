@@ -233,10 +233,24 @@ describe("Puff", () => {
   });
 });
 
-import { PUFF, TARGETS } from "./stats";
-describe("one set of targets for both screens", () => {
-  it("Dashboard green = 2+ trainings and 1+ extra a week; Puff's goal uses the same numbers", () => {
-    expect(TARGETS).toEqual({ trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
-    expect([PUFF.trainingsPerPerson, PUFF.workoutsPerPerson]).toEqual([2, 1]);
+import { DEFAULT_TARGETS } from "./stats";
+describe("weekly targets (per competition)", () => {
+  const today = "2026-12-13";
+  const m = (id: number, name: string) => ({ id, name, image: null });
+  const tr = (id: number, n: number) => Array.from({ length: n }, () => ({ member_id: id, date: today }));
+
+  it("default to 2 trainings + 1 extra a week", () => {
+    expect(DEFAULT_TARGETS).toEqual({ trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+  });
+  it("a competition's own targets drive Puff's goal and who glows", () => {
+    // Ann 3t + 2w. Default (2+1): goal 3, met. Custom 3+2: goal 5, still met. Custom 4+1: not met.
+    const squad = [m(1, "Ann")];
+    const t = tr(1, 3), w = tr(1, 2);
+    const def = puffSummary(squad, t, w, today);
+    const c32 = puffSummary(squad, t, w, today, { trainingsPerWeekMin: 3, workoutsPerWeekMin: 2 });
+    const c41 = puffSummary(squad, t, w, today, { trainingsPerWeekMin: 4, workoutsPerWeekMin: 1 });
+    expect([def.goal, def.fish[0].status, def.perPerson]).toEqual([3, 2, { trainings: 2, workouts: 1 }]);
+    expect([c32.goal, c32.fish[0].status, c32.mood]).toEqual([5, 2, "sparkly"]);
+    expect([c41.goal, c41.fish[0].status, c41.pct]).toEqual([5, 1, 1]);
   });
 });

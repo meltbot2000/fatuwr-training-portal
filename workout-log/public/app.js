@@ -1,4 +1,4 @@
-// FATUWR Comp Prep — single-file frontend, no build step.
+// Puff (FATUWR competition prep) — single-file frontend, no build step.
 // Every value from the server goes through esc() before it touches innerHTML.
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -98,7 +98,7 @@ const saveState = () => { try { localStorage.setItem("wl_view", JSON.stringify(s
 // ── Router ───────────────────────────────────────────────────────────────────
 const routes = [
   [/^#\/login$/, renderLogin, "Sign in"],
-  [/^#\/?$/, renderDashboard, "Comp Prep"],
+  [/^#\/?$/, renderDashboard, "Dashboard"],
   [/^#\/puff$/, renderPuff, "Puff"],
   [/^#\/member\/(\d+)$/, renderMember, "Activity"],
   [/^#\/log$/, renderLog, "Log workout"],
@@ -141,7 +141,7 @@ async function route() {
       const av = $("#meAvatar");
       av.hidden = !me || hash === "#/login";
       if (me) { av.href = `#/member/${me.member.id}`; av.innerHTML = avatar(me.member); }
-      document.title = `${title} · FATUWR`;
+      document.title = title === "Puff" ? "Puff" : `${title} · Puff`;
       view.innerHTML = `<p class="meta">Loading…</p>`;
       try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = `<div class="card"><p class="error">${esc(e.message)}</p></div>`; }
       window.scrollTo(0, 0);
@@ -163,6 +163,7 @@ function renderLogin() {
   let email = "";
   const step1 = () => {
     view.innerHTML = `
+      <div class="login-brand">${puffImg("cruising", 120)}<div class="cute">Puff</div><p class="meta">FATUWR competition prep</p></div>
       <div class="card stack">
         <h2>Sign in with your FATUWR portal account</h2>
         <p class="meta">For the competition squad. We'll email you a 6-digit code — the same login as the training portal.</p>
@@ -265,7 +266,7 @@ async function renderDashboard() {
         ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
         ${stat("Extra workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
       </div>
-      <p class="meta targets">Targets: at least ${T.trainingsPerWeekMin} trainings and ${T.workoutsPerWeekMin} extra workout a week.</p>`
+      <p class="meta targets">Targets: at least ${plural(T.trainingsPerWeekMin, "training")} and ${plural(T.workoutsPerWeekMin, "extra workout")} a week.</p>`
       : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
@@ -290,6 +291,7 @@ async function renderDashboard() {
   bindTooltips();
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
 /**
  * One stat box: the weekly average large, a total (or other context) small underneath.
@@ -401,7 +403,7 @@ async function renderPuff() {
         const range = next ? (t.from === 0 ? `under ${next.from * 100}%` : `${t.from * 100}–${next.from * 100 - 1}%`) : `${t.from * 100}%+`;
         return `<div class="${t.key === d.mood ? "on" : ""}">${puffImg(t.key, 52)}${esc(t.label.replace("!", ""))}<br>${range}</div>`;
       }).join("")}</div>
-      <p class="rule"><b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of ${d.perPerson.trainings + d.perPerson.workouts} per person (${d.perPerson.trainings} trainings + ${d.perPerson.workouts} extra workout). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
+      <p class="rule"><b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of ${d.perPerson.trainings + d.perPerson.workouts} per person (${plural(d.perPerson.trainings, "training")} + ${plural(d.perPerson.workouts, "extra workout")}). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
       ${me.canLog ? `<a class="btn full" href="#/log" style="text-align:center;text-decoration:none">+ Log a workout</a>` : ""}
     </section>
 
@@ -567,6 +569,11 @@ async function renderAdmin() {
         <div><label for="cs">Prep starts</label><input id="cs" type="date" required value="${me.today}"></div>
         <div><label for="cd">Competition date</label><input id="cd" type="date" required></div>
       </div>
+      <div class="grid2">
+        <div><label for="ct">Trainings per week</label><input id="ct" type="number" inputmode="numeric" min="0" max="14" step="1" required value="2"></div>
+        <div><label for="cw">Extra workouts per week</label><input id="cw" type="number" inputmode="numeric" min="0" max="14" step="1" required value="1"></div>
+      </div>
+      <p class="meta" style="margin:0">Weekly targets per person. They set the green/red on the Dashboard and Puff's team goal.</p>
       <p class="error" id="cerr"></p>
       <button type="submit">Create</button>
     </form>
@@ -579,6 +586,11 @@ async function renderAdmin() {
           <div><label for="es">Prep starts</label><input id="es" type="date" required value="${selected.startDate}"></div>
           <div><label for="ed">Competition date</label><input id="ed" type="date" required value="${selected.competitionDate}"></div>
         </div>
+      <div class="grid2">
+        <div><label for="et">Trainings per week</label><input id="et" type="number" inputmode="numeric" min="0" max="14" step="1" required value="${selected.targets.trainingsPerWeek}"></div>
+        <div><label for="ew">Extra workouts per week</label><input id="ew" type="number" inputmode="numeric" min="0" max="14" step="1" required value="${selected.targets.workoutsPerWeek}"></div>
+      </div>
+      <p class="meta" style="margin:0">Weekly targets per person. They set the green/red on the Dashboard and Puff's team goal.</p>
         <p class="error" id="eerr"></p>
         <div class="row"><button type="submit" class="secondary">Save</button><button type="button" class="danger" id="delc">Delete competition</button></div>
       </form>
@@ -610,7 +622,7 @@ async function renderAdmin() {
   $("#newc").onsubmit = async (ev) => {
     ev.preventDefault();
     try {
-      const { competition } = await api("/competitions", { method: "POST", body: { name: $("#cn").value, startDate: $("#cs").value, competitionDate: $("#cd").value } });
+      const { competition } = await api("/competitions", { method: "POST", body: { name: $("#cn").value, startDate: $("#cs").value, competitionDate: $("#cd").value, targetTrainings: Number($("#ct").value), targetWorkouts: Number($("#cw").value) } });
       state.adminCompId = competition.id; toast("Competition created"); route();
     } catch (e) { $("#cerr").textContent = e.message; }
   };
@@ -625,7 +637,7 @@ async function renderAdmin() {
   $("#sel").onchange = (e) => { state.adminCompId = Number(e.target.value); route(); };
   $("#editc").onsubmit = async (ev) => {
     ev.preventDefault();
-    try { await api(`/competitions/${selected.id}`, { method: "PATCH", body: { name: $("#en").value, startDate: $("#es").value, competitionDate: $("#ed").value } }); toast("Saved"); route(); }
+    try { await api(`/competitions/${selected.id}`, { method: "PATCH", body: { name: $("#en").value, startDate: $("#es").value, competitionDate: $("#ed").value, targetTrainings: Number($("#et").value), targetWorkouts: Number($("#ew").value) } }); toast("Saved"); route(); }
     catch (e) { $("#eerr").textContent = e.message; }
   };
   $("#delc").onclick = async () => {

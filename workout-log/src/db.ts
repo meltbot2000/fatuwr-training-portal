@@ -107,6 +107,10 @@ const MIGRATIONS = [
 // "duplicate column" error (1060) just means it already ran.
 const COLUMN_MIGRATIONS = [
   "ALTER TABLE members ADD COLUMN is_admin TINYINT NOT NULL DEFAULT 0",
+  // Weekly targets per person, per competition (set in Admin). Defaults = the club's
+  // standing targets, so existing competitions keep behaving exactly as before.
+  "ALTER TABLE competitions ADD COLUMN target_trainings TINYINT NOT NULL DEFAULT 2",
+  "ALTER TABLE competitions ADD COLUMN target_workouts TINYINT NOT NULL DEFAULT 1",
 ];
 
 // Sized to match (or exceed) the portal's own columns. They were narrower — day 32 vs the

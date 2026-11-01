@@ -78,11 +78,13 @@ export function periodRange(period: Period, today: string, prepStart: string): R
 }
 
 /**
- * Weekly targets per person: 2 or more regular trainings and 1 or more extra workouts.
- * ONE source for both screens: the Dashboard colours averages green when they meet
- * these, and Puff's team goal / glowing fish use the same numbers.
+ * Weekly targets per person: at least N regular trainings and M extra workouts. Set per
+ * competition in Admin (competitions.target_trainings / target_workouts); these are the
+ * defaults. ONE source for both screens: the Dashboard colours averages green when they
+ * meet them, and Puff's team goal / glowing fish use the same numbers.
  */
-export const TARGETS = { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 };
+export interface Targets { trainingsPerWeekMin: number; workoutsPerWeekMin: number }
+export const DEFAULT_TARGETS: Targets = { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 };
 
 const dayNum = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return Date.UTC(y, m - 1, d) / 86_400_000; };
 
@@ -190,13 +192,11 @@ export function buildDashboard(
 // ── Puff ─────────────────────────────────────────────────────────────────────────
 /**
  * Puff's mood = how the whole squad did over the LAST 7 DAYS (rolling, so Puff doesn't
- * fall asleep every Monday): sessions logged ÷ team goal, where the goal is 3 per person
- * a week — 2 regular trainings + 1 extra workout (the club's team goal, set 2026-11-02).
+ * fall asleep every Monday): sessions logged ÷ team goal, where the goal per person is
+ * the competition's weekly targets (default 2 regular trainings + 1 extra workout).
  */
 export const PUFF = {
   windowDays: 7,
-  trainingsPerPerson: TARGETS.trainingsPerWeekMin,
-  workoutsPerPerson: TARGETS.workoutsPerWeekMin,
   // mood thresholds on sessions ÷ goal
   moods: [
     { key: "snoozing", label: "Snoozing", from: 0 },
@@ -220,13 +220,14 @@ export function puffSummary(
   trainings: TrainingLite[],
   workouts: { member_id: number; date: string }[],
   today: string,
+  targets: Targets = DEFAULT_TARGETS,
 ) {
   const from = addDays(today, -(PUFF.windowDays - 1));
   const win = { from, to: today };
   const fish = members.map(m => {
     const t = trainings.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
     const w = workouts.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
-    const met = t >= PUFF.trainingsPerPerson && w >= PUFF.workoutsPerPerson;
+    const met = t >= targets.trainingsPerWeekMin && w >= targets.workoutsPerWeekMin;
     return { id: m.id, name: m.name, image: m.image, trainings: t, workouts: w, sessions: t + w,
              status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0 };
   });
@@ -236,13 +237,13 @@ export function puffSummary(
     .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings || b.name.localeCompare(a.name))
     .forEach((f, i) => { f.rank = i; });
 
-  const goal = members.length * (PUFF.trainingsPerPerson + PUFF.workoutsPerPerson);
+  const goal = members.length * (targets.trainingsPerWeekMin + targets.workoutsPerWeekMin);
   const sessions = fish.reduce((a, f) => a + f.sessions, 0);
   const pct = goal ? sessions / goal : 0;
   const mood = [...PUFF.moods].reverse().find(m => pct >= m.from)!;
   return {
     window: win, goal, sessions, pct: Math.round(pct * 100) / 100,
-    perPerson: { trainings: PUFF.trainingsPerPerson, workouts: PUFF.workoutsPerPerson },
+    perPerson: { trainings: targets.trainingsPerWeekMin, workouts: targets.workoutsPerWeekMin },
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,
     thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),

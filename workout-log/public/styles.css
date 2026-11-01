@@ -279,3 +279,8 @@ html, body { overscroll-behavior-y: contain; }
 @media (prefers-reduced-motion: reduce) {
   .puff-bob, .fish .swim, .bubble-dot, .puff-img.wiggle { animation: none !important; }
 }
+
+/* Login: the app's name and mascot above the sign-in card */
+.login-brand { display: flex; flex-direction: column; align-items: center; margin: 8px 0 16px; }
+.login-brand .cute { font-size: 34px; line-height: 1; margin-top: 4px; }
+.login-brand .meta { margin: 4px 0 0; }

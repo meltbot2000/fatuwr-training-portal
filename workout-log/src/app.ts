@@ -7,7 +7,7 @@ import { clearSessionCookie, hasAccess, requireAdmin, requireViewer, setSessionC
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, TARGETS, weeksElapsed, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, DEFAULT_TARGETS, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -15,10 +15,16 @@ import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 const wrap = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 
-interface CompetitionRow { id: number; name: string; start_date: string; competition_date: string }
+interface CompetitionRow { id: number; name: string; start_date: string; competition_date: string; target_trainings: number; target_workouts: number }
+
+const targetsOf = (c: CompetitionRow): Targets => ({
+  trainingsPerWeekMin: Number(c.target_trainings ?? DEFAULT_TARGETS.trainingsPerWeekMin),
+  workoutsPerWeekMin: Number(c.target_workouts ?? DEFAULT_TARGETS.workoutsPerWeekMin),
+});
 
 const competitionDto = (c: CompetitionRow & { squad_size?: number }) => ({
   id: c.id, name: c.name, startDate: c.start_date, competitionDate: c.competition_date,
+  targets: { trainingsPerWeek: targetsOf(c).trainingsPerWeekMin, workoutsPerWeek: targetsOf(c).workoutsPerWeekMin },
   ...(c.squad_size !== undefined ? { squadSize: Number(c.squad_size) } : {}),
 });
 
@@ -83,7 +89,7 @@ export function createApp() {
     const base = req.baseUrl; // "/amager" when mounted under the prefix
     res.type("application/manifest+json").setHeader("Cache-Control", "no-cache");
     res.json({
-      name: "FATUWR Comp Prep", short_name: "Comp Prep",
+      name: "Puff · FATUWR", short_name: "Puff",
       start_url: `${base}/`, scope: `${base}/`, display: "standalone",
       background_color: "#111111", theme_color: "#111111",
       icons: [
@@ -152,22 +158,27 @@ export function createApp() {
     const startDate = isoDate(body?.startDate, "startDate");
     const competitionDate = isoDate(body?.competitionDate, "competitionDate");
     if (startDate > competitionDate) throw new BadRequest("prep start must be on or before the competition date");
-    return { name, startDate, competitionDate };
+    const targetTrainings = body?.targetTrainings === undefined ? DEFAULT_TARGETS.trainingsPerWeekMin
+      : intIn(body.targetTrainings, "Trainings per week", 0, 14);
+    const targetWorkouts = body?.targetWorkouts === undefined ? DEFAULT_TARGETS.workoutsPerWeekMin
+      : intIn(body.targetWorkouts, "Extra workouts per week", 0, 14);
+    if (targetTrainings + targetWorkouts === 0) throw new BadRequest("Set at least one weekly target above 0");
+    return { name, startDate, competitionDate, targetTrainings, targetWorkouts };
   };
 
   app.post("/api/competitions", requireAdmin, wrap(async (req, res) => {
     const c = competitionBody(req.body);
     const r = await exec(
-      "INSERT INTO competitions (name, start_date, competition_date, created_by) VALUES (?, ?, ?, ?)",
-      [c.name, c.startDate, c.competitionDate, req.viewer!.id]);
+      "INSERT INTO competitions (name, start_date, competition_date, target_trainings, target_workouts, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+      [c.name, c.startDate, c.competitionDate, c.targetTrainings, c.targetWorkouts, req.viewer!.id]);
     res.json({ competition: competitionDto(await getCompetition(r.insertId)) });
   }));
 
   app.patch("/api/competitions/:id", requireAdmin, wrap(async (req, res) => {
     const existing = await getCompetition(req.params.id);
     const c = competitionBody(req.body);
-    await exec("UPDATE competitions SET name = ?, start_date = ?, competition_date = ? WHERE id = ?",
-      [c.name, c.startDate, c.competitionDate, existing.id]);
+    await exec("UPDATE competitions SET name = ?, start_date = ?, competition_date = ?, target_trainings = ?, target_workouts = ? WHERE id = ?",
+      [c.name, c.startDate, c.competitionDate, c.targetTrainings, c.targetWorkouts, existing.id]);
     res.json({ competition: competitionDto(await getCompetition(existing.id)) });
   }));
 
@@ -318,7 +329,7 @@ export function createApp() {
           query<any>("SELECT member_id, date FROM workouts WHERE member_id IN (?) AND date >= ?", [ids, from]),
         ])
       : [[], []];
-    res.json({ competition: competitionDto(comp), today, ...puffSummary(members, trainings, workouts, today) });
+    res.json({ competition: competitionDto(comp), today, ...puffSummary(members, trainings, workouts, today, targetsOf(comp)) });
   }));
 
   app.get("/api/dashboard", wrap(async (req, res) => {
@@ -351,7 +362,7 @@ export function createApp() {
     }));
     res.json({
       competition: competitionDto(comp), periods, period, range, today,
-      ...summarise(rows, weeks), targets: TARGETS,
+      ...summarise(rows, weeks), targets: targetsOf(comp),
       rows: withAvgs,
     });
   }));
