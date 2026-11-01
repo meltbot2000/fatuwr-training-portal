@@ -186,6 +186,7 @@ button:disabled { opacity: .5; cursor: default; }
 
 /* Team / You stat rows */
 .range-line { margin: 4px 2px 16px; }
+.range-gap { height: 8px; } /* chips → stats spacing when there's no notice */
 .statrow { margin-bottom: 16px; }
 .eyebrow {
   font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;

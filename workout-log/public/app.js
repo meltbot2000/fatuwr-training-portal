@@ -231,7 +231,6 @@ async function renderDashboard() {
   const max = Math.max(1, ...rows.map((r) => r.trainings + r.workouts));
   const failing = rows.filter((r) => r.syncError).length;
   const oldestSync = rows.map((r) => r.syncedAt).filter(Boolean).sort()[0];
-  const rangeText = data.range.from ? `${fmtDate(data.range.from, true)} – ${fmtDate(data.range.to, true)}` : `up to ${fmtDate(data.range.to, true)}`;
 
   view.innerHTML = `
     ${competitions.length > 1 ? `<div style="margin-bottom:12px"><label for="comp">Competition</label>
@@ -250,7 +249,7 @@ async function renderDashboard() {
       return `<div class="chips" role="group" aria-label="Period" style="margin-bottom:8px">${data.periods.filter((o) => !isMonth(o)).map(chip).join("")}</div>
         ${months.length ? `<div class="chips" role="group" aria-label="Month" style="margin-bottom:8px">${months.map(chip).join("")}</div>` : ""}`;
     })()}
-    <p class="meta range-line">${data.weeks === null ? `Starts ${fmtDate(data.range.from, true)}, nothing to show yet` : esc(rangeText)}</p>
+    ${data.weeks === null ? `<p class="meta range-line">Starts ${fmtDate(data.range.from, true)}, nothing to show yet</p>` : `<div class="range-gap"></div>`}
 
     <section class="statrow">
       <h3 class="eyebrow">Team <span>· average per person</span></h3>
