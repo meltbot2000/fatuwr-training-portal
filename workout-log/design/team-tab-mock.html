@@ -1,0 +1,436 @@
+<title>Puff Team Tab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Baloo+2:wght@600;700&display=swap">
+<style>
+/* Layout: phone-width app column (the real Comp Prep app's look), with a "mock controls"
+   panel beside it on desktop and above it on phones. Single dark look, like the app. */
+:root {
+  --bg: #111111;          /* app page */
+  --card: #1E1E1E;        /* app cards */
+  --raise: #2A2A2A;       /* app modal / chips */
+  --line: #2C2C2C;
+  --text: #FFFFFF;
+  --muted: #8E8E93;
+  --primary: #2196F3;     /* app accent */
+  --primary-soft: #93C5FD;
+  --good: #4CAF50;
+  --bad: #E66767;
+  --water-top: #0E3A5C;
+  --water-bot: #071B2C;
+  --puff: #F6C34A;        /* Puff's body */
+  --puff-dark: #DE9A2E;
+  --puff-belly: #FFF0C2;
+  --blush: #FF8FA3;
+  --mock: #F5C518;        /* marks things that exist only in this mock */
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-cute: "Baloo 2", "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #0A0A0A; color: var(--text); font: 15px/1.45 var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.layout { display: grid; gap: 20px; justify-content: center; grid-template-columns: minmax(0, 440px); }
+@media (min-width: 900px) { .layout { grid-template-columns: 320px 440px; align-items: start; } .controls { position: sticky; top: 20px; } }
+
+/* ── Mock controls ─────────────────────────────────────────────── */
+.controls { background: #17150A; border: 1px dashed #5A4E12; border-radius: 16px; padding: 16px; display: grid; gap: 16px; }
+.controls h2 { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--mock); }
+.controls p { margin: 0; color: #C9C2A0; font-size: 13px; }
+.ctl { display: grid; gap: 6px; }
+.ctl label, .ctl legend { font-size: 13px; color: #E8E1C0; font-weight: 500; }
+.ctl fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.radio { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #C9C2A0; }
+.radio input { margin-top: 3px; accent-color: var(--mock); }
+.radio b { color: #F2EDD5; font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--mock); }
+.effort-read { font-variant-numeric: tabular-nums; color: var(--mock); font-weight: 600; }
+
+/* ── Phone / app ───────────────────────────────────────────────── */
+.phone { background: var(--bg); border-radius: 28px; border: 1px solid #222; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.topbar { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+.topbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
+.topbar span { color: var(--muted); font-size: 13px; }
+.screen { padding: 14px; display: grid; gap: 14px; }
+.card { background: var(--card); border-radius: 18px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.cute { font-family: var(--font-cute); font-weight: 700; letter-spacing: .01em; }
+.meta { color: var(--muted); font-size: 13px; margin: 0; }
+.rule { font-size: 12.5px; color: var(--muted); background: var(--raise); border-radius: 12px; padding: 10px 12px; margin: 0; }
+.rule b { color: var(--text); font-weight: 600; }
+.tag-mock { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #111; background: var(--mock); border-radius: 4px; padding: 1px 5px; vertical-align: 2px; }
+
+/* Puff */
+.puff-stage {
+  position: relative; height: 210px; border-radius: 14px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 20%, #15476E 0%, var(--water-top) 45%, var(--water-bot) 100%);
+}
+.bubble-dot { position: absolute; bottom: -10px; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.35); animation: rise linear infinite; }
+@keyframes rise { to { transform: translateY(-240px); opacity: 0; } }
+.puff-wrap { position: absolute; left: 50%; top: 52%; width: 200px; transform: translate(-50%, -50%); transition: top .6s ease; }
+.puff-wrap.sleepy { top: 62%; }
+.puff-img { display: block; user-select: none; -webkit-user-drag: none; }
+.moods .puff-img { margin: 0 auto 2px; }
+.fish[data-status="2"] .puff-img { filter: drop-shadow(0 0 8px rgba(255, 226, 120, .85)); }
+.fish[data-status="0"] .puff-img { opacity: .8; filter: saturate(.75); }
+.puff-bob { animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 50%; }
+.puff-wrap.sleepy .puff-bob { animation-duration: 6s; }
+@keyframes bob { 50% { transform: translateY(-7px); } }
+.puff-body { transition: transform .5s cubic-bezier(.3,1.6,.5,1); transform-origin: 50% 55%; }
+.wiggle { animation: wiggle .7s ease; }
+@keyframes wiggle {
+  0%,100% { transform: rotate(0) scale(1); } 15% { transform: rotate(-12deg) scale(1.08); }
+  35% { transform: rotate(10deg) scale(1.12); } 55% { transform: rotate(-7deg) scale(1.05); } 75% { transform: rotate(4deg); }
+}
+.float-text { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-family: var(--font-cute); font-weight: 700; color: var(--puff); font-size: 18px; pointer-events: none; animation: floatUp 1.4s ease-out forwards; white-space: nowrap; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+@keyframes floatUp { from { opacity: 0; transform: translate(-50%, 10px); } 20% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -40px); } }
+
+.mood-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.mood-name { font-size: 26px; line-height: 1.1; }
+.mood-pct { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
+.meter { position: relative; height: 10px; border-radius: 6px; background: var(--raise); overflow: visible; }
+.meter > i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--puff); transition: width .5s ease; max-width: 100%; }
+.meter .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #444; border-radius: 1px; }
+.meter-labels { position: relative; height: 16px; font-size: 11px; color: var(--muted); }
+.meter-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.btn { font: 600 15px var(--font); border: 0; border-radius: 12px; padding: 12px 16px; background: var(--primary); color: #fff; cursor: pointer; }
+.btn:focus-visible, input:focus-visible { outline: 2px solid var(--primary-soft); outline-offset: 2px; }
+.btn.small { padding: 9px 12px; font-size: 14px; }
+.moods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.moods div { background: var(--raise); border-radius: 12px; padding: 6px 4px 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.moods div.on { outline: 2px solid var(--puff); color: var(--text); }
+
+
+/* Journey */
+.journey svg { width: 100%; height: auto; display: block; }
+.stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--raise); border-radius: 12px; padding: 10px; }
+.stat .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat .l { font-size: 11.5px; color: var(--muted); }
+.ahead { color: var(--good); } .behind { color: var(--bad); }
+
+/* Tank */
+.tank { position: relative; height: 360px; border-radius: 14px; overflow: hidden; background: linear-gradient(#123E62, #08243A 70%, #3A3220 100%); }
+.tank::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: repeating-radial-gradient(circle at 10px 30px, #5B4C2D 0 6px, #4A3E25 6px 12px); opacity: .9; }
+.fish { position: absolute; transform: translate(-50%, -50%); border: 0; background: none; padding: 0; cursor: pointer; transition: top .6s ease, left .6s ease; z-index: 2; }
+.fish .swim { animation: drift ease-in-out infinite alternate; }
+@keyframes drift { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
+.fish.dozing .swim { animation: none; }
+.fish svg { display: block; }
+.fish .nm { display: block; font-size: 10.5px; color: rgba(255,255,255,.75); margin-top: -4px; text-align: center; white-space: nowrap; }
+.fish.me .nm { color: var(--puff); font-weight: 700; }
+.fish:focus-visible { outline: 2px solid var(--primary-soft); border-radius: 8px; }
+/* Name caption: centred above the sand, so it's never cut off by the tank's edges */
+.fish-tip { position: absolute; z-index: 5; left: 50%; bottom: 36px; transform: translateX(-50%); background: rgba(17,17,17,.92); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.legend3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 11.5px; color: var(--muted); }
+.legend3 div { background: var(--raise); border-radius: 10px; padding: 6px 8px; }
+.legend3 b { color: var(--text); font-weight: 600; display: block; font-size: 12px; }
+
+.bottomnav { display: flex; border-top: 1px solid var(--line); background: var(--card); margin-top: auto; }
+.bottomnav span { flex: 1; text-align: center; padding: 13px 4px 15px; font-size: 13.5px; color: var(--muted); font-weight: 500; }
+.bottomnav span.on { color: var(--primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .puff-bob, .fish .swim, .bubble-dot { animation: none !important; }
+  .wiggle { animation-duration: .01s; }
+}
+</style>
+
+<div class="layout">
+  <aside class="controls" aria-label="Mock controls">
+    <h2>Mock controls</h2>
+    <p>These exist only in this mock. Play with them to see how Puff, the journey and the tank react. All numbers are example data.</p>
+    <div class="ctl">
+      <label for="effort">How hard the squad trained this week: <span class="effort-read" id="effortRead"></span></label>
+      <input type="range" id="effort" min="0" max="150" value="70" step="5">
+    </div>
+    <fieldset class="ctl">
+      <legend>Puff's mood is based on…</legend>
+      <label class="radio"><input type="radio" name="puffRule" id="puffTotal" value="total" checked><span><b>A · Team total.</b> Sessions logged by the squad in the last 7 days ÷ team goal (4 per person: 3 trainings + 1 extra).</span></label>
+      <label class="radio"><input type="radio" name="puffRule" id="puffShare" value="share"><span><b>B · Share on target.</b> % of the squad who met both personal targets in the last 7 days.</span></label>
+    </fieldset>
+    <fieldset class="ctl">
+      <legend>Distance to Amager comes from…</legend>
+      <label class="radio"><input type="radio" name="distRule" id="distSession" value="session" checked><span><b>A · Sessions (recommended).</b> Every training or extra workout (20+ min) moves the team the same distance, sized so a squad exactly on target arrives on 10 Apr.</span></label>
+      <label class="radio"><input type="radio" name="distRule" id="distMinutes" value="minutes"><span><b>B · Minutes moved.</b> Trainings count as 90 min, extra workouts by their logged minutes. Longer sessions go further.</span></label>
+    </fieldset>
+    <button class="btn" id="logBtnSide" type="button">Log a workout (as Melanie)</button>
+  </aside>
+
+  <main class="phone" aria-label="Team tab mock">
+    <div class="topbar"><h1>Team</h1><span>Mock date: Sun 13 Dec 2026</span></div>
+    <div class="screen">
+
+      <!-- Puff -->
+      <section class="card" aria-labelledby="puffTitle">
+        <p class="eyebrow" id="puffTitle">Puff · this week</p>
+        <div class="puff-stage" id="stage">
+          <div class="puff-wrap" id="puffWrap"><div class="puff-bob"><div class="puff-body" id="puffBody"></div></div></div>
+        </div>
+        <div class="mood-line">
+          <div class="mood-name cute" id="moodName"></div>
+          <div class="mood-pct" id="moodPct"></div>
+        </div>
+        <p class="meta" id="moodText"></p>
+        <div>
+          <div class="meter" aria-hidden="true"><i id="meterFill"></i><span class="tick" style="left:40%"></span><span class="tick" style="left:80%"></span></div>
+          <div class="meter-labels" aria-hidden="true"><span style="left:40%">40%</span><span style="left:80%">80%</span><span style="left:calc(100% - 14px)">100%</span></div>
+        </div>
+        <div class="moods" id="moodsRow"></div>
+        <p class="rule" id="puffRuleText"></p>
+        <button class="btn" id="logBtn" type="button">+ Log a workout</button>
+      </section>
+
+      <!-- Journey -->
+      <section class="card journey" aria-labelledby="jTitle">
+        <p class="eyebrow" id="jTitle">Swim to Amager</p>
+        <svg id="routeSvg" viewBox="0 0 340 200" role="img" aria-label="Route from Singapore to Copenhagen"></svg>
+        <div class="stats3">
+          <div class="stat"><div class="v" id="kmDone"></div><div class="l">of 11,150 km</div></div>
+          <div class="stat"><div class="v" id="nextStop"></div><div class="l" id="nextStopL"></div></div>
+          <div class="stat"><div class="v" id="pace"></div><div class="l">vs pace to arrive 10 Apr</div></div>
+        </div>
+        <p class="rule" id="distRuleText"></p>
+      </section>
+
+      <!-- Tank -->
+      <section class="card" aria-labelledby="tTitle">
+        <p class="eyebrow" id="tTitle">The tank · last 7 days</p>
+        <div class="tank" id="tank"></div>
+        <div class="legend3">
+          <div><b>Glowing, near the top</b>Met both targets</div>
+          <div><b>Swimming</b>Some sessions</div>
+          <div><b>Dozing on the sand</b>Nothing yet. A nudge, not a shame.</div>
+        </div>
+        <p class="meta">Tap a fish to see who it is. Bigger fish = more sessions.</p>
+      </section>
+    </div>
+    <nav class="bottomnav" aria-label="App tabs (mock)"><span>Dashboard</span><span class="on">Team</span><span>Log workout</span><span>Admin</span></nav>
+  </main>
+</div>
+
+<script>
+// ── Example squad (names from the real squad; numbers are invented) ──────────────
+const SQUAD = [
+  { name: "Hayley", f: 1.30 }, { name: "Melanie", f: 1.05, me: true }, { name: "Rei", f: 0.95 },
+  { name: "Dilys", f: 1.10 }, { name: "Genevieve", f: 0.55 }, { name: "Huiwen", f: 1.25 },
+  { name: "Gaya", f: 0.80 }, { name: "Kimberly", f: 0.35 }, { name: "Annabel", f: 1.00 }, { name: "Dylia", f: 0.70 },
+];
+const ROUTE_KM = 11150;
+// [name, km along the route, label dx, label dy, label anchor] — labels placed by hand so none overlap.
+const STOPS = [
+  ["Singapore", 0, -4, 18, "end"], ["Kuala Lumpur", 320, -10, 16, "end"], ["Colombo", 2770, -10, -10, "end"],
+  ["Dubai", 6070, 10, 14, "start"], ["Istanbul", 9070, 10, 12, "start"], ["Berlin", 10800, 10, 12, "start"],
+  ["Copenhagen", 11150, 10, -2, "start"],
+];
+const PREP_DAYS = 160;                 // 1 Nov 2026 → 10 Apr 2027
+const PREP_WEEKS = PREP_DAYS / 7;
+const TODAY_DAY = 42;                  // mock "today" = 13 Dec 2026
+const WEEKS_SO_FAR = TODAY_DAY / 7;
+const PER_PERSON_GOAL = 4;             // 3 trainings (>2) + 1 extra per week
+const TRAINING_MIN = 90, EXTRA_MIN = 45;
+
+const state = { effort: 70, puffRule: "total", distRule: "session", logged: 0 };
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Math.round(n).toLocaleString("en-GB");
+
+// ── Puff artwork (cut from the ChatGPT character sheet) ──────────────────────────
+// mood: 0 snoozing · 1 cruising · 2 puffed up · 3 sparkly; plus "wiggle" and "small".
+const SPRITES = ["snoozing", "cruising", "puffed", "sparkly"];
+const puffImg = (name, size, cls = "") =>
+  `<img class="puff-img ${cls}" src="puff/puff-${name}.webp" width="${size}" height="${size}" alt="" draggable="false">`;
+
+const MOODS = [
+  { name: "Snoozing", text: (d) => `Puff is dozing off. ${d}` },
+  { name: "Cruising", text: (d) => `Puff is cruising along. ${d}` },
+  { name: "Puffed up!", text: (d) => `Puff is puffed up and happy. ${d}` },
+  { name: "Sparkly!", text: (d) => `Target smashed. Puff is glowing. ${d}` },
+];
+const moodFor = (pct) => (pct < 0.4 ? 0 : pct < 0.8 ? 1 : pct < 1 ? 2 : 3);
+
+// ── Example numbers from the effort slider ───────────────────────────────────────
+function compute() {
+  const e = state.effort / 100;
+  const people = SQUAD.map((p, i) => {
+    const x = e * p.f;
+    const t = Math.max(0, Math.min(5, Math.round(3 * x)));
+    let w = Math.max(0, Math.min(4, Math.round(1.1 * x + (x > 1.15 ? 0.6 : 0))));
+    if (p.me) w += state.logged;
+    return { ...p, i, t, w, met: t > 2 && w >= 1 };
+  });
+  const n = people.length;
+  const sessions7 = people.reduce((a, p) => a + p.t + p.w, 0);
+  const goal7 = n * PER_PERSON_GOAL;
+  const share = people.filter((p) => p.met).length / n;
+  const pct = state.puffRule === "total" ? sessions7 / goal7 : share;
+
+  // distance so far: assume the same weekly effort since 1 Nov, plus anything logged here
+  const baseT = people.reduce((a, p) => a + p.t, 0);
+  const baseW = people.reduce((a, p) => a + p.w, 0) - state.logged;
+  let km, perUnitText;
+  if (state.distRule === "session") {
+    const kmPerSession = ROUTE_KM / (n * PER_PERSON_GOAL * PREP_WEEKS);
+    km = ((baseT + baseW) * WEEKS_SO_FAR + state.logged) * kmPerSession;
+    perUnitText = `<b>${kmPerSession.toFixed(1)} km per session</b> (11,150 km ÷ ${n} people × 4 sessions × ${PREP_WEEKS.toFixed(1)} weeks).`;
+  } else {
+    const kmPerMin = ROUTE_KM / (n * PREP_WEEKS * (3 * TRAINING_MIN + EXTRA_MIN));
+    km = ((baseT * TRAINING_MIN + baseW * EXTRA_MIN) * WEEKS_SO_FAR + state.logged * EXTRA_MIN) * kmPerMin;
+    perUnitText = `<b>${(kmPerMin * 60).toFixed(1)} km per hour moved</b>: a training is ${TRAINING_MIN} min (${(kmPerMin * TRAINING_MIN).toFixed(1)} km), a 45-min run ${(kmPerMin * 45).toFixed(1)} km.`;
+  }
+  km = Math.min(km, ROUTE_KM);
+  const paceKm = ROUTE_KM * (TODAY_DAY / PREP_DAYS);
+  const daysDiff = (km - paceKm) / (ROUTE_KM / PREP_DAYS);
+  return { people, n, sessions7, goal7, share, pct, km, paceKm, daysDiff, perUnitText };
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────────
+let lastMood = -1;
+function render() {
+  const d = compute();
+  $("effortRead").textContent = `${state.effort}% of target`;
+
+  const mood = moodFor(d.pct);
+  if (mood !== lastMood) {
+    $("puffBody").innerHTML = puffImg(SPRITES[mood], 200);
+    $("puffWrap").classList.toggle("sleepy", mood === 0);
+    lastMood = mood;
+  }
+  const pctTxt = Math.round(d.pct * 100);
+  $("moodName").textContent = MOODS[mood].name;
+  $("moodPct").textContent = `${pctTxt}%`;
+  $("meterFill").style.width = `${Math.min(100, pctTxt)}%`;
+  const detail = state.puffRule === "total"
+    ? `The squad has done ${d.sessions7} of ${d.goal7} sessions in the last 7 days.`
+    : `${Math.round(d.share * d.n)} of ${d.n} people met both targets in the last 7 days.`;
+  $("moodText").textContent = MOODS[mood].text(detail);
+  $("moodsRow").innerHTML = [["Snoozing", "under 40%"], ["Cruising", "40–79%"], ["Puffed up", "80–99%"], ["Sparkly", "100%+"]]
+    .map(([n, r], i) => `<div class="${i === mood ? "on" : ""}">${puffImg(SPRITES[i], 56)}${n}<br>${r}</div>`).join("");
+  $("puffRuleText").innerHTML = state.puffRule === "total"
+    ? `<b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of 4 per person (3 trainings + 1 extra workout). Rolling 7 days, so Puff doesn't crash every Monday.`
+    : `<b>How Puff's mood works:</b> the share of the squad who met both personal targets (3+ trainings and 1+ extra workout) in the last 7 days.`;
+
+  // journey
+  drawRoute(d.km, d.paceKm);
+  $("kmDone").textContent = fmt(d.km);
+  const next = STOPS.find((s) => s[1] > d.km);
+  $("nextStop").textContent = next ? fmt(next[1] - d.km) + " km" : "Arrived!";
+  $("nextStopL").textContent = next ? `to ${next[0]}` : "Copenhagen 🎉";
+  const days = Math.round(d.daysDiff);
+  $("pace").innerHTML = Math.abs(days) < 1 ? "On pace" : `<span class="${days > 0 ? "ahead" : "behind"}">${Math.abs(days)} days ${days > 0 ? "ahead" : "behind"}</span>`;
+  $("distRuleText").innerHTML = `<b>How distance works:</b> ${state.distRule === "session" ? "every regular training and every extra workout of 20+ minutes moves the team the same distance. " : "every minute of training moves the team forward. "}${d.perUnitText} A squad exactly on target arrives in Copenhagen on 10 Apr. The hollow ring shows where that pace would put you today.`;
+
+  drawTank(d.people);
+}
+
+function drawRoute(km, paceKm) {
+  const svg = $("routeSvg");
+  if (!svg.dataset.ready) {
+    svg.innerHTML = `
+      <defs><pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#2A3A4A"/></pattern></defs>
+      <rect x="0" y="0" width="340" height="200" rx="14" fill="#0D2236"/><rect x="0" y="0" width="340" height="200" rx="14" fill="url(#dots)"/>
+      <path id="route" d="M312 176 C 280 176, 268 150, 250 146 S 196 150, 176 128 S 150 92, 120 92 S 80 80, 66 58 S 40 30, 30 24" fill="none" stroke="#2F4C66" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 9"/>
+      <path id="routeDone" d="M312 176 C 280 176, 268 150, 250 146 S 196 150, 176 128 S 150 92, 120 92 S 80 80, 66 58 S 40 30, 30 24" fill="none" stroke="var(--puff)" stroke-width="5" stroke-linecap="round" pathLength="1000" stroke-dasharray="0 1000"/>
+      <g id="stops"></g><circle id="paceDot" r="8" fill="none" stroke="#CFE6FF" stroke-width="2" stroke-dasharray="3 2"/>
+      <g id="traveller"></g>`;
+    svg.dataset.ready = "1";
+    const path = $("route"), L = path.getTotalLength();
+    $("stops").innerHTML = STOPS.map(([name, k, dx, dy, anchor], i) => {
+      const p = path.getPointAtLength((k / ROUTE_KM) * L);
+      return `<circle cx="${p.x}" cy="${p.y}" r="${i === STOPS.length - 1 ? 6 : 4}" fill="${i === STOPS.length - 1 ? "#E01F26" : "#CFE6FF"}"/>
+        <text x="${p.x + dx}" y="${p.y + dy}" text-anchor="${anchor}" font-size="10.5" font-family="Inter, sans-serif" fill="${i === STOPS.length - 1 ? "#FFB3B6" : "#9FB8CF"}" font-weight="${i === STOPS.length - 1 ? 700 : 500}">${name}${i === STOPS.length - 1 ? " · Amager" : ""}</text>`;
+    }).join("");
+  }
+  const path = $("route"), L = path.getTotalLength();
+  $("routeDone").setAttribute("stroke-dasharray", `${(km / ROUTE_KM) * 1000} 1000`);
+  const pp = path.getPointAtLength((paceKm / ROUTE_KM) * L);
+  $("paceDot").setAttribute("cx", pp.x); $("paceDot").setAttribute("cy", pp.y);
+  const tp = path.getPointAtLength((km / ROUTE_KM) * L);
+  $("traveller").setAttribute("transform", `translate(${tp.x - 22} ${tp.y - 26})`);
+  if (!$("traveller").firstChild) $("traveller").innerHTML = `<image href="puff/puff-cruising.webp" width="44" height="44"/>`;
+}
+
+const tip = document.createElement("div");
+tip.className = "fish-tip"; tip.hidden = true;
+function drawTank(people) {
+  const tank = $("tank");
+  if (!tank.contains(tip)) tank.appendChild(tip);
+  people.forEach((p) => {
+    let el = tank.querySelector(`[data-i="${p.i}"]`);
+    if (!el) {
+      el = document.createElement("button");
+      el.type = "button"; el.className = "fish" + (p.me ? " me" : ""); el.dataset.i = p.i;
+      el.innerHTML = `<span class="swim" style="animation-duration:${3 + (p.i % 4) * 0.9}s;animation-delay:-${p.i * 0.7}s"><span class="art"></span></span><span class="nm">${p.me ? "You" : p.name}</span>`;
+      el.addEventListener("click", () => showTip(el, p.i));
+      tank.appendChild(el);
+    }
+    const total = p.t + p.w;
+    const status = p.met ? 2 : total > 0 ? 1 : 0;
+    const size = 38 + Math.min(total, 6) * 3;   // 38–56px: bigger = more sessions, still room for ten
+    el.classList.toggle("dozing", status === 0);
+    el.dataset.status = status;
+    const key = `${status}-${size}`;
+    if (el.dataset.key !== key) {
+      el.querySelector(".art").innerHTML = puffImg(status === 2 ? "puffed" : status === 1 ? "small" : "snoozing", size);
+      el.dataset.key = key;
+    }
+    // Staggered grid: two rows per band, the second row shifted half a column, so fish
+    // in the same band never sit on top of each other.
+    const col = p.i % 5, row = Math.floor(p.i / 5);
+    el.style.left = `${row ? 19 + col * 18 : 10 + col * 18}%`;
+    el.style.top = status === 0 ? `${row ? 82 : 72}%` : status === 1 ? `${row ? 58 : 42}%` : `${row ? 27 : 11}%`;
+    el.setAttribute("aria-label", `${p.name}: ${p.t} trainings and ${p.w} extra workouts in the last 7 days${p.met ? ", met both targets" : ""}`);
+    el._p = p;
+  });
+  if (!tip.hidden && tip._el) showTip(tip._el, tip._el.dataset.i);
+}
+function showTip(el, i) {
+  const p = el._p;
+  tip.textContent = `${p.name} · ${p.t} trainings, ${p.w} extra${p.met ? " ✓" : ""}`;
+
+  tip.hidden = false; tip._el = el;
+  clearTimeout(showTip.t); showTip.t = setTimeout(() => (tip.hidden = true), 2600);
+}
+
+// ── Wiggle on log ────────────────────────────────────────────────────────────────
+function logWorkout() {
+  const before = compute().km;
+  state.logged += 1;
+  render();
+  const body = $("puffBody");
+  const settled = body.innerHTML;
+  body.innerHTML = puffImg("wiggle", 200);
+  body.classList.remove("wiggle"); void body.offsetWidth; body.classList.add("wiggle");
+  clearTimeout(logWorkout.t);
+  logWorkout.t = setTimeout(() => { body.innerHTML = puffImg(SPRITES[lastMood], 200); }, 900);
+  const me = $("tank").querySelector(".fish.me .art");
+  if (me) { me.classList.remove("wiggle"); void me.offsetWidth; me.classList.add("wiggle"); }
+  const d = compute();
+  const f = document.createElement("div");
+  f.className = "float-text";
+  f.textContent = `+1 workout · +${Math.max(1, Math.round(d.km - before))} km`;
+  $("stage").appendChild(f);
+  setTimeout(() => f.remove(), 1500);
+}
+
+// bubbles
+for (let i = 0; i < 9; i++) {
+  const b = document.createElement("span");
+  b.className = "bubble-dot";
+  b.style.left = `${8 + i * 11}%`;
+  b.style.animationDuration = `${5 + (i % 4) * 1.7}s`;
+  b.style.animationDelay = `-${i * 1.3}s`;
+  b.style.transform = `scale(${0.6 + (i % 3) * 0.3})`;
+  $("stage").appendChild(b);
+}
+
+$("effort").addEventListener("input", (e) => { state.effort = +e.target.value; render(); });
+document.querySelectorAll('input[name="puffRule"]').forEach((r) => r.addEventListener("change", () => { state.puffRule = r.value; render(); }));
+document.querySelectorAll('input[name="distRule"]').forEach((r) => r.addEventListener("change", () => { state.distRule = r.value; render(); }));
+$("logBtn").addEventListener("click", logWorkout);
+$("logBtnSide").addEventListener("click", logWorkout);
+render();
+</script>
