@@ -34,10 +34,10 @@ export async function closePool(): Promise<void> {
 const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS members (
      id INT PRIMARY KEY,                       -- portal users.id
-     name VARCHAR(256) NOT NULL DEFAULT '',
+     name VARCHAR(512) NOT NULL DEFAULT '',
      image TEXT NULL,
-     club_role VARCHAR(32) NOT NULL DEFAULT '',
-     member_status VARCHAR(32) NOT NULL DEFAULT '',
+     club_role VARCHAR(64) NOT NULL DEFAULT '',
+     member_status VARCHAR(64) NOT NULL DEFAULT '',
      last_login_at DATETIME NULL,
      trainings_synced_at DATETIME NULL,
      trainings_sync_error VARCHAR(255) NULL,
@@ -76,8 +76,8 @@ const MIGRATIONS = [
      date CHAR(10) NOT NULL,
      pool VARCHAR(128) NOT NULL DEFAULT '',
      training_time VARCHAR(64) NOT NULL DEFAULT '',
-     day VARCHAR(32) NOT NULL DEFAULT '',
-     activity VARCHAR(64) NOT NULL DEFAULT '',
+     day VARCHAR(256) NOT NULL DEFAULT '',
+     activity VARCHAR(128) NOT NULL DEFAULT '',
      session_id VARCHAR(64) NOT NULL DEFAULT '',
      rain_off VARCHAR(8) NOT NULL DEFAULT '',
      synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -109,6 +109,20 @@ const COLUMN_MIGRATIONS = [
   "ALTER TABLE members ADD COLUMN is_admin TINYINT NOT NULL DEFAULT 0",
 ];
 
+// Sized to match (or exceed) the portal's own columns. They were narrower — day 32 vs the
+// portal's 256, activity 64 vs 128 — and MySQL strict mode rejects an over-long value,
+// which failed the WHOLE sync for everyone who attended that one session.
+const WIDEN = [
+  "ALTER TABLE training_records MODIFY day VARCHAR(256) NOT NULL DEFAULT ''",
+  "ALTER TABLE training_records MODIFY activity VARCHAR(128) NOT NULL DEFAULT ''",
+  "ALTER TABLE members MODIFY name VARCHAR(512) NOT NULL DEFAULT ''",
+  "ALTER TABLE members MODIFY club_role VARCHAR(64) NOT NULL DEFAULT ''",
+  "ALTER TABLE members MODIFY member_status VARCHAR(64) NOT NULL DEFAULT ''",
+];
+
+/** Clip to a column's width, so a long label from the portal can never fail an insert. */
+export const clip = (v: unknown, max: number): string => String(v ?? "").slice(0, max);
+
 // Workout types changed 2026-11-01 (see WORKOUT_TYPES). Idempotent: once no row holds an
 // old value these match nothing. Removed types become "Others" with the old type kept at
 // the front of the notes, so no detail is lost and old rows stay editable.
@@ -125,6 +139,7 @@ export async function migrate(): Promise<void> {
   for (const sql of COLUMN_MIGRATIONS) {
     try { await p.query(sql); } catch (e: any) { if (e?.errno !== 1060) throw e; }
   }
+  for (const sql of WIDEN) await p.query(sql);
   for (const sql of DATA_MIGRATIONS) await p.query(sql);
 }
 

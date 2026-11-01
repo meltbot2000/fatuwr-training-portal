@@ -10,7 +10,7 @@
  * and records the error, rather than blanking anyone's attendance.
  */
 import { addDays, config, todaySgt } from "./config";
-import { exec, getPool, query } from "./db";
+import { clip, exec, getPool, query } from "./db";
 import { portal, PortalError, type PortalMember, type PortalTrainingRecord } from "./portal";
 
 /** Competitions stay "active" for sync two weeks past the competition day. */
@@ -28,7 +28,7 @@ export async function upsertMember(m: PortalMember, opts: { loggedIn?: boolean; 
      ON DUPLICATE KEY UPDATE name = VALUES(name), image = VALUES(image),
        club_role = VALUES(club_role), member_status = VALUES(member_status)
        ${login ? ", is_admin = VALUES(is_admin), last_login_at = UTC_TIMESTAMP()" : ""}`,
-    [m.id, m.name, m.image, m.clubRole, m.memberStatus, login && opts.isAdmin ? 1 : 0],
+    [m.id, clip(m.name, 512), m.image, clip(m.clubRole, 64), clip(m.memberStatus, 64), login && opts.isAdmin ? 1 : 0],
   );
 }
 
@@ -45,7 +45,9 @@ export async function replaceTrainingRecords(memberId: number, records: PortalTr
          VALUES ? ON DUPLICATE KEY UPDATE member_id = VALUES(member_id), date = VALUES(date), pool = VALUES(pool),
            training_time = VALUES(training_time), day = VALUES(day), activity = VALUES(activity),
            session_id = VALUES(session_id), rain_off = VALUES(rain_off), synced_at = UTC_TIMESTAMP()`,
-        [records.map(r => [r.signupId, memberId, r.date, r.pool, r.trainingTime, r.day, r.activity, r.sessionId, r.rainOff])],
+        // Every text value clipped to its column (see WIDEN in db.ts for why).
+        [records.map(r => [r.signupId, memberId, clip(r.date, 10), clip(r.pool, 128), clip(r.trainingTime, 64),
+          clip(r.day, 256), clip(r.activity, 128), clip(r.sessionId, 64), clip(r.rainOff, 8)])],
       );
     }
     await conn.query(

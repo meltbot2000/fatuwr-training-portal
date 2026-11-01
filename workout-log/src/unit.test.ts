@@ -153,3 +153,14 @@ describe("sync errors", () => {
     expect(describeSyncError(Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" }))).toBe("local: ER_LOCK_DEADLOCK Deadlock found");
   });
 });
+
+import { clip } from "./db";
+
+describe("clip (sync never fails on an over-long portal value)", () => {
+  it("clips to the column width and handles empty values", () => {
+    expect(clip("x".repeat(300), 256)).toHaveLength(256);
+    expect(clip("Sunday", 256)).toBe("Sunday");
+    expect(clip(null, 10)).toBe("");
+    expect(clip(undefined, 10)).toBe("");
+  });
+});
