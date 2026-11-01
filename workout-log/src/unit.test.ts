@@ -232,3 +232,11 @@ describe("Puff", () => {
     expect(byRank).toEqual(["Di:0", "Cy:1", "Bo:1", "Ann:2"]);
   });
 });
+
+import { PUFF, TARGETS } from "./stats";
+describe("one set of targets for both screens", () => {
+  it("Dashboard green = 2+ trainings and 1+ extra a week; Puff's goal uses the same numbers", () => {
+    expect(TARGETS).toEqual({ trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([PUFF.trainingsPerPerson, PUFF.workoutsPerPerson]).toEqual([2, 1]);
+  });
+});

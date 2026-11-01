@@ -77,8 +77,12 @@ export function periodRange(period: Period, today: string, prepStart: string): R
   return { from: prepStart, to: today }; // "prep"
 }
 
-/** Targets for an individual's weekly averages (green when met, red when not). */
-export const TARGETS = { trainingsPerWeekAbove: 2, workoutsPerWeekMin: 1 };
+/**
+ * Weekly targets per person: 2 or more regular trainings and 1 or more extra workouts.
+ * ONE source for both screens: the Dashboard colours averages green when they meet
+ * these, and Puff's team goal / glowing fish use the same numbers.
+ */
+export const TARGETS = { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 };
 
 const dayNum = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return Date.UTC(y, m - 1, d) / 86_400_000; };
 
@@ -191,8 +195,8 @@ export function buildDashboard(
  */
 export const PUFF = {
   windowDays: 7,
-  trainingsPerPerson: 2,
-  workoutsPerPerson: 1,
+  trainingsPerPerson: TARGETS.trainingsPerWeekMin,
+  workoutsPerPerson: TARGETS.workoutsPerWeekMin,
   // mood thresholds on sessions ÷ goal
   moods: [
     { key: "snoozing", label: "Snoozing", from: 0 },

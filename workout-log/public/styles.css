@@ -23,7 +23,7 @@ html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px; line-height: 1.4;
-  padding-bottom: calc(72px + 16px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px));
 }
 a { color: var(--primary-light); }
 /* Top bar: matches the portal's AppHeader: card grey, 56px, centred 18px bold title,
@@ -46,18 +46,21 @@ a { color: var(--primary-light); }
 body { padding-top: calc(56px + env(safe-area-inset-top, 0px)); }
 main { max-width: 480px; margin: 0 auto; padding: 16px; }
 
-/* Bottom nav: matches the portal's BottomNav: card grey, outlined 22px icons over an
-   11px label, a 28×3 blue bar on the active tab, 72px tall. */
+/* Bottom nav: the portal's BottomNav look (card grey, outlined 22px icons over an 11px
+   label, a 28×3 blue bar on the active tab) with EQUAL space above the icons and below
+   the labels. On iPhones only part of the 34px home-indicator safe area is added, enough
+   to keep the labels clear of the indicator bar without a tall empty strip. */
+:root { --nav-pad: 12px; --nav-h: calc(var(--nav-pad) * 2 + 22px + 4px + 11px); }
 .bottomnav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
   background: var(--card); border-top: 1px solid var(--divider);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - 22px));
   transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden;
 }
-.bottomnav-inner { max-width: 480px; margin: 0 auto; height: 72px; display: flex; }
+.bottomnav-inner { max-width: 480px; margin: 0 auto; display: flex; }
 .bottomnav a {
   position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  gap: 4px; padding-top: 15px; text-decoration: none; color: var(--text-2);
+  gap: 4px; padding: var(--nav-pad) 4px; text-decoration: none; color: var(--text-2);
   font-size: 11px; font-weight: 500; line-height: 1; letter-spacing: .01em;
 }
 .bottomnav a[hidden] { display: none; }

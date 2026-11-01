@@ -262,10 +262,10 @@ async function renderDashboard() {
     <section class="statrow">
       <h3 class="eyebrow">You <span>· ${esc(me.member.name)}</span></h3>
       ${mine ? `<div class="stats">
-        ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v > T.trainingsPerWeekAbove)}
+        ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
         ${stat("Extra workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
       </div>
-      <p class="meta targets">Targets: more than ${T.trainingsPerWeekAbove} trainings and at least ${T.workoutsPerWeekMin} extra workout a week.</p>`
+      <p class="meta targets">Targets: at least ${T.trainingsPerWeekMin} trainings and ${T.workoutsPerWeekMin} extra workout a week.</p>`
       : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
@@ -313,7 +313,7 @@ function boardRow(r, max, T) {
   // Green/red against the same targets as the "You" boxes; plain when there's no
   // average yet (a period that hasn't started).
   const mark = (v, ok) => (v === null || v === undefined ? "" : ok(v) ? "ok" : "low");
-  const tCls = mark(r.avgTrainingsPerWeek, (v) => v > T.trainingsPerWeekAbove);
+  const tCls = mark(r.avgTrainingsPerWeek, (v) => v >= T.trainingsPerWeekMin);
   const wCls = mark(r.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin);
   const avgs = r.avgTrainingsPerWeek === null || r.avgTrainingsPerWeek === undefined ? ""
     : `<span class="${tCls}">${r.avgTrainingsPerWeek.toFixed(1)}</span> trainings/wk · <span class="${wCls}">${r.avgWorkoutsPerWeek.toFixed(1)}</span> extra/wk`;

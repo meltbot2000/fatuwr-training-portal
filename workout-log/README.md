@@ -42,7 +42,7 @@ or a database deadlock gets one automatic retry before it is recorded as a failu
 
 **Dashboard stats** (for the selected chip): **Team** shows the average trainings and extra
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
-The averages are coloured against `TARGETS` in `src/stats.ts`: trainings must be **above 2** a
+The averages are coloured against `TARGETS` in `src/stats.ts`: trainings must be **2 or more** a
 week and extra workouts **at least 1**. "Per week" means the total divided by the weeks
 elapsed in the period, with a minimum of 1 week.
 
