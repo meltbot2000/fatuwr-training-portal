@@ -284,3 +284,11 @@ html, body { overscroll-behavior-y: contain; }
 .login-brand { display: flex; flex-direction: column; align-items: center; margin: 8px 0 16px; }
 .login-brand .cute { font-size: 34px; line-height: 1; margin-top: 4px; }
 .login-brand .meta { margin: 4px 0 0; }
+
+/* Puff tab: the mood explanation folded behind a small "How it works" link */
+.how { font-size: 13px; color: var(--text-2); }
+.how summary { cursor: pointer; color: var(--primary-light); list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+.how summary::-webkit-details-marker { display: none; }
+.how summary::after { content: "›"; transition: transform .15s; display: inline-block; }
+.how[open] summary::after { transform: rotate(90deg); }
+.how p { margin: 8px 0 0; background: var(--modal); border-radius: 12px; padding: 10px 12px; }
