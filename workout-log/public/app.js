@@ -225,28 +225,30 @@ async function renderDashboard() {
       const isMonth = (o) => /^\d{4}-\d{2}$/.test(o.key);
       const months = data.periods.filter(isMonth);
       return `<div class="chips" role="group" aria-label="Period" style="margin-bottom:8px">${data.periods.filter((o) => !isMonth(o)).map(chip).join("")}</div>
-        ${months.length ? `<div class="chips" role="group" aria-label="Month" style="margin-bottom:12px">${months.map(chip).join("")}</div>` : ""}`;
+        ${months.length ? `<div class="chips" role="group" aria-label="Month" style="margin-bottom:8px">${months.map(chip).join("")}</div>` : ""}`;
     })()}
-    ${data.weeks === null ? `<div class="banner" style="background:var(--card);color:var(--text-2)">This period starts ${fmtDate(data.range.from, true)}. Nothing to show yet.</div>` : ""}
-    <div class="statrow">
-      <h3>Team <span class="meta">· per person, ${esc(rangeText)}</span></h3>
-      <div class="tiles cols2">
-        ${tile(fmtAvg(data.team.avgTrainingsPerWeek), "Avg trainings / week")}
-        ${tile(fmtAvg(data.team.avgWorkoutsPerWeek), "Avg extra workouts / week")}
+    <p class="meta range-line">${data.weeks === null ? `Starts ${fmtDate(data.range.from, true)}, nothing to show yet` : esc(rangeText)}</p>
+
+    <section class="statrow">
+      <h3 class="eyebrow">Team <span>· average per person</span></h3>
+      <div class="stats">
+        ${stat("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total, whole squad`)}
+        ${stat("Extra workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total, whole squad`)}
       </div>
-    </div>
-    <div class="statrow">
-      <h3>Individual <span class="meta">· ${esc(me.member.name)}</span></h3>
-      ${mine ? `<div class="tiles cols4">
-        ${tile(mine.trainings, "Trainings")}
-        ${tile(mine.workouts, "Extra workouts")}
-        ${tile(fmtAvg(mine.avgTrainingsPerWeek), "Avg trainings / week", target(mine.avgTrainingsPerWeek, (v) => v > T.trainingsPerWeekAbove, `target: above ${T.trainingsPerWeekAbove}`))}
-        ${tile(fmtAvg(mine.avgWorkoutsPerWeek), "Avg extra / week", target(mine.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin, `target: ${T.workoutsPerWeekMin}+`))}
-      </div>` : `<p class="meta">You're not in this squad, so there are no individual numbers.</p>`}
-    </div>
+    </section>
+
+    <section class="statrow">
+      <h3 class="eyebrow">You <span>· ${esc(me.member.name)}</span></h3>
+      ${mine ? `<div class="stats">
+        ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v > T.trainingsPerWeekAbove)}
+        ${stat("Extra workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
+      </div>
+      <p class="meta targets">Targets: more than ${T.trainingsPerWeekAbove} trainings and at least ${T.workoutsPerWeekMin} extra workout a week.</p>`
+      : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
+    </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
-      <div class="row spread"><h2 style="margin:0">Squad · ${rows.length}</h2><span class="meta">${esc(rangeText)}</span></div>
+      <h2 style="margin:0 0 4px">Squad · ${rows.length}</h2>
       <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Extra workouts</span></div>
       ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
       <p class="meta" style="margin:8px 0 0">Trainings = portal sessions signed up for, counted from 1 h after the start, when sign-ups end (full rain-offs excluded). Synced ${esc(ago(oldestSync))}.</p>
@@ -267,14 +269,20 @@ async function renderDashboard() {
 }
 
 const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
-function tile(value, label, status = "") {
-  return `<div class="tile${status ? " " + status.cls : ""}"><div class="num">${esc(value)}</div><div class="lbl">${esc(label)}</div>${status ? `<div class="target">${status.html}</div>` : ""}</div>`;
-}
-/** Green/red against a target — always with ✓/✗ and the target in words, never colour alone. */
-function target(v, ok, text) {
-  if (v === null || v === undefined) return "";
-  const pass = ok(v);
-  return { cls: pass ? "good" : "bad", html: `${pass ? "✓" : "✗"} ${esc(text)}` };
+/**
+ * One stat box: the weekly average large, a total (or other context) small underneath.
+ * With `meets`, the box is tinted green when the target is met and red when not.
+ * The targets themselves are spelled out once, under the row.
+ */
+function stat(label, perWeek, sub, meets) {
+  const has = perWeek !== null && perWeek !== undefined;
+  const cls = meets && has ? (meets(perWeek) ? " good" : " bad") : "";
+  const state = cls === " good" ? ", target met" : cls === " bad" ? ", below target" : "";
+  return `<div class="stat${cls}" aria-label="${esc(label)}: ${has ? perWeek.toFixed(1) + " per week" : "no data"}${state}">
+    <div class="stat-label">${esc(label)}</div>
+    <div class="stat-value">${has ? perWeek.toFixed(1) : "—"}<span class="unit">/wk</span></div>
+    <div class="stat-sub">${esc(sub)}</div>
+  </div>`;
 }
 
 function boardRow(r, max) {
@@ -288,7 +296,7 @@ function boardRow(r, max) {
   return `<li><a class="item" href="#/member/${r.member.id}" aria-label="${esc(label)}">
     <div class="row">${avatar(r.member)}
       <div style="flex:1;min-width:0"><div class="name">${esc(r.member.name)}</div></div>
-      <div class="counts"><span style="color:var(--text)">${r.trainings}</span> <span class="muted">+</span> <span style="color:var(--text)">${r.workouts}</span></div>
+      <div class="counts"><b>${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b>${r.workouts}</b> <span class="muted">extra</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">
       ${r.trainings ? `<span class="t" style="width:${pct(r.trainings)}%" data-tip="${r.trainings} regular training${r.trainings === 1 ? "" : "s"}"></span>` : ""}

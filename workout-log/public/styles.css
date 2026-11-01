@@ -158,19 +158,26 @@ button:disabled { opacity: .5; cursor: default; }
 /* A month that hasn't started: still tappable, just marked as later */
 .chip.upcoming:not([aria-pressed="true"]) { color: var(--text-2); border: 1px dashed var(--divider); }
 
-/* Team / Individual stat rows */
-.statrow { margin-bottom: 12px; }
-.statrow h3 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
-.tiles.cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; }
-.tiles.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 0; }
-.tiles.cols4 .tile { padding: 10px 8px; }
-.tiles.cols4 .num { font-size: 22px; }
-.tiles.cols4 .lbl { font-size: 12px; line-height: 1.25; }
-.tile .target { font-size: 12px; margin-top: 4px; font-weight: 500; }
-.tile.good { box-shadow: inset 0 0 0 1.5px var(--good); }
-.tile.good .num, .tile.good .target { color: var(--good); }
-.tile.bad { box-shadow: inset 0 0 0 1.5px var(--danger); }
-.tile.bad .num, .tile.bad .target { color: var(--danger); }
+/* Team / You stat rows */
+.range-line { margin: 4px 2px 16px; }
+.statrow { margin-bottom: 16px; }
+.eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); margin: 0 2px 8px;
+}
+.eyebrow span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--card); border-radius: 14px; padding: 14px 16px; }
+.stat-label { font-size: 13px; color: var(--text-2); }
+.stat-value { font-size: 30px; font-weight: 600; line-height: 1.15; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat-value .unit { font-size: 14px; font-weight: 500; color: var(--text-2); margin-left: 3px; }
+.stat-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.stat.good { background: rgba(76, 175, 80, .13); }
+.stat.good .stat-value { color: var(--good); }
+.stat.bad { background: rgba(230, 103, 103, .13); }
+.stat.bad .stat-value { color: var(--danger); }
+.targets { margin: 8px 2px 0; font-size: 12px; }
+.board .counts b { font-weight: 600; color: var(--text); }
 
 /* Pull to refresh (home-screen app) */
 .ptr {
