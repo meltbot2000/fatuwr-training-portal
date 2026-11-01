@@ -109,12 +109,23 @@ const COLUMN_MIGRATIONS = [
   "ALTER TABLE members ADD COLUMN is_admin TINYINT NOT NULL DEFAULT 0",
 ];
 
+// Workout types changed 2026-11-01 (see WORKOUT_TYPES). Idempotent: once no row holds an
+// old value these match nothing. Removed types become "Others" with the old type kept at
+// the front of the notes, so no detail is lost and old rows stay editable.
+const DATA_MIGRATIONS = [
+  "UPDATE workouts SET type = 'Gym/Strength' WHERE type = 'Gym / strength'",
+  "UPDATE workouts SET type = 'Others' WHERE type = 'Other'",
+  `UPDATE workouts SET notes = TRIM(CONCAT('[', type, '] ', COALESCE(notes, ''))), type = 'Others'
+   WHERE type IN ('Fins / underwater', 'Breath-hold', 'Cardio')`,
+];
+
 export async function migrate(): Promise<void> {
   const p = getPool();
   for (const sql of MIGRATIONS) await p.query(sql);
   for (const sql of COLUMN_MIGRATIONS) {
     try { await p.query(sql); } catch (e: any) { if (e?.errno !== 1060) throw e; }
   }
+  for (const sql of DATA_MIGRATIONS) await p.query(sql);
 }
 
 export async function query<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {

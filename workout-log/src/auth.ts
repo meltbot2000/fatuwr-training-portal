@@ -84,6 +84,9 @@ export async function requireViewer(req: Request, res: Response, next: NextFunct
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.viewer?.isAdmin) { res.status(403).json({ error: "admin_only" }); return; }
+  if (!req.viewer?.isAdmin) {
+    res.status(403).json({ error: "admin_only", message: "Only the app's admin can do this. If that's you, sign out and sign back in." });
+    return;
+  }
   next();
 }

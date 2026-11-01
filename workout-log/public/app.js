@@ -18,6 +18,9 @@ async function api(path, { method = "GET", body } = {}) {
   const res = await fetch(`api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && data.error === "not_signed_in") { setToken(null); me = null; location.hash = "#/login"; throw new Error(data.message || "Please sign in."); }
+  // Admin rights changed under a page that was already open: forget the cached "me" so the
+  // next screen re-reads it (and the Admin tab disappears if it no longer applies).
+  if (res.status === 403 && data.error === "admin_only") me = null;
   if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
   return data;
 }
@@ -143,7 +146,9 @@ function renderLogin() {
       const btn = ev.submitter; btn.disabled = true; $("#err").textContent = "";
       try {
         const { token } = await api("/auth/verify", { method: "POST", body: { email, code: $("#code").value.trim() } });
-        setToken(token); me = null; location.hash = "#/";
+        setToken(token); me = null;
+        try { localStorage.setItem("wl_email", email); } catch {}
+        location.hash = "#/";
       } catch (e) { $("#err").textContent = e.message; btn.disabled = false; }
     };
   };
@@ -159,7 +164,8 @@ async function renderDashboard() {
   ]);
   if (!data.competition) {
     view.innerHTML = `<div class="card"><h2>No competition set up yet</h2>
-      <p class="meta">${me.member.isAdmin ? `Create one in <a href="#/admin">Admin</a> and pick the squad.` : "An admin needs to set up the upcoming competition and its squad."}</p></div>`;
+      <p class="meta">${me.member.isAdmin ? `Create one in <a href="#/admin">Admin</a> and pick the squad.` : "An admin needs to set up the upcoming competition and its squad."}</p></div>` + accountFooter();
+    bindSignOut();
     return;
   }
   const c = data.competition;
@@ -195,6 +201,8 @@ async function renderDashboard() {
       <p class="meta" style="margin:8px 0 0">Trainings = portal sessions signed up for, counted from 1 h after the start, when sign-ups end (full rain-offs excluded). Synced ${esc(ago(oldestSync))}.</p>
     </div>`;
 
+  view.insertAdjacentHTML("beforeend", accountFooter());
+  bindSignOut();
   $("#comp")?.addEventListener("change", (e) => { state.competitionId = Number(e.target.value); saveState(); route(); });
   view.querySelectorAll("[data-period]").forEach((b) => (b.onclick = () => { state.period = b.dataset.period; saveState(); route(); }));
   bindTooltips();
@@ -205,7 +213,6 @@ function boardRow(r, max) {
   const types = r.topTypes.map((t) => `${esc(t.type)} ×${t.count}`).join(" · ");
   const bits = [
     r.workouts ? fmtMins(r.workoutMinutes) + " extra" : "",
-    r.avgIntensity != null ? `avg RPE ${r.avgIntensity}` : "",
     r.lastActive ? `last ${fmtDate(r.lastActive)}` : "no activity yet",
   ].filter(Boolean).join(" · ");
   const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} extra workouts`;
@@ -231,6 +238,20 @@ function bindTooltips() {
       tip.style.left = `${x}px`; tip.style.top = `${e.clientY - 36}px`;
     });
     el.addEventListener("pointerleave", () => (tip.hidden = true));
+  });
+}
+
+function accountFooter() {
+  let email = "";
+  try { email = localStorage.getItem("wl_email") || ""; } catch {}
+  return `<p class="meta" style="text-align:center;margin-top:24px">Signed in as ${esc(me.member.name)}${email ? ` (${esc(email)})` : ""}${me.member.isAdmin ? " · admin" : ""}
+    · <button class="link" id="signout" style="font-size:13px">Sign out</button></p>`;
+}
+function bindSignOut() {
+  $("#signout")?.addEventListener("click", () => {
+    setToken(null); me = null;
+    try { localStorage.removeItem("wl_email"); } catch {}
+    location.hash = "#/login";
   });
 }
 
@@ -279,7 +300,7 @@ function trainingItem(t) {
 function workoutItem(w, mine) {
   return `<li><div class="date">${fmtDate(w.date)}</div><div style="flex:1;min-width:0">
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-workout)"></i>Workout</span>
-    <span style="font-size:14px">${esc(w.type)} · ${fmtMins(w.durationMin)}${w.intensity ? ` · RPE ${w.intensity}` : ""}</span></div>
+    <span style="font-size:14px">${esc(w.type)} · ${fmtMins(w.durationMin)}</span></div>
     ${w.notes ? `<div class="notes">${esc(w.notes)}</div>` : ""}
     ${mine ? `<div class="row" style="gap:4px;margin-top:4px"><a href="#/log/${w.id}" class="meta">Edit</a><button class="danger" data-del="${w.id}">Delete</button></div>`
       : me.member.isAdmin ? `<button class="danger" data-del="${w.id}">Delete</button>` : ""}
@@ -295,7 +316,7 @@ async function renderLog(editId) {
   const { workouts } = await api("/workouts");
   const editing = editId ? workouts.find((w) => w.id === Number(editId)) : null;
   if (editId && !editing) throw new Error("Workout not found.");
-  const w = editing || { date: me.today, type: me.workoutTypes[0], durationMin: "", intensity: "", notes: "" };
+  const w = editing || { date: me.today, type: me.workoutTypes[0], durationMin: "", notes: "" };
 
   view.innerHTML = `
     <form id="f" class="card stack">
@@ -305,9 +326,7 @@ async function renderLog(editId) {
         <div><label for="dur">Duration (minutes)</label><input id="dur" type="number" inputmode="numeric" min="1" max="600" required value="${esc(w.durationMin)}"></div>
       </div>
       <div><label for="type">Type</label><select id="type">${me.workoutTypes.map((t) => `<option ${t === w.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
-      <div><label for="rpe">Intensity (RPE 1 = very easy, 10 = max effort) — optional</label>
-        <select id="rpe"><option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map((n) => `<option ${n === w.intensity ? "selected" : ""}>${n}</option>`).join("")}</select></div>
-      <div><label for="notes">Details — optional</label><textarea id="notes" maxlength="2000" placeholder="e.g. 5×5 squats 80kg, 4×25m apnea">${esc(w.notes)}</textarea></div>
+      <div><label for="notes">Details — optional</label><textarea id="notes" maxlength="2000" placeholder="e.g. 5×5 squats 80kg, 5 km easy run">${esc(w.notes)}</textarea></div>
       <p class="error" id="err"></p>
       <button class="full" type="submit">${editing ? "Save changes" : "Log workout"}</button>
       ${editing ? `<a href="#/log" class="meta" style="text-align:center;display:block">Cancel</a>` : ""}
@@ -320,7 +339,7 @@ async function renderLog(editId) {
     ev.preventDefault();
     const btn = ev.submitter; btn.disabled = true; $("#err").textContent = "";
     const body = { date: $("#date").value, type: $("#type").value, durationMin: Number($("#dur").value),
-      intensity: $("#rpe").value ? Number($("#rpe").value) : null, notes: $("#notes").value };
+      notes: $("#notes").value };
     try {
       await api(editing ? `/workouts/${editing.id}` : "/workouts", { method: editing ? "PATCH" : "POST", body });
       toast(editing ? "Workout updated" : "Workout logged");
@@ -338,7 +357,9 @@ async function renderLog(editId) {
 // ── Admin ────────────────────────────────────────────────────────────────────
 async function renderAdmin() {
   if (!me.member.isAdmin) { location.hash = "#/"; return; }
-  const { competitions } = await api("/competitions");
+  const [{ competitions }, { members: syncStatus }] = await Promise.all([api("/competitions"), api("/sync/status")]);
+  // Problems first, then everyone else.
+  const syncRows = [...syncStatus].sort((a, b) => (!!b.error - !!a.error) || a.name.localeCompare(b.name));
   const selected = competitions.find((c) => c.id === state.adminCompId) || competitions[0];
   const [squad, invites] = selected
     ? await Promise.all([api(`/competitions/${selected.id}/squad`).then((r) => r.members), api(`/competitions/${selected.id}/invites`).then((r) => r.invites)])
@@ -386,6 +407,10 @@ async function renderAdmin() {
       <h2>Training data</h2>
       <p class="meta">Attendance is pulled from the portal every 30 minutes and whenever someone signs in. Use this after closing a session if you want it on the dashboard right away.</p>
       <button class="secondary" id="sync">Sync now</button>
+      ${syncRows.length ? `<ul class="timeline">${syncRows.map((m) => `<li><div style="flex:1;min-width:0">
+        <div style="font-size:14px">${esc(m.name)}</div>
+        <div class="meta" ${m.error ? 'style="color:var(--warn)"' : ""}>${m.error ? esc(m.error) : `OK · synced ${esc(ago(m.syncedAt))}`}</div>
+      </div></li>`).join("")}</ul>` : ""}
     </div>`;
 
   $("#newc").onsubmit = async (ev) => {

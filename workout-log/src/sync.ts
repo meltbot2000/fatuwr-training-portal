@@ -59,18 +59,61 @@ export async function replaceTrainingRecords(memberId: number, records: PortalTr
   }
 }
 
-export async function syncMember(memberId: number): Promise<{ ok: boolean; count?: number; error?: string }> {
-  try {
-    const { member, records } = await portal.getTrainings(memberId);
-    await upsertMember(member);
-    await replaceTrainingRecords(memberId, records);
-    return { ok: true, count: records.length };
-  } catch (e: any) {
-    const error = e instanceof PortalError ? `${e.status} ${e.code}` : String(e?.message || e).slice(0, 200);
-    await exec("UPDATE members SET trainings_sync_error = ? WHERE id = ?", [error, memberId]).catch(() => {});
-    console.warn(`[Sync] member ${memberId} failed: ${error}`);
-    return { ok: false, error };
+type SyncResult = { ok: boolean; count?: number; error?: string };
+
+/**
+ * One sync per member at a time. A login sync, an admin "add", the invite matcher and
+ * the 30-min run can all target the same person; two overlapping DELETE+INSERTs of the
+ * same member's rows can deadlock, and the loser was recorded as a sync failure.
+ * Callers that arrive while a sync is running for that member share its result.
+ */
+const inFlight = new Map<number, Promise<SyncResult>>();
+
+export function syncMember(memberId: number): Promise<SyncResult> {
+  const running = inFlight.get(memberId);
+  if (running) return running;
+  const p = syncMemberOnce(memberId).finally(() => inFlight.delete(memberId));
+  inFlight.set(memberId, p);
+  return p;
+}
+
+/** Worth one retry: portal blips/redeploys and MySQL deadlock/lock-wait. */
+export function isTransient(e: any): boolean {
+  if (e instanceof PortalError) return e.status >= 500;
+  return e?.errno === 1213 || e?.errno === 1205;
+}
+
+async function syncMemberOnce(memberId: number): Promise<SyncResult> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { member, records } = await portal.getTrainings(memberId);
+      await upsertMember(member);
+      await replaceTrainingRecords(memberId, records);
+      return { ok: true, count: records.length };
+    } catch (e: any) {
+      if (attempt === 1 && isTransient(e)) { await new Promise(r => setTimeout(r, 2000)); continue; }
+      const error = describeSyncError(e);
+      await exec("UPDATE members SET trainings_sync_error = ? WHERE id = ?", [error, memberId]).catch(() => {});
+      console.warn(`[Sync] member ${memberId} failed: ${error}`, e instanceof PortalError ? "" : e);
+      return { ok: false, error };
+    }
   }
+}
+
+/** Plain-English reason, stored and shown to the admin. Starts with the raw code. */
+export function describeSyncError(e: any): string {
+  if (e instanceof PortalError) {
+    const why: Record<string, string> = {
+      portal_unreachable: "couldn't reach the portal",
+      unauthorized: "portal rejected the API key: PORTAL_API_KEY ≠ portal's WORKOUT_LOG_API_KEY",
+      partner_api_disabled: "WORKOUT_LOG_API_KEY isn't set on the portal",
+      not_found: "no portal account with this id any more",
+      db_unavailable: "portal's database read failed",
+      internal: "portal error (see portal logs: [PartnerAPI])",
+    };
+    return `${e.status} ${e.code}: ${why[e.code] ?? "portal returned an error"}`.slice(0, 250);
+  }
+  return `local: ${String(e?.code || "")} ${String(e?.message || e)}`.trim().slice(0, 250);
 }
 
 export async function activeSquadMemberIds(today = todaySgt()): Promise<number[]> {

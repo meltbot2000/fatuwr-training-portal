@@ -2,7 +2,8 @@
 
 A separate small app for squads preparing for a competition:
 
-- **Log workouts** outside regular training (type, duration, RPE, notes). Only squad members
+- **Log workouts** outside regular training (type: Run, Swim, Gym/Strength, HIIT, Mobility,
+  Others; duration; notes). Only squad members
   of an upcoming competition can log.
 - **Training attendance syncs in automatically** from the portal through its partner API
   (`API.md`).
@@ -34,6 +35,10 @@ Browser ──bearer token──▶ workout-log (Express, this folder) ──▶
 Sync runs every `SYNC_INTERVAL_MINUTES` (default 30) for members of active squads
 (competition date ≥ today − 14 days). It also runs right after a squad member signs in,
 when an admin adds someone, and on the admin "Sync now" button.
+
+**Sync problems** are listed per person, with a plain-English reason, under Admin →
+Training data. Syncs for one person never overlap (they share a run), and a portal blip
+or a database deadlock gets one automatic retry before it is recorded as a failure.
 
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.

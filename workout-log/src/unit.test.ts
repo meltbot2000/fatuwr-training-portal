@@ -50,7 +50,7 @@ describe("buildDashboard", () => {
   const workouts = [
     { member_id: 2, date: "2026-10-03", type: "Swim", duration_min: 45, intensity: 6 },
     { member_id: 2, date: "2026-10-04", type: "Swim", duration_min: 30, intensity: 9 },
-    { member_id: 2, date: "2026-10-05", type: "Gym / strength", duration_min: 60, intensity: null },
+    { member_id: 2, date: "2026-10-05", type: "Gym/Strength", duration_min: 60, intensity: null },
   ];
 
   it("counts per member within the range and ranks by total activity", () => {
@@ -59,7 +59,7 @@ describe("buildDashboard", () => {
     const ben = rows[0];
     expect(ben.workoutMinutes).toBe(135);
     expect(ben.avgIntensity).toBe(7.5);
-    expect(ben.topTypes).toEqual([{ type: "Swim", count: 2 }, { type: "Gym / strength", count: 1 }]);
+    expect(ben.topTypes).toEqual([{ type: "Swim", count: 2 }, { type: "Gym/Strength", count: 1 }]);
     expect(ben.lastActive).toBe("2026-10-05");
     expect(ben.syncError).toBe("502 portal_unreachable");
     expect(rows[2].lastActive).toBeNull();
@@ -68,6 +68,13 @@ describe("buildDashboard", () => {
   it("all-time includes older trainings", () => {
     const rows = buildDashboard(members, trainings, workouts, { from: null, to: "2026-11-01" });
     expect(rows.find(r => r.member.id === 1)!.trainings).toBe(2);
+  });
+});
+
+describe("workout types", () => {
+  it("are exactly the club's list, in order", async () => {
+    const { WORKOUT_TYPES } = await import("./stats");
+    expect([...WORKOUT_TYPES]).toEqual(["Run", "Swim", "Gym/Strength", "HIIT", "Mobility", "Others"]);
   });
 });
 
@@ -81,6 +88,7 @@ describe("workoutInput", () => {
     [{ date: "2026-11-02" }, /future/],
     [{ date: "2026-02-30" }, /real date/],
     [{ type: "Golf" }, /type/],
+    [{ type: "Cardio" }, /type/],         // removed 2026-11-01
     [{ durationMin: 0 }, /durationMin/],
     [{ durationMin: 12.5 }, /durationMin/],
     [{ intensity: 11 }, /intensity/],
@@ -112,5 +120,24 @@ describe("matchInvite", () => {
   });
   it("no match for unknown names", () => {
     expect(matchInvite("Dylia", members)).toEqual([]);
+  });
+});
+
+import { describeSyncError, isTransient } from "./sync";
+import { PortalError } from "./portal";
+
+describe("sync errors", () => {
+  it("retries portal 5xx and MySQL deadlocks, not 4xx", () => {
+    expect(isTransient(new PortalError(502, "portal_unreachable"))).toBe(true);
+    expect(isTransient(new PortalError(503, "db_unavailable"))).toBe(true);
+    expect(isTransient(new PortalError(404, "not_found"))).toBe(false);
+    expect(isTransient(new PortalError(401, "unauthorized"))).toBe(false);
+    expect(isTransient({ errno: 1213 })).toBe(true);
+    expect(isTransient(new Error("boom"))).toBe(false);
+  });
+  it("explains the error in plain English, keeping the raw code", () => {
+    expect(describeSyncError(new PortalError(401, "unauthorized"))).toMatch(/^401 unauthorized: .*PORTAL_API_KEY/);
+    expect(describeSyncError(new PortalError(404, "not_found"))).toMatch(/no portal account/);
+    expect(describeSyncError(Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" }))).toBe("local: ER_LOCK_DEADLOCK Deadlock found");
   });
 });

@@ -5,14 +5,12 @@
 import { addDays } from "./config";
 
 export const WORKOUT_TYPES = [
-  "Gym / strength",
-  "Swim",
-  "Fins / underwater",
-  "Breath-hold",
   "Run",
-  "Cardio",
+  "Swim",
+  "Gym/Strength",
+  "HIIT",
   "Mobility",
-  "Other",
+  "Others",
 ] as const;
 
 export type Period = "all" | "prep" | "4w";

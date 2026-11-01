@@ -222,6 +222,13 @@ export function createApp() {
     res.json(await portal.searchMembers(q));
   }));
 
+  app.get("/api/sync/status", requireAdmin, wrap(async (_req, res) => {
+    const rows = await query<any>(
+      `SELECT m.id, m.name, m.trainings_synced_at, m.trainings_sync_error
+       FROM members m WHERE m.id IN (SELECT member_id FROM squad_members) ORDER BY m.name`);
+    res.json({ members: rows.map(r => ({ id: r.id, name: r.name, syncedAt: r.trainings_synced_at, error: r.trainings_sync_error })) });
+  }));
+
   app.post("/api/sync", requireAdmin, wrap(async (_req, res) => {
     res.json(await syncAll());
   }));
