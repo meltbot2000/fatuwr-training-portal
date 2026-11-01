@@ -175,7 +175,10 @@ export function buildDashboard(
         .slice(0, 3)
         .map(([type, count]) => ({ type, count })),
     }))
+    // Best to worst for the selected period: most sessions overall, then more regular
+    // trainings (the main target), then name so ties stay in a stable order.
     .sort((a, b) =>
       (b.trainings + b.workouts) - (a.trainings + a.workouts) ||
+      b.trainings - a.trainings ||
       a.member.name.localeCompare(b.member.name));
 }

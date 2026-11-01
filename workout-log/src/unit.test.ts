@@ -181,3 +181,18 @@ describe("weekly averages", () => {
     expect(summarise([{ trainings: 1, workouts: 1 }], null).team.avgTrainingsPerWeek).toBeNull();
   });
 });
+
+describe("squad order (best to worst)", () => {
+  it("most sessions first, then more trainings, then name", () => {
+    const m = (id: number, name: string) => ({ id, name, image: null, syncedAt: null, syncError: null });
+    const t = (id: number, n: number) => Array.from({ length: n }, () => ({ member_id: id, date: "2026-11-10" }));
+    const w = (id: number, n: number) => Array.from({ length: n }, () => ({ member_id: id, date: "2026-11-10", type: "Run", duration_min: 30, intensity: null }));
+    const rows = buildDashboard(
+      [m(1, "Zed"), m(2, "Amy"), m(3, "Bea"), m(4, "Cy")],
+      [...t(1, 1), ...t(2, 3), ...t(3, 3)],
+      [...w(1, 3), ...w(2, 1), ...w(3, 1), ...w(4, 1)],
+      { from: "2026-11-01", to: "2026-11-30" });
+    // Zed 1+3=4, Amy 3+1=4, Bea 3+1=4, Cy 0+1=1 → Amy & Bea (3 trainings) before Zed (1), by name
+    expect(rows.map(r => r.member.name)).toEqual(["Amy", "Bea", "Zed", "Cy"]);
+  });
+});

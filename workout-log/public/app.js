@@ -250,7 +250,7 @@ async function renderDashboard() {
     <div class="card">
       <h2 style="margin:0 0 4px">Squad · ${rows.length}</h2>
       <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Extra workouts</span></div>
-      ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
+      ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max, T)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
       <p class="meta" style="margin:8px 0 0">Trainings = portal sessions signed up for, counted from 1 h after the start, when sign-ups end (full rain-offs excluded). Synced ${esc(ago(oldestSync))}.</p>
     </div>`;
 
@@ -285,9 +285,16 @@ function stat(label, perWeek, sub, meets) {
   </div>`;
 }
 
-function boardRow(r, max) {
+function boardRow(r, max, T) {
   const pct = (n) => (n / max) * 100;
   const types = r.topTypes.map((t) => `${esc(t.type)} ×${t.count}`).join(" · ");
+  // Green/red against the same targets as the "You" boxes; plain when there's no
+  // average yet (a period that hasn't started).
+  const mark = (v, ok) => (v === null || v === undefined ? "" : ok(v) ? "ok" : "low");
+  const tCls = mark(r.avgTrainingsPerWeek, (v) => v > T.trainingsPerWeekAbove);
+  const wCls = mark(r.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin);
+  const avgs = r.avgTrainingsPerWeek === null || r.avgTrainingsPerWeek === undefined ? ""
+    : `<span class="${tCls}">${r.avgTrainingsPerWeek.toFixed(1)}</span> trainings/wk · <span class="${wCls}">${r.avgWorkoutsPerWeek.toFixed(1)}</span> extra/wk`;
   const bits = [
     r.workouts ? fmtMins(r.workoutMinutes) + " extra" : "",
     r.lastActive ? `last ${fmtDate(r.lastActive)}` : "no activity yet",
@@ -296,13 +303,13 @@ function boardRow(r, max) {
   return `<li><a class="item" href="#/member/${r.member.id}" aria-label="${esc(label)}">
     <div class="row">${avatar(r.member)}
       <div style="flex:1;min-width:0"><div class="name">${esc(r.member.name)}</div></div>
-      <div class="counts"><b>${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b>${r.workouts}</b> <span class="muted">extra</span></div>
+      <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">extra</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">
       ${r.trainings ? `<span class="t" style="width:${pct(r.trainings)}%" data-tip="${r.trainings} regular training${r.trainings === 1 ? "" : "s"}"></span>` : ""}
       ${r.workouts ? `<span class="w" style="width:${pct(r.workouts)}%" data-tip="${r.workouts} extra workout${r.workouts === 1 ? "" : "s"} · ${fmtMins(r.workoutMinutes)}"></span>` : ""}
     </div>` : ""}
-    <div class="meta sub">${esc(bits)}${types ? `<br>${types}` : ""}${r.syncError ? `<br><span style="color:var(--warn)">training sync failing</span>` : ""}</div>
+    <div class="meta sub">${avgs ? `${avgs}<br>` : ""}${esc(bits)}${types ? `<br>${types}` : ""}${r.syncError ? `<br><span style="color:var(--warn)">training sync failing</span>` : ""}</div>
   </a></li>`;
 }
 

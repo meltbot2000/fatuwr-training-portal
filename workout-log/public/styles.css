@@ -186,3 +186,7 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .ptr span { padding-bottom: 10px; }
 html, body { overscroll-behavior-y: contain; }
+
+/* Squad list: on/below target */
+.board .ok { color: var(--good) !important; font-weight: 600; }
+.board .low { color: var(--danger) !important; font-weight: 600; }
