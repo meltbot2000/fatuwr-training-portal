@@ -49,6 +49,18 @@ elapsed in the period, with a minimum of 1 week.
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.
 
+## On phones (home-screen web app)
+
+- **Staying signed in:** the login token is kept in localStorage *and* in a cookie
+  (path `/amager/`). iOS clears a home-screen app's localStorage after a while, which used
+  to sign people out. The token is now restored from the cookie, the same fix the portal
+  uses. The server only reads the Bearer header, never the cookie.
+- **Getting new versions:** assets are served as `app.js?v=<hash>`. The app asks
+  `/api/version` whenever it's reopened and reloads itself if a new version is live.
+  Pull down at the top of the page to reload by hand (home-screen app only).
+- `manifest.webmanifest` makes "Add to Home Screen" open `/amager/` full-screen with the
+  red icon.
+
 ## Access
 
 Only **squad members** (of any competition) and **this app's admins** can sign in. Admins

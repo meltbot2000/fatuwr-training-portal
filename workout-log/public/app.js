@@ -7,8 +7,37 @@ const TOKEN_KEY = "wl_token";
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
-function setToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {} }
+// The login token lives in localStorage AND in a cookie. iOS clears a home-screen web
+// app's localStorage after a while, which looked like "logged out every time I reopen
+// the app"; the cookie survives that, and the token is restored from it. Same fix the
+// portal uses (client/src/main.tsx). The server never reads the cookie — requests carry
+// the token as a Bearer header — so it adds no CSRF exposure.
+const COOKIE_PATH = new URL(document.baseURI).pathname; // "/amager/"
+const TOKEN_MAX_AGE = 90 * 24 * 60 * 60; // matches the server's token lifetime
+function readTokenCookie() {
+  const m = document.cookie.split("; ").find((c) => c.startsWith(TOKEN_KEY + "="));
+  return m ? decodeURIComponent(m.slice(TOKEN_KEY.length + 1)) : null;
+}
+function writeTokenCookie(t) {
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = t
+    ? `${TOKEN_KEY}=${encodeURIComponent(t)}; Max-Age=${TOKEN_MAX_AGE}; Path=${COOKIE_PATH}; SameSite=Lax${secure}`
+    : `${TOKEN_KEY}=; Max-Age=0; Path=${COOKIE_PATH}; SameSite=Lax${secure}`;
+}
+function getToken() {
+  let t = null;
+  try { t = localStorage.getItem(TOKEN_KEY); } catch {}
+  if (t) return t;
+  t = readTokenCookie();
+  if (t) { try { localStorage.setItem(TOKEN_KEY, t); } catch {} }
+  return t;
+}
+function setToken(t) {
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {}
+  writeTokenCookie(t);
+}
+// Someone signed in before this change only has the localStorage copy — back it up now.
+{ let t = null; try { t = localStorage.getItem(TOKEN_KEY); } catch {} if (t && !readTokenCookie()) writeTokenCookie(t); }
 
 async function api(path, { method = "GET", body } = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -191,9 +220,13 @@ async function renderDashboard() {
         ? `<div class="num">${daysLeft}</div><div class="lbl">${daysLeft === 1 ? "day to go" : "days to go"}</div>`
         : `<div class="lbl">Done</div>`}</div>
     </div>
-    <div class="chips" role="group" aria-label="Period" style="margin-bottom:12px">
-      ${data.periods.map((o) => `<button class="chip${o.upcoming ? " upcoming" : ""}" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}">${esc(o.label)}</button>`).join("")}
-    </div>
+    ${(() => {
+      const chip = (o) => `<button class="chip${o.upcoming ? " upcoming" : ""}" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}">${esc(o.label)}</button>`;
+      const isMonth = (o) => /^\d{4}-\d{2}$/.test(o.key);
+      const months = data.periods.filter(isMonth);
+      return `<div class="chips" role="group" aria-label="Period" style="margin-bottom:8px">${data.periods.filter((o) => !isMonth(o)).map(chip).join("")}</div>
+        ${months.length ? `<div class="chips" role="group" aria-label="Month" style="margin-bottom:12px">${months.map(chip).join("")}</div>` : ""}`;
+    })()}
     ${data.weeks === null ? `<div class="banner" style="background:var(--card);color:var(--text-2)">This period starts ${fmtDate(data.range.from, true)}. Nothing to show yet.</div>` : ""}
     <div class="statrow">
       <h3>Team <span class="meta">· per person, ${esc(rangeText)}</span></h3>
@@ -515,5 +548,60 @@ async function renderAdmin() {
     }, 250);
   };
 }
+
+// ── Staying up to date ───────────────────────────────────────────────────────
+// A home-screen web app has no refresh button. Two ways it gets new code and data:
+// 1. Pull down at the top of the page to reload (home-screen app only; a browser tab
+//    has its own pull-to-refresh).
+// 2. When the app is reopened, it asks the server which version is live and reloads
+//    itself if that has changed since it loaded.
+const LOADED_VERSION = document.querySelector('meta[name="app-version"]')?.content || "";
+const isStandalone = () => window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+
+async function checkForUpdate() {
+  if (!LOADED_VERSION) return;
+  try {
+    const { version } = await (await fetch("api/version", { cache: "no-store" })).json();
+    if (version && version !== LOADED_VERSION) location.reload();
+  } catch {}
+}
+let lastCheck = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (Date.now() - lastCheck < 30_000) return;
+  lastCheck = Date.now();
+  checkForUpdate();
+  if (getToken() && me) route(); // fresh numbers too
+});
+
+(function pullToRefresh() {
+  if (!isStandalone()) return;
+  const ptr = $("#ptr"), label = $("#ptr-label");
+  const THRESHOLD = 70;
+  let startY = null, pull = 0;
+  window.addEventListener("touchstart", (e) => {
+    startY = window.scrollY <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
+    pull = 0;
+  }, { passive: true });
+  window.addEventListener("touchmove", (e) => {
+    if (startY === null) return;
+    pull = Math.max(0, e.touches[0].clientY - startY);
+    if (pull <= 0) { ptr.style.height = "0px"; return; }
+    const h = Math.min(90, pull * 0.6);
+    ptr.style.height = `${h}px`;
+    label.textContent = pull > THRESHOLD ? "Release to refresh" : "Pull to refresh";
+  }, { passive: true });
+  window.addEventListener("touchend", () => {
+    if (startY === null) return;
+    startY = null;
+    if (pull > THRESHOLD) {
+      label.textContent = "Refreshing…";
+      ptr.style.height = "44px";
+      location.reload();
+    } else {
+      ptr.style.height = "0px";
+    }
+  });
+})();
 
 route();

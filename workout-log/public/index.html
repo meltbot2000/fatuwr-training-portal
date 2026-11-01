@@ -10,10 +10,16 @@
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Comp Prep">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar"><h1 id="title">Comp Prep</h1></header>
+  <div id="ptr" class="ptr" aria-hidden="true"><span id="ptr-label">Pull to refresh</span></div>
   <main id="view" aria-live="polite"></main>
   <nav class="bottomnav" id="nav" hidden>
     <a href="#/" data-tab="dashboard">Dashboard</a>

@@ -1,4 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from "express";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -72,6 +73,25 @@ export function createApp() {
     try { await getPool().query("SELECT 1"); res.json({ status: "ok" }); }
     catch { res.status(503).json({ status: "db_unreachable" }); }
   }));
+
+  // Public: lets an open (or reopened) app notice it's out of date and reload.
+  app.get("/api/version", (_req, res) => { res.json({ version: frontendVersion() }); });
+
+  // Web app manifest: "Add to Home Screen" opens the comp-prep app full-screen, at
+  // /amager/, with the red icon.
+  app.get("/manifest.webmanifest", (req, res) => {
+    const base = req.baseUrl; // "/amager" when mounted under the prefix
+    res.type("application/manifest+json").setHeader("Cache-Control", "no-cache");
+    res.json({
+      name: "FATUWR Comp Prep", short_name: "Comp Prep",
+      start_url: `${base}/`, scope: `${base}/`, display: "standalone",
+      background_color: "#111111", theme_color: "#111111",
+      icons: [
+        { src: `${base}/icon-512.png`, sizes: "512x512", type: "image/png" },
+        { src: `${base}/apple-touch-icon.png`, sizes: "180x180", type: "image/png" },
+      ],
+    });
+  });
 
   // ── Login (relayed to the portal) ─────────────────────────────────────────────
   app.post("/api/auth/send", wrap(async (req, res) => {
@@ -361,6 +381,21 @@ export function createApp() {
   return app;
 }
 
+// ── Frontend version ──────────────────────────────────────────────────────────
+// A hash of the shipped frontend files. Assets are requested as app.js?v=<hash>, so any
+// page load after a deploy fetches the new code (a home-screen web app otherwise keeps
+// running the old one), and the app compares it with /api/version when reopened.
+const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+let _version: string | null = null;
+export function frontendVersion(): string {
+  if (_version) return _version;
+  const h = createHash("sha256");
+  for (const f of ["index.html", "app.js", "styles.css"]) {
+    try { h.update(fs.readFileSync(path.join(publicDir, f))); } catch { /* tests: no files */ }
+  }
+  return (_version = h.digest("hex").slice(0, 12));
+}
+
 /**
  * Static frontend. Kept out of createApp so tests don't need the files.
  *
@@ -369,15 +404,18 @@ export function createApp() {
  * through Railway's Fastly edge (portal SYSTEM.md §3).
  */
 export function serveFrontend(app: express.Express, basePath: string) {
-  const here = path.dirname(fileURLToPath(import.meta.url));
   // dist/index.js → ../public ; src/app.ts (dev) → ../public
-  const publicDir = path.resolve(here, "..", "public");
   const noCache = (res: Response) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Surrogate-Control", "no-store");
   };
+  const v = frontendVersion();
   const indexHtml = fs.readFileSync(path.join(publicDir, "index.html"), "utf8")
-    .replace('<base href="/">', `<base href="${basePath}/">`);
+    .replace('<base href="/">', `<base href="${basePath}/">`)
+    .replace('href="styles.css"', `href="styles.css?v=${v}"`)
+    .replace('src="app.js"', `src="app.js?v=${v}"`)
+    .replace('</head>', `  <meta name="app-version" content="${v}">\n</head>`)
+    .replace(/__BASE__/g, basePath);
   app.use(express.static(publicDir, { index: false, setHeaders: noCache }));
   app.get("*", (_req, res) => { noCache(res); res.type("html").send(indexHtml); });
 }
