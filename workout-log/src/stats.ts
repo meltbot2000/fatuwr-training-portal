@@ -13,15 +13,64 @@ export const WORKOUT_TYPES = [
   "Others",
 ] as const;
 
-export type Period = "all" | "prep" | "4w";
-export const PERIODS: Period[] = ["all", "prep", "4w"];
+/**
+ * Dashboard periods (the chips):
+ *   "prep"     since the competition's prep start   (default)
+ *   "year"     since 1 Jan of the prep-start year    ("Since 2026")
+ *   "YYYY-MM"  one calendar month, for every month from the prep-start month up to the
+ *              month BEFORE the competition (Amager Cup: Nov, Dec, Jan, Feb, Mar).
+ *              Months that haven't started yet are listed but disabled.
+ */
+export type Period = string;
+export const DEFAULT_PERIOD = "prep";
 
 export interface Range { from: string | null; to: string }
+export interface PeriodOption { key: string; label: string; disabled: boolean }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_KEY = /^(\d{4})-(\d{2})$/;
+
+function monthKeys(prepStart: string, competitionDate: string): string[] {
+  const keys: string[] = [];
+  let [y, m] = prepStart.slice(0, 7).split("-").map(Number);
+  const end = competitionDate.slice(0, 7);
+  for (let i = 0; i < 24; i++) {
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    if (key >= end) break;
+    keys.push(key);
+    m === 12 ? (y++, m = 1) : m++;
+  }
+  return keys;
+}
+
+export function periodOptions(prepStart: string, competitionDate: string, today: string): PeriodOption[] {
+  return [
+    { key: "prep", label: "Since prep start", disabled: false },
+    { key: "year", label: `Since ${prepStart.slice(0, 4)}`, disabled: false },
+    ...monthKeys(prepStart, competitionDate).map(k => ({
+      key: k,
+      label: MONTHS[Number(k.slice(5)) - 1],
+      disabled: `${k}-01` > today,
+    })),
+  ];
+}
+
+/** A requested period if it is one of the (enabled) options, else the default. */
+export function parsePeriod(v: unknown, options: PeriodOption[]): Period {
+  const hit = options.find(o => o.key === String(v ?? ""));
+  return hit && !hit.disabled ? hit.key : DEFAULT_PERIOD;
+}
 
 export function periodRange(period: Period, today: string, prepStart: string): Range {
-  if (period === "prep") return { from: prepStart, to: today };
-  if (period === "4w") return { from: addDays(today, -27), to: today }; // 28 days incl. today
-  return { from: null, to: today };
+  if (period === "year") return { from: `${prepStart.slice(0, 4)}-01-01`, to: today };
+  const m = MONTH_KEY.exec(period);
+  if (m) {
+    const [y, mo] = [Number(m[1]), Number(m[2])];
+    const next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    const last = addDays(next, -1);
+    return { from: `${period}-01`, to: last < today ? last : today };
+  }
+  return { from: prepStart, to: today }; // "prep"
 }
 
 export const inRange = (date: string, r: Range) => (!r.from || date >= r.from) && date <= r.to;

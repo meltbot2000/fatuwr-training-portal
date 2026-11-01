@@ -8,7 +8,7 @@ A separate small app for squads preparing for a competition:
 - **Training attendance syncs in automatically** from the portal through its partner API
   (`API.md`).
 - **Dashboard** for the squad: each squad member's regular trainings and
-  extra workouts, with All time / Since prep start / Last 4 weeks views, plus a per-person
+  extra workouts, with Since prep start (default) / Since <prep-start year> / one chip per month from prep start up to the competition month, plus a per-person
   timeline with workout details.
 - **Admin** (only the login emails in `ADMIN_EMAILS`, default `tanmelanie@gmail.com`;
   **not** the portal's Admin role): create competitions (name, prep start, competition

@@ -6,7 +6,7 @@ import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, inRange, periodRange, PERIODS, WORKOUT_TYPES, type Period } from "./stats";
+import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -277,13 +277,13 @@ export function createApp() {
   }));
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
-  const parsePeriod = (v: unknown): Period => (PERIODS as string[]).includes(String(v)) ? (v as Period) : "all";
 
   app.get("/api/dashboard", wrap(async (req, res) => {
     const today = todaySgt();
     const comp = req.query.competitionId ? await getCompetition(req.query.competitionId) : await defaultCompetition(today);
     if (!comp) { res.json({ competition: null, rows: [] }); return; }
-    const period = parsePeriod(req.query.period);
+    const periods = periodOptions(comp.start_date, comp.competition_date, today);
+    const period = parsePeriod(req.query.period, periods);
     const range = periodRange(period, today, comp.start_date);
 
     const members = await query<any>(
@@ -300,7 +300,7 @@ export function createApp() {
     const rows = buildDashboard(
       members.map(m => ({ id: m.id, name: m.name, image: m.image, syncedAt: m.trainings_synced_at, syncError: m.trainings_sync_error })),
       trainings, workouts, range);
-    res.json({ competition: competitionDto(comp), period, range, today, rows });
+    res.json({ competition: competitionDto(comp), periods, period, range, today, rows });
   }));
 
   // Per-person detail behind a dashboard row: every training and workout in the period.
@@ -310,8 +310,10 @@ export function createApp() {
     if (!m) throw new NotFound("member not found");
     const today = todaySgt();
     const comp = req.query.competitionId ? await getCompetition(req.query.competitionId) : await defaultCompetition(today);
-    const period = parsePeriod(req.query.period);
-    const range = periodRange(period, today, comp?.start_date ?? addDays(today, -27));
+    const prepStart = comp?.start_date ?? addDays(today, -27);
+    const periods = periodOptions(prepStart, comp?.competition_date ?? today, today);
+    const period = parsePeriod(req.query.period, periods);
+    const range = periodRange(period, today, prepStart);
     const [trainings, workouts] = await Promise.all([
       query("SELECT * FROM training_records WHERE member_id = ? ORDER BY date DESC", [id]),
       query("SELECT * FROM workouts WHERE member_id = ? ORDER BY date DESC, id DESC", [id]),
@@ -319,7 +321,7 @@ export function createApp() {
     res.json({
       member: { id: m.id, name: m.name, image: m.image },
       syncedAt: m.trainings_synced_at, syncError: m.trainings_sync_error,
-      period, range,
+      period, periodLabel: periods.find(o => o.key === period)?.label ?? "", range,
       trainings: trainings.filter((t: any) => inRange(t.date, range)).map(trainingDto),
       workouts: workouts.filter((w: any) => inRange(w.date, range)).map(workoutDto),
     });

@@ -58,11 +58,13 @@ function avatar(m) {
 }
 
 let me = null;
-const state = { competitionId: null, period: "all" };
+const state = { competitionId: null, period: "prep" };
 try { Object.assign(state, JSON.parse(localStorage.getItem("wl_view") || "{}")); } catch {}
+// Old saved choices ("all", "4w") no longer exist — the server would fall back anyway,
+// but reset here so the highlighted chip and the data always agree.
+if (state.period === "all" || state.period === "4w") state.period = "prep";
 const saveState = () => { try { localStorage.setItem("wl_view", JSON.stringify(state)); } catch {} };
 
-const PERIOD_LABELS = { all: "All time", prep: "Since prep start", "4w": "Last 4 weeks" };
 
 // ── Router ───────────────────────────────────────────────────────────────────
 const routes = [
@@ -169,6 +171,7 @@ async function renderDashboard() {
     return;
   }
   const c = data.competition;
+  if (data.period !== state.period) { state.period = data.period; saveState(); }
   const daysLeft = daysBetween(data.today, c.competitionDate);
   const rows = data.rows;
   const totT = rows.reduce((a, r) => a + r.trainings, 0);
@@ -191,7 +194,7 @@ async function renderDashboard() {
       <div class="tile"><div class="num">${totW}</div><div class="lbl">extra workouts</div></div>
     </div>
     <div class="chips" role="group" aria-label="Period" style="margin-bottom:12px">
-      ${Object.entries(PERIOD_LABELS).map(([k, v]) => `<button class="chip" data-period="${k}" aria-pressed="${k === data.period}">${v}</button>`).join("")}
+      ${data.periods.map((o) => `<button class="chip" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}" ${o.disabled ? 'disabled title="Not started yet"' : ""}>${esc(o.label)}</button>`).join("")}
     </div>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
@@ -269,7 +272,7 @@ async function renderMember(id) {
 
   view.innerHTML = `
     <div class="card row">${avatar(d.member)}<div><div class="name" style="font-weight:500">${esc(d.member.name)}</div>
-      <div class="meta">${esc(PERIOD_LABELS[d.period])}${d.range.from ? ` · from ${fmtDate(d.range.from, true)}` : ""}</div></div></div>
+      <div class="meta">${esc(d.periodLabel)} · ${fmtDate(d.range.from, true)} – ${fmtDate(d.range.to, true)}</div></div></div>
     <div class="tiles">
       <div class="tile"><div class="num">${d.trainings.length}</div><div class="lbl">trainings</div></div>
       <div class="tile"><div class="num">${d.workouts.length}</div><div class="lbl">extra workouts</div></div>

@@ -135,3 +135,4 @@ button:disabled { opacity: .5; cursor: default; }
   .bar .t { background: CanvasText; }
   .bar .w { background: repeating-linear-gradient(45deg, CanvasText 0 2px, Canvas 2px 5px); }
 }
+.chip:disabled { opacity: .4; cursor: default; }

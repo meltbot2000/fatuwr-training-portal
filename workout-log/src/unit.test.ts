@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { issueToken, verifyToken } from "./auth";
 import { addDays, todaySgt } from "./config";
-import { buildDashboard, periodRange } from "./stats";
+import { buildDashboard, parsePeriod, periodOptions, periodRange } from "./stats";
 import { BadRequest, workoutInput } from "./validate";
 
 const SECRET = "x".repeat(40);
@@ -30,9 +30,21 @@ describe("dates", () => {
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
   });
   it("builds period ranges", () => {
-    expect(periodRange("all", "2026-11-01", "2026-09-01")).toEqual({ from: null, to: "2026-11-01" });
-    expect(periodRange("prep", "2026-11-01", "2026-09-01")).toEqual({ from: "2026-09-01", to: "2026-11-01" });
-    expect(periodRange("4w", "2026-11-01", "2026-09-01")).toEqual({ from: "2026-10-05", to: "2026-11-01" });
+    expect(periodRange("prep", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-11-01", to: "2026-12-15" });
+    expect(periodRange("year", "2027-02-03", "2026-11-01")).toEqual({ from: "2026-01-01", to: "2027-02-03" });
+    expect(periodRange("2026-11", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+    expect(periodRange("2026-12", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-12-01", to: "2026-12-15" }); // capped at today
+    expect(periodRange("2027-02", "2027-03-30", "2026-11-01")).toEqual({ from: "2027-02-01", to: "2027-02-28" });
+    expect(periodRange("2026-12", "2027-03-30", "2026-11-01").to).toBe("2026-12-31");             // year rollover
+  });
+  it("offers Since prep start, Since <year>, then Nov–Mar for the Amager Cup", () => {
+    const opts = periodOptions("2026-11-01", "2027-04-10", "2026-12-02");
+    expect(opts.map(o => o.label)).toEqual(["Since prep start", "Since 2026", "Nov", "Dec", "Jan", "Feb", "Mar"]);
+    expect(opts.filter(o => o.disabled).map(o => o.label)).toEqual(["Jan", "Feb", "Mar"]);
+    expect(parsePeriod("2026-12", opts)).toBe("2026-12");
+    expect(parsePeriod("2027-02", opts)).toBe("prep"); // not started yet
+    expect(parsePeriod("all", opts)).toBe("prep");     // retired choice
+    expect(parsePeriod(undefined, opts)).toBe("prep");
   });
 });
 
