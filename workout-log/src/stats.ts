@@ -182,3 +182,65 @@ export function buildDashboard(
       b.trainings - a.trainings ||
       a.member.name.localeCompare(b.member.name));
 }
+
+// ── Puff ─────────────────────────────────────────────────────────────────────────
+/**
+ * Puff's mood = how the whole squad did over the LAST 7 DAYS (rolling, so Puff doesn't
+ * fall asleep every Monday): sessions logged ÷ team goal, where the goal is 4 per person
+ * a week — 3 regular trainings (the "above 2" target) + 1 extra workout.
+ */
+export const PUFF = {
+  windowDays: 7,
+  trainingsPerPerson: 3,
+  workoutsPerPerson: 1,
+  // mood thresholds on sessions ÷ goal
+  moods: [
+    { key: "snoozing", label: "Snoozing", from: 0 },
+    { key: "cruising", label: "Cruising", from: 0.4 },
+    { key: "puffed", label: "Puffed up!", from: 0.8 },
+    { key: "sparkly", label: "Sparkly!", from: 1 },
+  ],
+} as const;
+
+export interface PuffFish {
+  id: number; name: string; image: string | null;
+  trainings: number; workouts: number; sessions: number;
+  /** 0 nothing yet · 1 some sessions · 2 met both weekly targets */
+  status: 0 | 1 | 2;
+  /** 0 = least active … n-1 = most active; the tank places fish left → right by this */
+  rank: number;
+}
+
+export function puffSummary(
+  members: { id: number; name: string; image: string | null }[],
+  trainings: TrainingLite[],
+  workouts: { member_id: number; date: string }[],
+  today: string,
+) {
+  const from = addDays(today, -(PUFF.windowDays - 1));
+  const win = { from, to: today };
+  const fish = members.map(m => {
+    const t = trainings.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
+    const w = workouts.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
+    const met = t >= PUFF.trainingsPerPerson && w >= PUFF.workoutsPerPerson;
+    return { id: m.id, name: m.name, image: m.image, trainings: t, workouts: w, sessions: t + w,
+             status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0 };
+  });
+  // Least → most: status first (glowing fish end up furthest right), then sessions, then
+  // trainings; name keeps ties stable.
+  [...fish]
+    .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings || b.name.localeCompare(a.name))
+    .forEach((f, i) => { f.rank = i; });
+
+  const goal = members.length * (PUFF.trainingsPerPerson + PUFF.workoutsPerPerson);
+  const sessions = fish.reduce((a, f) => a + f.sessions, 0);
+  const pct = goal ? sessions / goal : 0;
+  const mood = [...PUFF.moods].reverse().find(m => pct >= m.from)!;
+  return {
+    window: win, goal, sessions, pct: Math.round(pct * 100) / 100,
+    mood: mood.key, moodLabel: mood.label,
+    metCount: fish.filter(f => f.status === 2).length,
+    thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),
+    fish,
+  };
+}

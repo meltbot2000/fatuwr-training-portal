@@ -7,7 +7,7 @@ import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, perWeek, summarise, TARGETS, weeksElapsed, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, TARGETS, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -297,6 +297,24 @@ export function createApp() {
   }));
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
+
+  // Puff tab: the team's mood over the last 7 days + the tank.
+  app.get("/api/puff", wrap(async (req, res) => {
+    const today = todaySgt();
+    const comp = req.query.competitionId ? await getCompetition(req.query.competitionId) : await defaultCompetition(today);
+    if (!comp) { res.json({ competition: null }); return; }
+    const members = await query<any>(
+      `SELECT m.id, m.name, m.image FROM squad_members s JOIN members m ON m.id = s.member_id WHERE s.competition_id = ?`, [comp.id]);
+    const ids = members.map(m => m.id);
+    const from = addDays(today, -(PUFF.windowDays - 1));
+    const [trainings, workouts] = ids.length
+      ? await Promise.all([
+          query<any>("SELECT member_id, date FROM training_records WHERE member_id IN (?) AND date >= ?", [ids, from]),
+          query<any>("SELECT member_id, date FROM workouts WHERE member_id IN (?) AND date >= ?", [ids, from]),
+        ])
+      : [[], []];
+    res.json({ competition: competitionDto(comp), today, ...puffSummary(members, trainings, workouts, today) });
+  }));
 
   app.get("/api/dashboard", wrap(async (req, res) => {
     const today = todaySgt();

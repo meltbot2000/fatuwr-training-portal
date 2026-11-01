@@ -99,6 +99,7 @@ const saveState = () => { try { localStorage.setItem("wl_view", JSON.stringify(s
 const routes = [
   [/^#\/login$/, renderLogin, "Sign in"],
   [/^#\/?$/, renderDashboard, "Comp Prep"],
+  [/^#\/puff$/, renderPuff, "Puff"],
   [/^#\/member\/(\d+)$/, renderMember, "Activity"],
   [/^#\/log$/, renderLog, "Log workout"],
   [/^#\/log\/(\d+)$/, renderLog, "Edit workout"],
@@ -120,7 +121,7 @@ async function route() {
     $("#nav-admin").hidden = !me.member.isAdmin;
     $("#nav-log").hidden = !me.canLog;
   }
-  const tab = hash.startsWith("#/log") ? "log" : hash.startsWith("#/admin") ? "admin" : "dashboard";
+  const tab = hash.startsWith("#/log") ? "log" : hash.startsWith("#/admin") ? "admin" : hash.startsWith("#/puff") ? "puff" : "dashboard";
   nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.tab === tab));
 
   for (const [re, fn, title] of routes) {
@@ -349,6 +350,93 @@ function bindSignOut() {
   });
 }
 
+// ── Puff ────────────────────────────────────────────────────────────────────
+const puffImg = (name, size, cls = "") =>
+  `<img class="puff-img ${cls}" src="puff/puff-${name}.webp" width="${size}" height="${size}" alt="" draggable="false">`;
+
+async function renderPuff() {
+  const d = await api(`/puff${state.competitionId ? `?competitionId=${state.competitionId}` : ""}`);
+  if (!d.competition) {
+    view.innerHTML = `<div class="card"><h2>No competition set up yet</h2><p class="meta">Puff wakes up once there's a squad.</p></div>`;
+    return;
+  }
+  const pct = Math.round(d.pct * 100);
+  const text = {
+    snoozing: "Puff is dozing off.",
+    cruising: "Puff is cruising along.",
+    puffed: "Puff is puffed up and happy.",
+    sparkly: "Target smashed. Puff is glowing!",
+  }[d.mood];
+  const n = d.fish.length;
+  const bubbles = Array.from({ length: 8 }, (_, i) =>
+    `<span class="bubble-dot" style="left:${8 + i * 12}%;animation-duration:${5 + (i % 4) * 1.7}s;animation-delay:-${i * 1.3}s"></span>`).join("");
+
+  view.innerHTML = `
+    <section class="card puff-card">
+      <p class="eyebrow">Puff · last 7 days</p>
+      <div class="puff-stage">${bubbles}
+        <div class="puff-wrap ${d.mood}"><div class="puff-bob">${puffImg(d.mood, 200)}</div></div>
+      </div>
+      <div class="mood-line"><div class="mood-name cute">${esc(d.moodLabel)}</div><div class="mood-pct">${pct}%</div></div>
+      <p class="meta">${esc(text)} The squad has done ${d.sessions} of ${d.goal} sessions in the last 7 days.</p>
+      <div>
+        <div class="meter" aria-hidden="true"><i style="width:${Math.min(100, pct)}%"></i>
+          ${d.thresholds.slice(1, 3).map((t) => `<span class="tick" style="left:${t.from * 100}%"></span>`).join("")}</div>
+        <div class="meter-labels" aria-hidden="true">${d.thresholds.slice(1).map((t) => `<span style="left:${t.from === 1 ? "calc(100% - 14px)" : t.from * 100 + "%"}">${t.from * 100}%</span>`).join("")}</div>
+      </div>
+      <div class="moods">${d.thresholds.map((t, i) => {
+        const next = d.thresholds[i + 1];
+        const range = next ? (t.from === 0 ? `under ${next.from * 100}%` : `${t.from * 100}–${next.from * 100 - 1}%`) : `${t.from * 100}%+`;
+        return `<div class="${t.key === d.mood ? "on" : ""}">${puffImg(t.key, 52)}${esc(t.label.replace("!", ""))}<br>${range}</div>`;
+      }).join("")}</div>
+      <p class="rule"><b>How Puff's mood works:</b> sessions the squad logged in the last 7 days ÷ the team goal of 4 per person (3 trainings + 1 extra workout). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
+      ${me.canLog ? `<a class="btn full" href="#/log" style="text-align:center;text-decoration:none">+ Log a workout</a>` : ""}
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">The tank · last 7 days</p>
+      <div class="tank" id="tank">
+        ${d.fish.map((f) => {
+          const x = n > 1 ? 9 + (f.rank * 82) / (n - 1) : 50;     // most active → furthest right
+          const band = f.status === 2 ? [13, 29] : f.status === 1 ? [44, 58] : [74, 84];
+          const y = band[f.rank % 2];
+          const size = 38 + Math.min(f.sessions, 6) * 3;
+          const sprite = f.status === 2 ? "puffed" : f.status === 1 ? "small" : "snoozing";
+          const isMe = f.id === me.member.id;
+          const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} extra in the last 7 days${f.status === 2 ? ", met both targets" : ""}`;
+          return `<button type="button" class="fish s${f.status}${isMe ? " me" : ""}" style="left:${x}%;top:${y}%"
+              data-tip="${esc(`${f.name} · ${f.trainings} trainings, ${f.workouts} extra${f.status === 2 ? " ✓" : ""}`)}" aria-label="${esc(label)}">
+            <span class="swim" style="animation-duration:${3 + (f.rank % 4) * 0.9}s;animation-delay:-${f.rank * 0.7}s">${puffImg(sprite, size)}</span>
+            <span class="nm">${isMe ? "You" : esc(f.name.split(" ")[0])}</span></button>`;
+        }).join("")}
+        <div class="fish-tip" id="fishTip" hidden></div>
+      </div>
+      <div class="legend3">
+        <div><b>Top right, glowing</b>Met both targets</div>
+        <div><b>Swimming</b>Some sessions</div>
+        <div><b>Dozing on the sand</b>Nothing yet</div>
+      </div>
+      <p class="meta">The further right, the more someone has done this week. Tap a fish to see who it is.</p>
+    </section>`;
+
+  const tip = $("#fishTip");
+  view.querySelectorAll(".fish").forEach((b) => (b.onclick = () => {
+    tip.textContent = b.dataset.tip; tip.hidden = false;
+    clearTimeout(tip._t); tip._t = setTimeout(() => (tip.hidden = true), 2600);
+  }));
+}
+
+/** After logging a workout: Puff pops up and wiggles. */
+function celebrate() {
+  const el = document.createElement("div");
+  el.className = "celebrate";
+  el.setAttribute("role", "status");
+  el.innerHTML = `${puffImg("wiggle", 150, "wiggle")}<div class="cute">Workout logged!</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add("out"), 1300);
+  setTimeout(() => el.remove(), 1700);
+}
+
 // ── Member detail ────────────────────────────────────────────────────────────
 async function renderMember(id) {
   const q = new URLSearchParams({ ...(state.competitionId ? { competitionId: state.competitionId } : {}), period: state.period });
@@ -436,7 +524,7 @@ async function renderLog(editId) {
       notes: $("#notes").value };
     try {
       await api(editing ? `/workouts/${editing.id}` : "/workouts", { method: editing ? "PATCH" : "POST", body });
-      toast(editing ? "Workout updated" : "Workout logged");
+      if (editing) toast("Workout updated"); else celebrate();
       if (editing) location.hash = "#/log"; else route();
     } catch (e) { $("#err").textContent = e.message; btn.disabled = false; }
   };

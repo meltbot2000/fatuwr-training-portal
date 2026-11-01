@@ -49,6 +49,18 @@ elapsed in the period, with a minimum of 1 week.
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.
 
+## Puff tab
+
+The second tab. **Puff** (artwork in `public/puff/`, see `design/README.md`) shows the
+whole squad's mood over the **last 7 days, rolling**: sessions logged (regular trainings
+plus extra workouts) ÷ a team goal of 4 per person (3 trainings + 1 extra). Under 40% is
+snoozing, 40–79% cruising, 80–99% puffed up, 100%+ sparkly (`PUFF` in `src/stats.ts`).
+
+**The tank:** one fish per squad member. Glowing and puffed means they met both weekly
+targets, small and swimming means some sessions, and dozing on the sand means none yet.
+Fish are placed left to right from least to most active, so the glowing ones end up top
+right. Saving a workout shows a wiggling Puff.
+
 ## On phones (home-screen web app)
 
 - **Staying signed in:** the login token is kept in localStorage *and* in a cookie

@@ -196,3 +196,37 @@ describe("squad order (best to worst)", () => {
     expect(rows.map(r => r.member.name)).toEqual(["Amy", "Bea", "Zed", "Cy"]);
   });
 });
+
+import { puffSummary } from "./stats";
+
+describe("Puff", () => {
+  const today = "2026-12-13";
+  const m = (id: number, name: string) => ({ id, name, image: null });
+  const tr = (id: number, n: number, date = today) => Array.from({ length: n }, () => ({ member_id: id, date }));
+  const squad = [m(1, "Ann"), m(2, "Bo"), m(3, "Cy"), m(4, "Di")];
+
+  it("mood = sessions in the last 7 days ÷ 4 per person", () => {
+    // goal 16. Ann 3t+1w (met) · Bo 2t · Cy 1w · Di nothing → 7 sessions = 44% → cruising
+    const s = puffSummary(squad, [...tr(1, 3), ...tr(2, 2)], [...tr(1, 1), ...tr(3, 1)], today);
+    expect([s.goal, s.sessions, s.pct, s.mood]).toEqual([16, 7, 0.44, "cruising"]);
+    expect(s.metCount).toBe(1);
+  });
+  it("only counts the rolling 7-day window", () => {
+    const s = puffSummary(squad, [...tr(1, 5, "2026-12-06"), ...tr(1, 1, "2026-12-07")], [], today);
+    expect(s.sessions).toBe(1); // 6 Dec is 8 days ago
+    expect(s.window).toEqual({ from: "2026-12-07", to: today });
+  });
+  it("thresholds: <40% snoozing, 40–79 cruising, 80–99 puffed, 100+ sparkly", () => {
+    const at = (n: number) => puffSummary([m(1, "A")], tr(1, n), [], today).mood;   // goal 4
+    expect([at(1), at(2), at(3), at(4), at(6)]).toEqual(["snoozing", "cruising", "cruising", "sparkly", "sparkly"]);
+    expect(puffSummary([m(1, "A"), m(2, "B"), m(3, "C"), m(4, "D"), m(5, "E")], tr(1, 17), [], today).mood).toBe("puffed"); // 17/20 = 85%
+  });
+  it("tank order: glowing fish furthest right, then by sessions", () => {
+    const s = puffSummary(squad,
+      [...tr(1, 3), ...tr(2, 4), ...tr(3, 1)],      // Ann 3t, Bo 4t (no extra → not met), Cy 1t
+      [...tr(1, 1)],                                  // Ann met both
+      today);
+    const byRank = [...s.fish].sort((a, b) => a.rank - b.rank).map(f => `${f.name}:${f.status}`);
+    expect(byRank).toEqual(["Di:0", "Cy:1", "Bo:1", "Ann:2"]);
+  });
+});
