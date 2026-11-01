@@ -280,7 +280,7 @@ export function createApp() {
 
   app.patch("/api/workouts/:id", wrap(async (req, res) => {
     const w = await ownWorkout(req);
-    if (w.member_id !== req.viewer!.id) throw new Forbidden("you can only edit your own workouts");
+    if (w.member_id !== req.viewer!.id) throw new Forbidden("You can only edit your own workouts.");
     const input = workoutInput(req.body, todaySgt());
     await exec("UPDATE workouts SET date = ?, type = ?, duration_min = ?, intensity = ?, notes = ? WHERE id = ?",
       [input.date, input.type, input.durationMin, input.intensity, input.notes || null, w.id]);
@@ -290,8 +290,8 @@ export function createApp() {
 
   app.delete("/api/workouts/:id", wrap(async (req, res) => {
     const w = await ownWorkout(req);
-    // Admins may remove a workout too (e.g. an obvious mistake reported to them).
-    if (w.member_id !== req.viewer!.id && !req.viewer!.isAdmin) throw new Forbidden("you can only delete your own workouts");
+    // Only the person who logged it — admins included, nobody else can edit or delete it.
+    if (w.member_id !== req.viewer!.id) throw new Forbidden("You can only delete your own workouts.");
     await exec("DELETE FROM workouts WHERE id = ?", [w.id]);
     res.json({ ok: true });
   }));

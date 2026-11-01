@@ -29,7 +29,12 @@ a { color: var(--primary-light); }
   position: sticky; top: 0; z-index: 5; background: var(--bg);
   padding: 14px 16px; border-bottom: 1px solid var(--divider);
 }
-.topbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
+.topbar { display: flex; align-items: center; gap: 4px; }
+.topbar h1 { margin: 0; font-size: 17px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .back {
+  background: none; color: var(--primary); font-size: 30px; line-height: 1; font-weight: 400;
+  padding: 0 10px 4px 0; margin-left: -4px; border-radius: 6px;
+}
 main { max-width: 720px; margin: 0 auto; padding: 16px; }
 
 .bottomnav {

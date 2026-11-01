@@ -107,6 +107,8 @@ const routes = [
 
 async function route() {
   const hash = location.hash || "#/";
+  if (route.last && route.last !== hash) route.navigated = true;
+  route.last = hash;
   $("#tooltip").hidden = true; // its anchor is about to be removed, so pointerleave won't fire
   if (!getToken() && hash !== "#/login") { location.hash = "#/login"; return; }
   if (getToken() && !me && hash !== "#/login") {
@@ -125,6 +127,8 @@ async function route() {
     const m = hash.match(re);
     if (m) {
       $("#title").textContent = title;
+      // Sub-pages (a person's activity, editing a workout) get a back button.
+      $("#back").hidden = !/^#\/(member|log)\/\d+$/.test(hash);
       document.title = `${title} · FATUWR`;
       view.innerHTML = `<p class="meta">Loading…</p>`;
       try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = `<div class="card"><p class="error">${esc(e.message)}</p></div>`; }
@@ -135,6 +139,12 @@ async function route() {
   location.hash = "#/";
 }
 window.addEventListener("hashchange", route);
+$("#back").addEventListener("click", () => {
+  // Back to where they came from inside the app; straight to the dashboard if they
+  // opened the page directly (e.g. from a shared link) and there's nothing to go back to.
+  if (route.navigated) history.back();
+  else location.hash = location.hash.startsWith("#/log/") ? "#/log" : "#/";
+});
 
 // ── Login ────────────────────────────────────────────────────────────────────
 function renderLogin() {
@@ -387,7 +397,7 @@ function workoutItem(w, mine) {
     <span style="font-size:14px">${esc(w.type)} · ${fmtMins(w.durationMin)}</span></div>
     ${w.notes ? `<div class="notes">${esc(w.notes)}</div>` : ""}
     ${mine ? `<div class="row" style="gap:4px;margin-top:4px"><a href="#/log/${w.id}" class="meta">Edit</a><button class="danger" data-del="${w.id}">Delete</button></div>`
-      : me.member.isAdmin ? `<button class="danger" data-del="${w.id}">Delete</button>` : ""}
+      : ""}
   </div></li>`;
 }
 
