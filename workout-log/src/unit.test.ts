@@ -100,10 +100,10 @@ describe("workoutInput", () => {
   it.each([
     [{ date: "2026-11-02" }, /future/],
     [{ date: "2026-02-30" }, /real date/],
-    [{ type: "Golf" }, /type/],
-    [{ type: "Cardio" }, /type/],         // removed 2026-11-01
-    [{ durationMin: 0 }, /durationMin/],
-    [{ durationMin: 12.5 }, /durationMin/],
+    [{ type: "Golf" }, /workout type/],
+    [{ type: "Cardio" }, /workout type/],         // removed 2026-11-01
+    [{ durationMin: 0 }, /Duration/],
+    [{ durationMin: 12.5 }, /Duration/],
     [{ intensity: 11 }, /intensity/],
     [{ notes: "x".repeat(2001) }, /too long/],
   ])("rejects %o", (patch, msg) => {

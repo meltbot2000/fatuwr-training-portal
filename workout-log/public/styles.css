@@ -61,6 +61,18 @@ textarea { min-height: 80px; resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 input { min-width: 0; }
+.grid2 > * { min-width: 0; }
+
+/* One height for every single-line field, so side-by-side fields line up. */
+input, select { height: 46px; display: block; }
+
+/* iOS Safari renders date fields with a fixed intrinsic width (ignoring the column, so
+   it spilled into Duration), centred text and its own height. Strip that. */
+input[type="date"] {
+  -webkit-appearance: none; appearance: none;
+  min-width: 0; max-width: 100%; text-align: left; line-height: normal;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
 button, .btn {
   font: inherit; font-size: 15px; font-weight: 500; border: 0; border-radius: 8px;
@@ -80,7 +92,8 @@ button:disabled { opacity: .5; cursor: default; }
 .chip[aria-pressed="true"] { background: var(--primary); }
 
 .banner { background: var(--warn-bg); color: var(--warn); font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
-.error { color: var(--danger); font-size: 13px; min-height: 1em; }
+.error { color: var(--danger); font-size: 13px; }
+.error:empty { display: none; } /* no reserved gap above the button when there's no error */
 
 .avatar {
   width: 36px; height: 36px; border-radius: 50%; flex: none; object-fit: cover;

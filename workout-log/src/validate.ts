@@ -32,10 +32,10 @@ export interface WorkoutInput { date: string; type: string; durationMin: number;
 
 export function workoutInput(body: any, today: string): WorkoutInput {
   const date = isoDate(body?.date, "date");
-  if (date > today) throw new BadRequest("date cannot be in the future");
+  if (date > today) throw new BadRequest("The date can't be in the future");
   const type = String(body?.type ?? "");
-  if (!(WORKOUT_TYPES as readonly string[]).includes(type)) throw new BadRequest("type is not a known workout type");
-  const durationMin = intIn(body?.durationMin, "durationMin", 1, 600);
+  if (!(WORKOUT_TYPES as readonly string[]).includes(type)) throw new BadRequest("Pick a workout type from the list");
+  const durationMin = intIn(body?.durationMin, "Duration (minutes)", 1, 600);
   const intensity = body?.intensity === null || body?.intensity === undefined || body?.intensity === ""
     ? null : intIn(body.intensity, "intensity", 1, 10);
   const notes = text(body?.notes, "notes", 2000);
