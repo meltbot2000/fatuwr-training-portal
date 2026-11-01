@@ -16,6 +16,7 @@ import { sheetSessions, sheetSignups, sheetPayments, sheetUsers, users } from ".
 import { ENV } from "./env";
 import { sql } from "drizzle-orm";
 import compression from "compression";
+import { createPartnerApiRouter } from "../partnerApi";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -375,6 +376,9 @@ async function startServer() {
       res.status(500).json({ error: msg });
     }
   });
+  // Partner API for companion apps (workout-log). Bearer-key protected; 503 when
+  // WORKOUT_LOG_API_KEY is unset. See server/partnerApi.ts and workout-log/API.md.
+  app.use("/api/v1", createPartnerApiRouter());
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

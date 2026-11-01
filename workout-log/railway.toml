@@ -1,0 +1,11 @@
+# Railway service for the workout log. In the Railway dashboard set this service's
+# Root Directory to /workout-log so it builds from here, not from the portal's root.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["/workout-log/**"]
+
+[deploy]
+healthcheckPath = "/api/health/db"  # DB-aware on purpose — see portal SYSTEM.md Bug 24
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"

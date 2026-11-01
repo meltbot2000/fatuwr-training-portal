@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-09-01 (Data-tab attendance derived from sign-ups, payment transfer timestamp preserved + displayed, timezone-safe `toIsoDate`)*
+*Last updated: 2026-11-01 (Partner API `/api/v1` + the separate workout-log app — §15)*
 
 ---
 
@@ -119,6 +119,7 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 | `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | R2 API token secret |
 | `CLOUDFLARE_R2_BUCKET` | R2 bucket name |
 | `CLOUDFLARE_R2_PUBLIC_URL` | R2 public base URL (e.g. `https://pub-xxx.r2.dev`) |
+| `WORKOUT_LOG_API_KEY` | Bearer key for the partner API `/api/v1` (§15). Unset = API answers 503 |
 
 ---
 
@@ -806,6 +807,8 @@ If a requirement is ambiguous or there is risk of a wrong assumption — **stop 
 | `server/adminSessions.test.ts` | `admin.allSessions` live attendance + revenue derivation, mixed date formats, membership-row exclusion — Bug 17 |
 | `server/sessions.test.ts` | `sessions.list` / `sessions.detail` — **`sessions.detail` currently FAILS** (pre-existing, unrelated to the above) |
 | `server/auth.logout.test.ts` | `auth.logout` — **currently FAILS** (pre-existing) |
+| `server/trainingRecords.test.ts` | Attendance rule for the partner API: closed-only, full vs half rain-off, refunds/membership rows, legacy dates, dedupe |
+| `server/partnerApi.test.ts` | `/api/v1`: key checks, no email/fees leak, Sheet-fallback refusal, login relay |
 
 Baseline as of 2026-09-01: **40 passing, 2 failing**, both failures pre-existing. Compare against this baseline before blaming a change.
 
@@ -907,3 +910,35 @@ On 2026-09-01 the deployment was still **version 5, cut 2026-05-04**. Saving in 
 **When cutting a new version, branch from the LIVE editor source, not from `Code.gs` and not from the highest-numbered file.** Mirror into `Code.gs` only after deploying, so `Code.gs` always means "what is live".
 
 **Never edit live GAS files in place. Always create a new versioned file.**
+
+---
+
+## 15. Partner API + workout-log app (added 2026-11-01)
+
+A **separate app** in `workout-log/` (own package, own Railway service with Root Directory
+`/workout-log`, own MySQL) lets competition squads log extra workouts. A dashboard,
+visible to any signed-in member, shows each squad member's regular-training attendance next to
+their extra workouts. Full docs: `workout-log/README.md`. API contract: `workout-log/API.md`.
+
+**The only coupling is the portal's REST partner API at `/api/v1`** (`server/partnerApi.ts`):
+- Bearer `WORKOUT_LOG_API_KEY`, timing-safe compare. Unset means 503, so it is off by default.
+- Login relay (`/auth/otp/send|verify`) reuses `otp_codes`, the OTP email and the **same
+  rate-limit maps**. Those moved from `routers.ts` to `server/otpRateLimit.ts` so both paths
+  share them. Never creates portal accounts.
+- `/members`, `/members/:id`: id, name, photo URL (http only, never base64), memberStatus,
+  clubRole. **No email, no paymentId, no money anywhere in the API.**
+- `/members/:id/trainings`: attendance derived live by `deriveTrainingRecords()`
+  (`server/trainingRecords.ts`, pure and tested). Rule: sign-up matches a session by
+  pool + date, the session is **closed** (`isClosed` non-empty), and it is not a **full**
+  rain-off (half counts, flagged). Refunds and membership rows are excluded, with one
+  record per person per session. Ownership comes via `getAllSignupsByEmail` (paymentId-primary).
+  If any sign-up row lacks an `id` (the Sheets fallback, which is stale), it returns **503
+  rather than stale data**.
+
+**"Attended" means "signed up and the session closed".** There is no check-in data. If the
+club starts closing sessions late or not at all, the dashboard undercounts. That is the
+rule the user chose.
+
+The workout app keeps a cache of attendance (`training_records`). It is replaced per member
+only after a 200 from the portal, so a portal outage never blanks the dashboard.
+
