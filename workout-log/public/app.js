@@ -246,8 +246,9 @@ async function renderDashboard() {
       const chip = (o) => `<button class="chip${o.upcoming ? " upcoming" : ""}" data-period="${esc(o.key)}" aria-pressed="${o.key === data.period}">${esc(o.label)}</button>`;
       const isMonth = (o) => /^\d{4}-\d{2}$/.test(o.key);
       const months = data.periods.filter(isMonth);
-      return `<div class="chips" role="group" aria-label="Period" style="margin-bottom:8px">${data.periods.filter((o) => !isMonth(o)).map(chip).join("")}</div>
-        ${months.length ? `<div class="chips" role="group" aria-label="Month" style="margin-bottom:8px">${months.map(chip).join("")}</div>` : ""}`;
+      // One row: overall chips | months. Swipes sideways on the narrowest phones.
+      return `<div class="chips one-row" role="group" aria-label="Period">${data.periods.filter((o) => !isMonth(o)).map(chip).join("")}${
+        months.length ? `<span class="chip-divider" aria-hidden="true"></span>${months.map(chip).join("")}` : ""}</div>`;
     })()}
     ${data.weeks === null ? `<p class="meta range-line">Starts ${fmtDate(data.range.from, true)}, nothing to show yet</p>` : `<div class="range-gap"></div>`}
 

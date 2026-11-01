@@ -15,8 +15,8 @@ export const WORKOUT_TYPES = [
 
 /**
  * Dashboard periods (the chips):
- *   "prep"     since the competition's prep start   (default)
- *   "year"     since 1 Jan of the prep-start year    ("Since 2026")
+ *   "prep"     since the competition's prep start, to today   ("Prep", the default)
+ *   "year"     calendar year of the prep start, 1 Jan–31 Dec  ("2026"; capped at today)
  *   "YYYY-MM"  one calendar month, for every month from the prep-start month up to the
  *              month BEFORE the competition (Amager Cup: Nov, Dec, Jan, Feb, Mar).
  *              Every month is selectable; one that hasn't started yet simply has no
@@ -46,8 +46,8 @@ function monthKeys(prepStart: string, competitionDate: string): string[] {
 
 export function periodOptions(prepStart: string, competitionDate: string, today: string): PeriodOption[] {
   return [
-    { key: "prep", label: "Since prep start", upcoming: prepStart > today },
-    { key: "year", label: `Since ${prepStart.slice(0, 4)}`, upcoming: false },
+    { key: "prep", label: "Prep", upcoming: prepStart > today },
+    { key: "year", label: prepStart.slice(0, 4), upcoming: false },
     ...monthKeys(prepStart, competitionDate).map(k => ({
       key: k,
       label: MONTHS[Number(k.slice(5)) - 1],
@@ -63,7 +63,10 @@ export function parsePeriod(v: unknown, options: PeriodOption[]): Period {
 }
 
 export function periodRange(period: Period, today: string, prepStart: string): Range {
-  if (period === "year") return { from: `${prepStart.slice(0, 4)}-01-01`, to: today };
+  if (period === "year") {
+    const y = prepStart.slice(0, 4), end = `${y}-12-31`;
+    return { from: `${y}-01-01`, to: end < today ? end : today };   // calendar year only
+  }
   const m = MONTH_KEY.exec(period);
   if (m) {
     const [y, mo] = [Number(m[1]), Number(m[2])];

@@ -293,3 +293,13 @@ html, body { overscroll-behavior-y: contain; }
 .how summary::after { content: "›"; transition: transform .15s; display: inline-block; }
 .how[open] summary::after { transform: rotate(90deg); }
 .how p { margin: 8px 0 0; background: var(--modal); border-radius: 12px; padding: 10px 12px; }
+
+/* Period chips: one tidy row (Prep · 2026 | months), compact, swipeable if it ever
+   doesn't fit rather than wrapping onto a second line. */
+.chips.one-row {
+  flex-wrap: nowrap; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  margin: 0 -16px 4px; padding: 0 16px 2px;    /* let it scroll to the screen edge */
+}
+.chips.one-row::-webkit-scrollbar { display: none; }
+.chips.one-row .chip { flex: none; font-size: 13px; font-weight: 500; padding: 7px 8px; text-align: center; }
+.chip-divider { flex: none; width: 1px; height: 20px; background: #3A3A3A; margin: 0 1px; }

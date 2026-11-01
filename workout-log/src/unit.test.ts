@@ -31,16 +31,17 @@ describe("dates", () => {
   });
   it("builds period ranges", () => {
     expect(periodRange("prep", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-11-01", to: "2026-12-15" });
-    expect(periodRange("year", "2027-02-03", "2026-11-01")).toEqual({ from: "2026-01-01", to: "2027-02-03" });
+    expect(periodRange("year", "2027-02-03", "2026-11-01")).toEqual({ from: "2026-01-01", to: "2026-12-31" }); // calendar 2026 only
+    expect(periodRange("year", "2026-11-20", "2026-11-01")).toEqual({ from: "2026-01-01", to: "2026-11-20" }); // capped at today
     expect(periodRange("2026-11", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-11-01", to: "2026-11-30" });
     expect(periodRange("2026-12", "2026-12-15", "2026-11-01")).toEqual({ from: "2026-12-01", to: "2026-12-15" }); // capped at today
     expect(periodRange("2027-02", "2027-03-30", "2026-11-01")).toEqual({ from: "2027-02-01", to: "2027-02-28" });
     expect(periodRange("2026-12", "2027-03-30", "2026-11-01").to).toBe("2026-12-31");             // year rollover
     expect(periodRange("2027-02", "2026-11-05", "2026-11-01")).toEqual({ from: "2027-02-01", to: "2027-02-28" }); // future month: whole span
   });
-  it("offers Since prep start, Since <year>, then Nov–Mar for the Amager Cup", () => {
+  it("offers Prep, 2026, then Nov–Mar for the Amager Cup", () => {
     const opts = periodOptions("2026-11-01", "2027-04-10", "2026-12-02");
-    expect(opts.map(o => o.label)).toEqual(["Since prep start", "Since 2026", "Nov", "Dec", "Jan", "Feb", "Mar"]);
+    expect(opts.map(o => o.label)).toEqual(["Prep", "2026", "Nov", "Dec", "Jan", "Feb", "Mar"]);
     expect(opts.filter(o => o.upcoming).map(o => o.label)).toEqual(["Jan", "Feb", "Mar"]);
     expect(parsePeriod("2026-12", opts)).toBe("2026-12");
     expect(parsePeriod("2027-02", opts)).toBe("2027-02"); // upcoming months are selectable
