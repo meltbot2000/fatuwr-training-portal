@@ -5,8 +5,17 @@ export const config = {
   sessionSecret: process.env.SESSION_SECRET ?? "",
   syncIntervalMinutes: Math.max(5, Number(process.env.SYNC_INTERVAL_MINUTES) || 30),
   port: Number(process.env.PORT) || 3100,
+  /** URL prefix the app is served under, e.g. "/amager" when the portal forwards
+   *  fatuwr.up.railway.app/amager/* here. "" = served at the root. */
+  basePath: normaliseBasePath(process.env.BASE_PATH),
   isProduction: process.env.NODE_ENV === "production",
 };
+
+export function normaliseBasePath(raw: string | undefined): string {
+  const t = (raw || "").trim().replace(/\/+$/, "");
+  if (!t) return "";
+  return t.startsWith("/") ? t : `/${t}`;
+}
 
 export function assertConfig(): void {
   const missing = [

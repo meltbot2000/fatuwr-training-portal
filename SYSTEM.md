@@ -120,6 +120,7 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 | `CLOUDFLARE_R2_BUCKET` | R2 bucket name |
 | `CLOUDFLARE_R2_PUBLIC_URL` | R2 public base URL (e.g. `https://pub-xxx.r2.dev`) |
 | `WORKOUT_LOG_API_KEY` | Bearer key for the partner API `/api/v1` (§15). Unset = API answers 503 |
+| `WORKOUT_LOG_URL` | Private URL of the workout-log service, e.g. `http://<service>.railway.internal:3100`; the portal forwards `/amager/*` there (§15). Unset = `/amager` answers 503 |
 
 ---
 
@@ -917,8 +918,15 @@ On 2026-09-01 the deployment was still **version 5, cut 2026-05-04**. Saving in 
 
 A **separate app** in `workout-log/` (own package, own Railway service with Root Directory
 `/workout-log`, own MySQL) lets competition squads log extra workouts. A dashboard,
-visible to any signed-in member, shows each squad member's regular-training attendance next to
-their extra workouts. Full docs: `workout-log/README.md`. API contract: `workout-log/API.md`.
+shows each squad member's regular-training attendance next to their extra workouts.
+**Only squad members and portal Admins can sign in** (checked on every request).
+First competition: **Amager Cup, 10 Apr 2027**, seeded on the app's first boot.
+
+**URL `fatuwr.up.railway.app/amager`**: the portal forwards `/amager/*` byte-for-byte to the
+workout-log service's private address (`server/workoutLogProxy.ts`, env `WORKOUT_LOG_URL`).
+The service runs with `BASE_PATH=/amager` and has no public domain. **The proxy must stay
+mounted above `express.json()`**, or POST bodies arrive empty (`workoutLogProxy.test.ts`
+guards this). Full docs: `workout-log/README.md`. API contract: `workout-log/API.md`.
 
 **The only coupling is the portal's REST partner API at `/api/v1`** (`server/partnerApi.ts`):
 - Bearer `WORKOUT_LOG_API_KEY`, timing-safe compare. Unset means 503, so it is off by default.

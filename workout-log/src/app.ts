@@ -1,7 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from "express";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { issueToken, requireAdmin, requireViewer } from "./auth";
+import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
 import { addDays, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
@@ -82,6 +83,11 @@ export function createApp() {
     const email = text(req.body?.email, "email", 320, { required: true }).toLowerCase();
     const code = text(req.body?.code, "code", 6, { required: true });
     const { member } = await portal.verifyOtp(email, code);
+    // Squad members and portal Admins only. Checked before anything is stored, so people
+    // outside the squad leave no trace here.
+    if (!(await hasAccess(member.id, member.clubRole))) {
+      throw new Forbidden("This app is only for the competition squad. Ask an admin if you think you should be on it.");
+    }
     await upsertMember(member, { loggedIn: true });
     // Fresh attendance for squad members; don't make the login wait for it.
     if (await viewerCanLog(member.id, todaySgt())) syncMember(member.id).catch(() => {});
@@ -298,11 +304,23 @@ export function createApp() {
   return app;
 }
 
-/** Static frontend. Kept out of createApp so tests don't need the files. */
-export function serveFrontend(app: express.Express) {
+/**
+ * Static frontend. Kept out of createApp so tests don't need the files.
+ *
+ * Nothing here is content-hashed, so everything is no-cache — and Surrogate-Control
+ * no-store, because when served via the portal's /amager proxy the response passes
+ * through Railway's Fastly edge (portal SYSTEM.md §3).
+ */
+export function serveFrontend(app: express.Express, basePath: string) {
   const here = path.dirname(fileURLToPath(import.meta.url));
   // dist/index.js → ../public ; src/app.ts (dev) → ../public
   const publicDir = path.resolve(here, "..", "public");
-  app.use(express.static(publicDir, { index: false, maxAge: 0 }));
-  app.get("*", (_req, res) => { res.sendFile(path.join(publicDir, "index.html")); });
+  const noCache = (res: Response) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Surrogate-Control", "no-store");
+  };
+  const indexHtml = fs.readFileSync(path.join(publicDir, "index.html"), "utf8")
+    .replace('<base href="/">', `<base href="${basePath}/">`);
+  app.use(express.static(publicDir, { index: false, setHeaders: noCache }));
+  app.get("*", (_req, res) => { noCache(res); res.type("html").send(indexHtml); });
 }

@@ -6,7 +6,7 @@ A separate small app for squads preparing for a competition:
   of an upcoming competition can log.
 - **Training attendance syncs in automatically** from the portal through its partner API
   (`API.md`).
-- **Dashboard** for any signed-in club member: each squad member's regular trainings and
+- **Dashboard** for the squad: each squad member's regular trainings and
   extra workouts, with All time / Since prep start / Last 4 weeks views, plus a per-person
   timeline with workout details.
 - **Admin** (portal `clubRole = Admin`): create competitions (name, prep start, competition
@@ -37,19 +37,43 @@ when an admin adds someone, and on the admin "Sync now" button.
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.
 
+## Access
+
+Only **squad members** (of any competition) and **portal Admins**, who set up the squad, can
+sign in. Everyone else gets "This app is only for the competition squad". This is checked at
+login and on every request, so removing someone from the squad locks them out immediately.
+
+## URL: fatuwr.up.railway.app/amager
+
+Railway can't send a *path* of one domain to another service, so the **portal forwards
+`/amager/*`** to this service over Railway's private network (`server/workoutLogProxy.ts`).
+This service runs with `BASE_PATH=/amager` and needs **no public domain of its own**.
+
+On first boot it creates the **Amager Cup** competition (10 Apr 2027, prep start 1 Nov
+2026 as a placeholder). Change the prep start in Admin if needed.
+
 ## Deploy (Railway, same project as the portal)
 
-1. **Portal service**: add env `WORKOUT_LOG_API_KEY` = a long random string
-   (`openssl rand -hex 32`). Until it is set, `/api/v1` answers 503.
-2. **New MySQL service** for this app (keep it separate from the portal's DB).
-3. **New service** from this GitHub repo, with **Root Directory `/workout-log`**. It builds
-   from this folder's `Dockerfile` and `railway.toml`. Env vars:
-   - `DATABASE_URL` = `${{<new MySQL>.MYSQL_URL}}`
-   - `PORTAL_URL` = `http://${{<portal service>.RAILWAY_PRIVATE_DOMAIN}}:<port>` (private network), or `https://fatuwr.up.railway.app`
-   - `PORTAL_API_KEY` = same value as the portal's `WORKOUT_LOG_API_KEY`
-   - `SESSION_SECRET` = another `openssl rand -hex 32`
-4. Generate a domain for the service. Tables are created on boot.
-5. Sign in as a portal Admin → Admin tab → create the competition → add the squad.
+1. **New MySQL service** (call it `workout-db`). Keep it separate from the portal's DB.
+2. **New service** from this GitHub repo, named `workout-log`:
+   - Settings → Source → **Root Directory `/workout-log`**. Railway then picks up this
+     folder's `Dockerfile` and `railway.toml`.
+   - Variables:
+     - `DATABASE_URL` = `${{workout-db.MYSQL_URL}}`
+     - `PORTAL_URL` = `https://fatuwr.up.railway.app`
+     - `PORTAL_API_KEY` = a long random string (`openssl rand -hex 32`)
+     - `SESSION_SECRET` = a different long random string
+     - `BASE_PATH` = `/amager`
+     - `PORT` = `3100` (fixed, so the private URL below is predictable)
+   - Do **not** generate a public domain.
+3. **Portal service** variables:
+   - `WORKOUT_LOG_API_KEY` = the same value as `PORTAL_API_KEY` above
+   - `WORKOUT_LOG_URL` = `http://${{workout-log.RAILWAY_PRIVATE_DOMAIN}}:3100`
+4. Wait for both deploys, then open `https://fatuwr.up.railway.app/amager`, sign in as a
+   portal Admin → Admin → add the squad.
+
+Until step 3 is done, `/amager` answers "not configured yet" and the portal is otherwise
+unaffected.
 
 ## Local dev
 

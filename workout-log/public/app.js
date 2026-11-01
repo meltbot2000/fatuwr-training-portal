@@ -14,9 +14,10 @@ async function api(path, { method = "GET", body } = {}) {
   const headers = { "Content-Type": "application/json" };
   const t = getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
-  const res = await fetch(`/api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  // Relative on purpose: resolves against <base href>, so the app works under /amager/.
+  const res = await fetch(`api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && data.error === "not_signed_in") { setToken(null); me = null; location.hash = "#/login"; throw new Error("Please sign in."); }
+  if (res.status === 401 && data.error === "not_signed_in") { setToken(null); me = null; location.hash = "#/login"; throw new Error(data.message || "Please sign in."); }
   if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
   return data;
 }
@@ -108,7 +109,7 @@ function renderLogin() {
     view.innerHTML = `
       <div class="card stack">
         <h2>Sign in with your FATUWR portal account</h2>
-        <p class="meta">We'll email you a 6-digit code — the same login as the training portal.</p>
+        <p class="meta">For the competition squad. We'll email you a 6-digit code — the same login as the training portal.</p>
         <form id="f" class="stack">
           <div><label for="email">Email</label><input id="email" type="email" autocomplete="email" required value="${esc(email)}"></div>
           <p class="error" id="err"></p>

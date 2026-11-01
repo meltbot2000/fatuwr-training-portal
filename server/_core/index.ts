@@ -17,6 +17,7 @@ import { ENV } from "./env";
 import { sql } from "drizzle-orm";
 import compression from "compression";
 import { createPartnerApiRouter } from "../partnerApi";
+import { createWorkoutLogProxy } from "../workoutLogProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -45,6 +46,9 @@ async function startServer() {
   // Railway's edge does gzip the static assets. Every tRPC call paid full price, on every
   // refetch. No endpoint streams (no SSE, no res.write), so this is safe everywhere.
   app.use(compression());
+  // /amager/* → the separate workout-log service. MUST stay above the body parsers, which
+  // would otherwise consume the request stream. See server/workoutLogProxy.ts.
+  app.use(createWorkoutLogProxy("/amager", () => process.env.WORKOUT_LOG_URL ?? ""));
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
