@@ -7,6 +7,7 @@ import { addDays, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
 import { buildDashboard, inRange, periodRange, PERIODS, WORKOUT_TYPES, type Period } from "./stats";
+import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
 
@@ -176,6 +177,42 @@ export function createApp() {
     const c = await getCompetition(req.params.id);
     await exec("DELETE FROM squad_members WHERE competition_id = ? AND member_id = ?", [c.id, Number(req.params.memberId)]);
     res.json({ ok: true });
+  }));
+
+  // ── Squad invites (names waiting to be matched to a portal account) ─────────
+  app.get("/api/competitions/:id/invites", requireAdmin, wrap(async (req, res) => {
+    const c = await getCompetition(req.params.id);
+    const rows = await query<any>(
+      "SELECT id, name, candidates, note FROM squad_invites WHERE competition_id = ? AND status = 'pending' ORDER BY name", [c.id]);
+    res.json({ invites: rows.map(r => ({ id: r.id, name: r.name, note: r.note || "Not checked yet", candidates: r.candidates ? JSON.parse(r.candidates) : [] })) });
+  }));
+
+  async function pendingInvite(id: unknown) {
+    const n = Number(id);
+    const [inv] = Number.isInteger(n) ? await query<any>("SELECT * FROM squad_invites WHERE id = ? AND status = 'pending'", [n]) : [];
+    if (!inv) throw new NotFound("invite not found");
+    return inv;
+  }
+
+  app.post("/api/invites/:id/pick", requireAdmin, wrap(async (req, res) => {
+    const inv = await pendingInvite(req.params.id);
+    const memberId = intIn(req.body?.memberId, "memberId", 1, 2_147_483_647);
+    const { members } = await portal.getMembers([memberId]);
+    if (!members[0]) throw new NotFound("no such portal member");
+    await upsertMember(members[0]);
+    await exec("INSERT IGNORE INTO squad_members (competition_id, member_id) VALUES (?, ?)", [inv.competition_id, memberId]);
+    await exec("UPDATE squad_invites SET status = 'added', member_id = ? WHERE id = ?", [memberId, inv.id]);
+    res.json({ ok: true, sync: await syncMember(memberId) });
+  }));
+
+  app.post("/api/invites/:id/dismiss", requireAdmin, wrap(async (req, res) => {
+    const inv = await pendingInvite(req.params.id);
+    await exec("UPDATE squad_invites SET status = 'dismissed' WHERE id = ?", [inv.id]);
+    res.json({ ok: true });
+  }));
+
+  app.post("/api/invites/retry", requireAdmin, wrap(async (_req, res) => {
+    res.json(await resolvePendingInvites());
   }));
 
   app.get("/api/portal-members", requireAdmin, wrap(async (req, res) => {

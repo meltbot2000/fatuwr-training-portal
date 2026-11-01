@@ -96,6 +96,9 @@ export function syncAll(): Promise<SyncSummary> {
   running = (async () => {
     let synced = 0, failed = 0;
     try { await refreshProfiles(); } catch (e: any) { console.warn("[Sync] profile refresh failed:", e?.message); }
+    // Pending squad names (e.g. someone who has only just made a portal account).
+    // Imported lazily: invites.ts imports this module.
+    try { await (await import("./invites")).resolvePendingInvites(); } catch (e: any) { console.warn("[Sync] invites failed:", e?.message); }
     for (const id of await activeSquadMemberIds()) {
       // Sequential on purpose: a squad is ~20 people and the portal is one small instance.
       const r = await syncMember(id);

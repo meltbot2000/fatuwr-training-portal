@@ -50,7 +50,14 @@ Railway can't send a *path* of one domain to another service, so the **portal fo
 This service runs with `BASE_PATH=/amager` and needs **no public domain of its own**.
 
 On first boot it creates the **Amager Cup** competition (10 Apr 2027, prep start 1 Nov
-2026 as a placeholder). Change the prep start in Admin if needed.
+2026 as a placeholder; change it in Admin if needed) and queues the initial squad names
+(`src/seed.ts`). This runs once only (`app_meta` marker), so later Admin edits stick.
+
+**Squad names → portal accounts** (`src/invites.ts`): a name is added automatically only
+when exactly one portal account has it as its first or full name. The portal search is a
+substring match, so "Rei" alone would also hit "Andrei". Names with no match, or several,
+wait in Admin → **Still to match**, with the candidates as one-tap buttons. They are
+retried at every sync, so someone who signs up to the portal later is picked up.
 
 ## Deploy (Railway, same project as the portal)
 

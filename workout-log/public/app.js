@@ -340,7 +340,9 @@ async function renderAdmin() {
   if (!me.member.isAdmin) { location.hash = "#/"; return; }
   const { competitions } = await api("/competitions");
   const selected = competitions.find((c) => c.id === state.adminCompId) || competitions[0];
-  const squad = selected ? (await api(`/competitions/${selected.id}/squad`)).members : [];
+  const [squad, invites] = selected
+    ? await Promise.all([api(`/competitions/${selected.id}/squad`).then((r) => r.members), api(`/competitions/${selected.id}/invites`).then((r) => r.invites)])
+    : [[], []];
 
   view.innerHTML = `
     <form id="newc" class="card stack">
@@ -366,6 +368,14 @@ async function renderAdmin() {
         <div class="row"><button type="submit" class="secondary">Save</button><button type="button" class="danger" id="delc">Delete competition</button></div>
       </form>
     </div>
+    ${invites.length ? `<div class="card stack">
+      <div class="row spread"><h2 style="margin:0">Still to match · ${invites.length}</h2><button class="link" id="retry">Check again</button></div>
+      <p class="meta">These names couldn't be matched to exactly one portal account. Pick the right person, or search below and then dismiss.</p>
+      <ul class="timeline">${invites.map((i) => `<li style="align-items:flex-start"><div style="flex:1;min-width:0">
+        <div style="font-weight:500">${esc(i.name)}</div><div class="meta">${esc(i.note)}</div>
+        ${i.candidates.length ? `<div class="chips" style="margin-top:8px">${i.candidates.map((c) => `<button class="chip" data-pick="${i.id}" data-member="${c.id}">Add ${esc(c.name)}</button>`).join("")}</div>` : ""}
+      </div><button class="danger" data-dismiss="${i.id}">Dismiss</button></li>`).join("")}</ul>
+    </div>` : ""}
     <div class="card stack">
       <h2>Squad · ${squad.length}</h2>
       <div><label for="q">Add a portal member</label><input id="q" placeholder="Search by name" autocomplete="off"></div>
@@ -408,6 +418,21 @@ async function renderAdmin() {
     await api(`/competitions/${selected.id}/squad/${b.dataset.rm}`, { method: "DELETE" });
     toast("Removed from squad"); route();
   }));
+
+  view.querySelectorAll("[data-pick]").forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    await api(`/invites/${b.dataset.pick}/pick`, { method: "POST", body: { memberId: Number(b.dataset.member) } });
+    toast("Added to squad"); route();
+  }));
+  view.querySelectorAll("[data-dismiss]").forEach((b) => (b.onclick = async () => {
+    await api(`/invites/${b.dataset.dismiss}/dismiss`, { method: "POST" });
+    route();
+  }));
+  $("#retry")?.addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    const r = await api("/invites/retry", { method: "POST" });
+    toast(r.added ? `Matched ${r.added}` : "No new matches"); route();
+  });
 
   const inSquad = new Set(squad.map((m) => m.id));
   let timer;

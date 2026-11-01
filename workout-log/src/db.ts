@@ -83,6 +83,24 @@ const MIGRATIONS = [
      synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
      INDEX idx_training_member_date (member_id, date)
    ) CHARACTER SET utf8mb4`,
+  // Names an admin asked to have in a squad, waiting to be matched to a portal account.
+  `CREATE TABLE IF NOT EXISTS squad_invites (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     competition_id INT NOT NULL,
+     name VARCHAR(128) NOT NULL,
+     status VARCHAR(16) NOT NULL DEFAULT 'pending',   -- pending | added | dismissed
+     member_id INT NULL,
+     candidates TEXT NULL,                             -- JSON [{id,name}] when ambiguous
+     note VARCHAR(255) NULL,
+     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     UNIQUE KEY uq_invite (competition_id, name)
+   ) CHARACTER SET utf8mb4`,
+  // One-off markers (e.g. "this seed already ran"), so deleting seeded data sticks.
+  `CREATE TABLE IF NOT EXISTS app_meta (
+     k VARCHAR(64) PRIMARY KEY,
+     v VARCHAR(255) NOT NULL,
+     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+   ) CHARACTER SET utf8mb4`,
 ];
 
 export async function migrate(): Promise<void> {

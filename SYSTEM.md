@@ -920,7 +920,10 @@ A **separate app** in `workout-log/` (own package, own Railway service with Root
 `/workout-log`, own MySQL) lets competition squads log extra workouts. A dashboard,
 shows each squad member's regular-training attendance next to their extra workouts.
 **Only squad members and portal Admins can sign in** (checked on every request).
-First competition: **Amager Cup, 10 Apr 2027**, seeded on the app's first boot.
+First competition: **Amager Cup, 10 Apr 2027**, seeded on the app's first boot together with the
+initial squad names (Hayley, Melanie, Rei, Dilys, Genevieve, Dylia, Huiwen, Gaya, Kimberly,
+Annabel). Each is matched to a portal account only when exactly one first name matches;
+anything else waits in Admin → "Still to match" (`workout-log/src/invites.ts`).
 
 **URL `fatuwr.up.railway.app/amager`**: the portal forwards `/amager/*` byte-for-byte to the
 workout-log service's private address (`server/workoutLogProxy.ts`, env `WORKOUT_LOG_URL`).

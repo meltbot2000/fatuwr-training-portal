@@ -90,3 +90,27 @@ describe("workoutInput", () => {
     expect(() => workoutInput({ ...ok, ...patch }, "2026-11-01")).toThrow(msg);
   });
 });
+
+import { matchInvite } from "./invites";
+
+describe("matchInvite", () => {
+  const members = [
+    { id: 1, name: "Rei Tan" }, { id: 2, name: "Andrei Lim" }, { id: 3, name: "Reina Ho" },
+    { id: 4, name: "Melanie Tan" }, { id: 5, name: "Melanie Goh" }, { id: 6, name: "Génevieve  Ong" },
+    { id: 7, name: "Gaya" },
+  ];
+  it("matches on first name only, not substrings", () => {
+    expect(matchInvite("Rei", members).map(m => m.id)).toEqual([1]);
+  });
+  it("returns every candidate when ambiguous", () => {
+    expect(matchInvite("melanie", members).map(m => m.id)).toEqual([4, 5]);
+  });
+  it("ignores accents, case, extra spaces; matches whole single-word names", () => {
+    expect(matchInvite("Genevieve", members).map(m => m.id)).toEqual([6]);
+    expect(matchInvite("Genevieve Ong", members).map(m => m.id)).toEqual([6]);
+    expect(matchInvite("GAYA", members).map(m => m.id)).toEqual([7]);
+  });
+  it("no match for unknown names", () => {
+    expect(matchInvite("Dylia", members)).toEqual([]);
+  });
+});
