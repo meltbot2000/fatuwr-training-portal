@@ -9,6 +9,11 @@ export const config = {
    *  fatuwr.up.railway.app/amager/* here. "" = served at the root. */
   basePath: normaliseBasePath(process.env.BASE_PATH),
   isProduction: process.env.NODE_ENV === "production",
+  /** The ONLY people with admin rights here — matched against the email they verified a
+   *  login code for. Deliberately not the portal's clubRole: other people are portal
+   *  Admins. Override with ADMIN_EMAILS (comma-separated) without a code change. */
+  adminEmails: (process.env.ADMIN_EMAILS || "tanmelanie@gmail.com")
+    .split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
 };
 
 export function normaliseBasePath(raw: string | undefined): string {

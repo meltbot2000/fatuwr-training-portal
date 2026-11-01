@@ -192,7 +192,7 @@ async function renderDashboard() {
       <div class="row spread"><h2 style="margin:0">Squad · ${rows.length}</h2><span class="meta">${esc(rangeText)}</span></div>
       <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Extra workouts</span></div>
       ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
-      <p class="meta" style="margin:8px 0 0">Trainings = closed portal sessions signed up for (full rain-offs excluded). Synced ${esc(ago(oldestSync))}.</p>
+      <p class="meta" style="margin:8px 0 0">Trainings = portal sessions signed up for, counted from 1 h after the start, when sign-ups end (full rain-offs excluded). Synced ${esc(ago(oldestSync))}.</p>
     </div>`;
 
   $("#comp")?.addEventListener("change", (e) => { state.competitionId = Number(e.target.value); saveState(); route(); });

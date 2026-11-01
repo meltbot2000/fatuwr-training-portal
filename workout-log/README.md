@@ -9,7 +9,8 @@ A separate small app for squads preparing for a competition:
 - **Dashboard** for the squad: each squad member's regular trainings and
   extra workouts, with All time / Since prep start / Last 4 weeks views, plus a per-person
   timeline with workout details.
-- **Admin** (portal `clubRole = Admin`): create competitions (name, prep start, competition
+- **Admin** (only the login emails in `ADMIN_EMAILS`, default `tanmelanie@gmail.com`;
+  **not** the portal's Admin role): create competitions (name, prep start, competition
   date) and pick the squad from portal members.
 
 Sign-in uses the portal account (same emailed code), relayed through the API. There are no
@@ -39,8 +40,9 @@ Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings a
 
 ## Access
 
-Only **squad members** (of any competition) and **portal Admins**, who set up the squad, can
-sign in. Everyone else gets "This app is only for the competition squad". This is checked at
+Only **squad members** (of any competition) and **this app's admins** can sign in. Admins
+are the login emails in `ADMIN_EMAILS` (default `tanmelanie@gmail.com`), checked against the
+email the person just verified a code for. Being an Admin in the portal grants nothing here. Everyone else gets "This app is only for the competition squad". This is checked at
 login and on every request, so removing someone from the squad locks them out immediately.
 
 ## URL: fatuwr.up.railway.app/amager
@@ -77,7 +79,7 @@ retried at every sync, so someone who signs up to the portal later is picked up.
    - `WORKOUT_LOG_API_KEY` = the same value as `PORTAL_API_KEY` above
    - `WORKOUT_LOG_URL` = `http://${{workout-log.RAILWAY_PRIVATE_DOMAIN}}:3100`
 4. Wait for both deploys, then open `https://fatuwr.up.railway.app/amager`, sign in as a
-   portal Admin → Admin → add the squad.
+   admin email → Admin → check "Still to match".
 
 Until step 3 is done, `/amager` answers "not configured yet" and the portal is otherwise
 unaffected.

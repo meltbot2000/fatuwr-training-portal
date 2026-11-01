@@ -24,7 +24,7 @@ import { users } from "../drizzle/schema";
 import * as db from "./db";
 import { generateOtp, sendOtpEmail } from "./email";
 import { checkSendRateLimit, checkVerifyRateLimit, recordVerifyAttempt } from "./otpRateLimit";
-import { getAllSignupsByEmail, getSessions } from "./googleSheets";
+import { getAllSignupsByEmail, getSessions, isPastSignupCutoff } from "./googleSheets";
 import { deriveTrainingRecords } from "./trainingRecords";
 
 export const API_VERSION = "1";
@@ -196,6 +196,7 @@ export function createPartnerApiRouter(getKey: () => string = () => process.env.
     try {
       const u = await getUserById(id);
       if (!u) { res.status(404).json({ error: "not_found" }); return; }
+      const now = Date.now();
       const [signups, sessions] = await Promise.all([
         // paymentId-primary attribution (SYSTEM.md §8) — same helper the portal's own
         // history screens use, so the two apps can never disagree about ownership.
@@ -212,7 +213,7 @@ export function createPartnerApiRouter(getKey: () => string = () => process.env.
       const records = deriveTrainingRecords(
         signups.map(s => ({ id: s.id as number, pool: s.pool, dateOfTraining: s.dateOfTraining, activity: s.activity })),
         sessions,
-        { from: from || undefined, to: to || undefined },
+        { isOver: (s) => isPastSignupCutoff(s, now), from: from || undefined, to: to || undefined },
       );
       res.json({ member: toPartnerMember(u), records, generatedAt: new Date().toISOString() });
     } catch (e: any) {

@@ -919,7 +919,9 @@ On 2026-09-01 the deployment was still **version 5, cut 2026-05-04**. Saving in 
 A **separate app** in `workout-log/` (own package, own Railway service with Root Directory
 `/workout-log`, own MySQL) lets competition squads log extra workouts. A dashboard,
 shows each squad member's regular-training attendance next to their extra workouts.
-**Only squad members and portal Admins can sign in** (checked on every request).
+**Only squad members and the app's own admins can sign in** (checked on every request).
+App admin = login email in `ADMIN_EMAILS` (default tanmelanie@gmail.com); the portal's
+`clubRole` grants nothing there.
 First competition: **Amager Cup, 10 Apr 2027**, seeded on the app's first boot together with the
 initial squad names (Hayley, Melanie, Rei, Dilys, Genevieve, Dylia, Huiwen, Gaya, Kimberly,
 Annabel). Each is matched to a portal account only when exactly one first name matches;
@@ -946,9 +948,10 @@ guards this). Full docs: `workout-log/README.md`. API contract: `workout-log/API
   If any sign-up row lacks an `id` (the Sheets fallback, which is stale), it returns **503
   rather than stale data**.
 
-**"Attended" means "signed up and the session closed".** There is no check-in data. If the
-club starts closing sessions late or not at all, the dashboard undercounts. That is the
-rule the user chose.
+**"Attended" means "signed up, and sign-ups for the session have ended"** (start + 1 h).
+There is no check-in data. **`isClosed` is NOT a signal that a session happened.** It is
+the admin's manual "close sign-ups" control and is rarely used. An earlier version
+mistakenly keyed attendance on it, so nothing counted.
 
 The workout app keeps a cache of attendance (`training_records`). It is replaced per member
 only after a 200 from the portal, so a portal outage never blanks the dashboard.

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { hasAccess, issueToken, requireAdmin, requireViewer } from "./auth";
-import { addDays, todaySgt } from "./config";
+import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
 import { buildDashboard, inRange, periodRange, PERIODS, WORKOUT_TYPES, type Period } from "./stats";
@@ -86,10 +86,11 @@ export function createApp() {
     const { member } = await portal.verifyOtp(email, code);
     // Squad members and portal Admins only. Checked before anything is stored, so people
     // outside the squad leave no trace here.
-    if (!(await hasAccess(member.id, member.clubRole))) {
+    const isAdmin = config.adminEmails.includes(email);
+    if (!(await hasAccess(member.id, isAdmin))) {
       throw new Forbidden("This app is only for the competition squad. Ask an admin if you think you should be on it.");
     }
-    await upsertMember(member, { loggedIn: true });
+    await upsertMember(member, { loggedIn: true, isAdmin });
     // Fresh attendance for squad members; don't make the login wait for it.
     if (await viewerCanLog(member.id, todaySgt())) syncMember(member.id).catch(() => {});
     res.json({ token: issueToken(member.id) });

@@ -54,12 +54,12 @@ declare global {
 }
 
 /**
- * Who may use the app at all: squad members (of any competition) and portal Admins — the
- * admins need to get in to set up the squad. Checked at login AND on every request, so
- * removing someone from the squad (or their admin role) shuts them out immediately.
+ * Who may use the app at all: squad members (of any competition) and this app's admins
+ * (ADMIN_EMAILS — not portal Admins). Checked at login AND on every request, so removing
+ * someone from the squad shuts them out immediately.
  */
-export async function hasAccess(memberId: number, clubRole: string): Promise<boolean> {
-  if (clubRole === "Admin") return true;
+export async function hasAccess(memberId: number, isAdmin: boolean): Promise<boolean> {
+  if (isAdmin) return true;
   const [row] = await query("SELECT 1 FROM squad_members WHERE member_id = ? LIMIT 1", [memberId]);
   return !!row;
 }
@@ -69,14 +69,14 @@ export async function requireViewer(req: Request, res: Response, next: NextFunct
   const id = verifyToken(h.startsWith("Bearer ") ? h.slice(7) : "");
   if (!id) { res.status(401).json({ error: "not_signed_in" }); return; }
   try {
-    const [m] = await query<{ id: number; name: string; image: string | null; club_role: string }>(
-      "SELECT id, name, image, club_role FROM members WHERE id = ?", [id]);
+    const [m] = await query<{ id: number; name: string; image: string | null; club_role: string; is_admin: number }>(
+      "SELECT id, name, image, club_role, is_admin FROM members WHERE id = ?", [id]);
     if (!m) { res.status(401).json({ error: "not_signed_in" }); return; }
-    if (!(await hasAccess(m.id, m.club_role))) {
+    if (!(await hasAccess(m.id, !!m.is_admin))) {
       res.status(401).json({ error: "not_signed_in", message: "This app is for the competition squad only." });
       return;
     }
-    req.viewer = { id: m.id, name: m.name, image: m.image, clubRole: m.club_role, isAdmin: m.club_role === "Admin" };
+    req.viewer = { id: m.id, name: m.name, image: m.image, clubRole: m.club_role, isAdmin: !!m.is_admin };
     next();
   } catch (e) {
     next(e);

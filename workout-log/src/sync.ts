@@ -16,14 +16,19 @@ import { portal, PortalError, type PortalMember, type PortalTrainingRecord } fro
 /** Competitions stay "active" for sync two weeks past the competition day. */
 const ACTIVE_GRACE_DAYS = 14;
 
-export async function upsertMember(m: PortalMember, opts: { loggedIn?: boolean } = {}): Promise<void> {
+/**
+ * Cache a portal profile. is_admin is only ever written at login (`isAdmin` given), the
+ * one moment we know which email the person proved they own; syncs leave it alone.
+ */
+export async function upsertMember(m: PortalMember, opts: { loggedIn?: boolean; isAdmin?: boolean } = {}): Promise<void> {
+  const login = opts.loggedIn === true;
   await exec(
-    `INSERT INTO members (id, name, image, club_role, member_status, last_login_at)
-     VALUES (?, ?, ?, ?, ?, ${opts.loggedIn ? "UTC_TIMESTAMP()" : "NULL"})
+    `INSERT INTO members (id, name, image, club_role, member_status, is_admin, last_login_at)
+     VALUES (?, ?, ?, ?, ?, ?, ${login ? "UTC_TIMESTAMP()" : "NULL"})
      ON DUPLICATE KEY UPDATE name = VALUES(name), image = VALUES(image),
        club_role = VALUES(club_role), member_status = VALUES(member_status)
-       ${opts.loggedIn ? ", last_login_at = UTC_TIMESTAMP()" : ""}`,
-    [m.id, m.name, m.image, m.clubRole, m.memberStatus],
+       ${login ? ", is_admin = VALUES(is_admin), last_login_at = UTC_TIMESTAMP()" : ""}`,
+    [m.id, m.name, m.image, m.clubRole, m.memberStatus, login && opts.isAdmin ? 1 : 0],
   );
 }
 

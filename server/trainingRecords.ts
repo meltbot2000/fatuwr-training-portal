@@ -10,9 +10,11 @@
  *   1. The sign-up must match a session by pool + date (the same key admin.allSessions
  *      and the rain-off flow use). Membership / trial fee rows carry no pool and match
  *      nothing; refunds are excluded by isAttendanceRow().
- *   2. The session must be CLOSED (isClosed non-empty — "Closed" from the admin button,
- *      "TRUE" on seeded rows). A sign-up only becomes an attendance once its session
- *      closes; upcoming sign-ups are not attendances yet.
+ *   2. The session must be OVER for sign-ups — past the portal's own sign-up cutoff
+ *      (1 h after start, SGT; isPastSignupCutoff in googleSheets.ts, the same rule that
+ *      drops a session off the sign-up list). The caller passes that test in as
+ *      `isOver`, which keeps this module pure. The admin "close sign-ups" flag
+ *      (isClosed) is NOT used: it is a sign-up control, not a sign that training happened.
  *   3. A FULL rain-off is excluded — nobody trained. A HALF rain-off still counts (people
  *      were in the water) and is flagged so the consumer can show it.
  *
@@ -50,7 +52,6 @@ export interface SessionLike {
   trainingTime?: string | null;
   day?: string | null;
   pool?: string | null;
-  isClosed?: string | null;
   rainOff?: string | null;
 }
 
@@ -84,7 +85,7 @@ const key = (pool: string | null | undefined, isoDate: string) =>
 export function deriveTrainingRecords(
   signups: SignupLike[],
   sessions: SessionLike[],
-  opts: { from?: string; to?: string } = {},
+  opts: { isOver: (s: SessionLike) => boolean; from?: string; to?: string },
 ): TrainingRecord[] {
   const byKey = new Map<string, SessionLike>();
   for (const s of sessions) {
@@ -92,10 +93,8 @@ export function deriveTrainingRecords(
     if (!iso || !(s.pool || "").trim()) continue;
     const k = key(s.pool, iso);
     // Two sessions on the same pool+date cannot be told apart from a sign-up row (it
-    // stores no time). Keep the first; prefer a closed one so a duplicate open row
-    // cannot hide a real attendance.
-    const existing = byKey.get(k);
-    if (!existing || (!isClosed(existing) && isClosed(s))) byKey.set(k, s);
+    // stores no time). Keep the first.
+    if (!byKey.has(k)) byKey.set(k, s);
   }
 
   const seen = new Set<string>();
@@ -108,7 +107,7 @@ export function deriveTrainingRecords(
     if (opts.to && iso > opts.to) continue;
 
     const session = byKey.get(key(su.pool, iso));
-    if (!session || !isClosed(session)) continue;
+    if (!session || !opts.isOver(session)) continue;
     const rain = (session.rainOff || "").trim().toLowerCase();
     if (rain.startsWith("full")) continue;
 
@@ -131,8 +130,4 @@ export function deriveTrainingRecords(
   }
   out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   return out;
-}
-
-function isClosed(s: SessionLike): boolean {
-  return (s.isClosed || "").trim().length > 0;
 }

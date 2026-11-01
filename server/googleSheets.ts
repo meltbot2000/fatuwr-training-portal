@@ -543,7 +543,7 @@ function toIsoDateStr(dateStr: string): string | null {
  * When trainingTime is absent/unparseable, midnight SGT is used as the start
  * (conservative: session stays visible all day).
  */
-function sessionStartUTC(trainingDate: string, trainingTime: string | null | undefined): number | null {
+export function sessionStartUTC(trainingDate: string, trainingTime: string | null | undefined): number | null {
   const isoDate = toIsoDateStr(trainingDate);
   if (!isoDate) return null;
 
@@ -571,6 +571,22 @@ function sessionStartUTC(trainingDate: string, trainingTime: string | null | und
   return isNaN(dt.getTime()) ? null : dt.getTime();
 }
 
+/**
+ * Sign-ups for a session end this long after its start (SGT). This is THE cutoff: the
+ * sessions list hides the session from then on, and the partner API counts a sign-up as
+ * an attended training from then on. One constant so the two can never disagree.
+ */
+export const SIGNUP_CUTOFF_AFTER_START_MS = 60 * 60 * 1000;
+
+/** Has this session passed its sign-up cutoff? False when the date can't be parsed. */
+export function isPastSignupCutoff(
+  session: { trainingDate: string; trainingTime?: string | null },
+  now = Date.now(),
+): boolean {
+  const startMs = sessionStartUTC(session.trainingDate, session.trainingTime);
+  return startMs !== null && now >= startMs + SIGNUP_CUTOFF_AFTER_START_MS;
+}
+
 export async function getUpcomingSessions(): Promise<SessionRow[]> {
   const sessions = await getSessions();
   const now = Date.now();
@@ -581,7 +597,7 @@ export async function getUpcomingSessions(): Promise<SessionRow[]> {
       // If date can't be parsed, hide the session
       if (startMs === null) return false;
       // Hide once 1 hour past the session start (in SGT)
-      return now < startMs + 60 * 60 * 1000;
+      return now < startMs + SIGNUP_CUTOFF_AFTER_START_MS;
     })
     .sort((a, b) => {
       const msA = sessionStartUTC(a.trainingDate, a.trainingTime) ?? 0;

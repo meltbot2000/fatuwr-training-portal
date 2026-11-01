@@ -42,8 +42,9 @@ That person's regular-training attendance, derived live from sign-ups.
 
 A sign-up counts as an attended training when **all** of these hold:
 1. It matches a session by pool + date. Membership/trial fees and refunds never count.
-2. That session is **closed** (`isClosed` is non-empty). Sign-ups become attendances
-   when the session closes, not before.
+2. The session is past the portal's **sign-up cutoff**: 1 hour after its start time (SGT),
+   the same moment the portal drops it from the sign-up list (`isPastSignupCutoff`).
+   The admin "close sign-ups" flag (`isClosed`) is not used.
 3. The session was not a **full** rain-off. Half rain-offs count, flagged `rainOff: "half"`.
 4. One record per person per session, even if duplicate sign-up rows exist.
 

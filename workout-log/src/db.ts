@@ -103,9 +103,18 @@ const MIGRATIONS = [
    ) CHARACTER SET utf8mb4`,
 ];
 
+// Columns added after first release. MySQL has no ADD COLUMN IF NOT EXISTS, so a
+// "duplicate column" error (1060) just means it already ran.
+const COLUMN_MIGRATIONS = [
+  "ALTER TABLE members ADD COLUMN is_admin TINYINT NOT NULL DEFAULT 0",
+];
+
 export async function migrate(): Promise<void> {
   const p = getPool();
   for (const sql of MIGRATIONS) await p.query(sql);
+  for (const sql of COLUMN_MIGRATIONS) {
+    try { await p.query(sql); } catch (e: any) { if (e?.errno !== 1060) throw e; }
+  }
 }
 
 export async function query<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {

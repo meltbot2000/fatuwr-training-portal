@@ -30,6 +30,7 @@ vi.mock("./db", () => {
 vi.mock("./email", () => ({ generateOtp: () => "123456", sendOtpEmail: vi.fn(async () => true) }));
 vi.mock("./googleSheets", () => ({
   getAllSignupsByEmail: vi.fn(async () => state.signups),
+  isPastSignupCutoff: () => true,
   getSessions: vi.fn(async () => [
     { rowId: "r1", trainingDate: "2026-10-04", trainingTime: "7:45 PM", day: "Sunday", pool: "CCAB", isClosed: "Closed", rainOff: "" },
   ]),
@@ -86,12 +87,16 @@ describe("members", () => {
 });
 
 describe("trainings", () => {
-  it("returns closed-session attendance without fees", async () => {
+  it("returns attendance without fees", async () => {
     state.signups = [{ id: 11, pool: "CCAB", dateOfTraining: "2026-10-04", activity: "Regular Training", actualFees: 13 }];
     const body = await (await get("/members/7/trainings")).json();
     expect(body.records).toHaveLength(1);
     expect(body.records[0].signupId).toBe(11);
-    expect(JSON.stringify(body)).not.toMatch(/fee|13/i);
+    // Exact field list — a fee/amount field can't sneak in. (A text search for "13"
+    // was flaky: generatedAt is a timestamp and can contain it.)
+    expect(Object.keys(body.records[0]).sort()).toEqual(
+      ["activity", "date", "day", "pool", "rainOff", "sessionId", "signupId", "trainingTime"]);
+    expect(JSON.stringify(body)).not.toMatch(/fee/i);
   });
   it("refuses (503) when sign-ups came from the stale Sheet fallback", async () => {
     state.signups = [{ pool: "CCAB", dateOfTraining: "2026-10-04", activity: "Regular Training" }];
