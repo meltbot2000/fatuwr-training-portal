@@ -137,6 +137,10 @@ async function route() {
       $("#title").textContent = title;
       // Sub-pages (a person's activity, editing a workout) get a back button.
       $("#back").hidden = !/^#\/(member|log)\/\d+$/.test(hash);
+      // The viewer's avatar sits top right (like the portal) and opens their own activity.
+      const av = $("#meAvatar");
+      av.hidden = !me || hash === "#/login";
+      if (me) { av.href = `#/member/${me.member.id}`; av.innerHTML = avatar(me.member); }
       document.title = `${title} · FATUWR`;
       view.innerHTML = `<p class="meta">Loading…</p>`;
       try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = `<div class="card"><p class="error">${esc(e.message)}</p></div>`; }

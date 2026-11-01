@@ -18,38 +18,56 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* component display rules must never un-hide things */
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px; line-height: 1.4;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(72px + 16px + env(safe-area-inset-bottom, 0px));
 }
 a { color: var(--primary-light); }
+/* Top bar: matches the portal's AppHeader: card grey, 56px, centred 18px bold title,
+   back chevron on the left, the viewer's avatar on the right. */
 .topbar {
-  position: sticky; top: 0; z-index: 5; background: var(--bg);
-  padding: 14px 16px; border-bottom: 1px solid var(--divider);
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  background: var(--card); border-bottom: 1px solid var(--divider);
+  padding-top: env(safe-area-inset-top, 0px);
+  transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; /* portal Bug 5 */
 }
-.topbar { display: flex; align-items: center; gap: 4px; }
-.topbar h1 { margin: 0; font-size: 17px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar .back {
-  background: none; color: var(--primary); font-size: 30px; line-height: 1; font-weight: 400;
-  padding: 0 10px 4px 0; margin-left: -4px; border-radius: 6px;
+.topbar-inner { position: relative; max-width: 480px; margin: 0 auto; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; }
+.topbar h1 {
+  position: absolute; left: 50%; transform: translateX(-50%); max-width: calc(100% - 120px);
+  margin: 0; font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-main { max-width: 720px; margin: 0 auto; padding: 16px; }
+.icon-btn { background: none; color: var(--text); padding: 6px; border-radius: 9999px; display: inline-flex; }
+.icon-btn:hover { background: rgba(255,255,255,.08); }
+.me-avatar { margin-left: auto; display: inline-flex; border-radius: 50%; text-decoration: none; }
+.me-avatar .avatar { width: 32px; height: 32px; font-size: 12px; background: rgba(255,255,255,.2); color: #fff; }
+body { padding-top: calc(56px + env(safe-area-inset-top, 0px)); }
+main { max-width: 480px; margin: 0 auto; padding: 16px; }
 
+/* Bottom nav: matches the portal's BottomNav: card grey, outlined 22px icons over an
+   11px label, a 28×3 blue bar on the active tab, 72px tall. */
 .bottomnav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
-  display: flex; background: var(--card); border-top: 1px solid var(--divider);
-  padding-bottom: env(safe-area-inset-bottom);
-  transform: translateZ(0); /* portal Bug 5: keep fixed bars attached on iOS */
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  background: var(--card); border-top: 1px solid var(--divider);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden;
 }
+.bottomnav-inner { max-width: 480px; margin: 0 auto; height: 72px; display: flex; }
 .bottomnav a {
-  flex: 1; text-align: center; padding: 14px 4px; font-size: 14px; font-weight: 500;
-  color: var(--text-2); text-decoration: none;
+  position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 4px; padding-top: 15px; text-decoration: none; color: var(--text-2);
+  font-size: 11px; font-weight: 500; line-height: 1; letter-spacing: .01em;
 }
-.bottomnav a.active { color: var(--primary); }
+.bottomnav a[hidden] { display: none; }
+.bottomnav a.active { color: var(--primary); font-weight: 600; }
+.bottomnav a.active::before {
+  content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 28px; height: 3px; background: var(--primary); border-radius: 0 0 4px 4px;
+}
 
-.card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
 .card h2 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
 .meta { font-size: 13px; color: var(--text-2); }
 .muted { color: var(--text-2); }
@@ -60,7 +78,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
 input, select, textarea {
   width: 100%; font: inherit; font-size: 16px; color: var(--text);
-  background: var(--bg); border: 1px solid var(--divider); border-radius: 8px; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--divider); border-radius: 12px; padding: 10px 12px;
 }
 textarea { min-height: 80px; resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
@@ -80,7 +98,7 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
 button, .btn {
-  font: inherit; font-size: 15px; font-weight: 500; border: 0; border-radius: 8px;
+  font: inherit; font-size: 15px; font-weight: 500; border: 0; border-radius: 9999px;
   padding: 11px 16px; cursor: pointer; background: var(--primary); color: #fff;
 }
 button.secondary { background: var(--modal); color: var(--text); }
@@ -96,7 +114,7 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .chip[aria-pressed="true"] { background: var(--primary); }
 
-.banner { background: var(--warn-bg); color: var(--warn); font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.banner { background: var(--warn-bg); color: var(--warn); font-size: 13px; padding: 10px 12px; border-radius: 12px; margin-bottom: 12px; }
 .error { color: var(--danger); font-size: 13px; }
 .error:empty { display: none; } /* no reserved gap above the button when there's no error */
 
@@ -108,7 +126,7 @@ button:disabled { opacity: .5; cursor: default; }
 
 /* Hero tiles */
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-.tile { background: var(--card); border-radius: 12px; padding: 12px; }
+.tile { background: var(--card); border-radius: 16px; padding: 12px; }
 .tile .num { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tile .lbl { font-size: 13px; color: var(--text-2); }
 
@@ -145,7 +163,7 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .toast {
   position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-  background: var(--modal); padding: 10px 16px; border-radius: 8px; font-size: 14px; z-index: 30;
+  background: var(--modal); padding: 10px 16px; border-radius: 9999px; font-size: 14px; z-index: 30;
   max-width: calc(100% - 32px);
 }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -172,7 +190,7 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .eyebrow span { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.stat { background: var(--card); border-radius: 14px; padding: 14px 16px; }
+.stat { background: var(--card); border-radius: 16px; padding: 14px 16px; }
 .stat-label { font-size: 13px; color: var(--text-2); }
 .stat-value { font-size: 30px; font-weight: 600; line-height: 1.15; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .stat-value .unit { font-size: 14px; font-weight: 500; color: var(--text-2); margin-left: 3px; }
