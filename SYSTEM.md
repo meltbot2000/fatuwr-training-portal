@@ -808,7 +808,7 @@ If a requirement is ambiguous or there is risk of a wrong assumption — **stop 
 | `server/adminSessions.test.ts` | `admin.allSessions` live attendance + revenue derivation, mixed date formats, membership-row exclusion — Bug 17 |
 | `server/sessions.test.ts` | `sessions.list` / `sessions.detail` — **`sessions.detail` currently FAILS** (pre-existing, unrelated to the above) |
 | `server/auth.logout.test.ts` | `auth.logout` — **currently FAILS** (pre-existing) |
-| `server/trainingRecords.test.ts` | Attendance rule for the partner API: closed-only, full vs half rain-off, refunds/membership rows, legacy dates, dedupe |
+| `server/trainingRecords.test.ts` | Attendance rule for the partner API: sign-up cutoff (start + 1 h SGT, shared with the sessions list), full vs half rain-off, refunds/membership rows, legacy dates, dedupe |
 | `server/partnerApi.test.ts` | `/api/v1`: key checks, no email/fees leak, Sheet-fallback refusal, login relay |
 
 Baseline as of 2026-09-01: **40 passing, 2 failing**, both failures pre-existing. Compare against this baseline before blaming a change.
