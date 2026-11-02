@@ -260,7 +260,7 @@ async function renderDashboard() {
     ${competitions.length > 1 ? `<div style="margin-bottom:12px"><label for="comp">Competition</label>
       <select id="comp">${competitions.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${esc(x.name)} · ${fmtDate(x.competitionDate, true)}</option>`).join("")}</select></div>` : ""}
     <div class="card row spread" style="align-items:center">
-      <div style="min-width:0"><div class="name" style="font-size:17px;font-weight:600">${esc(c.name)}</div>
+      <div style="min-width:0"><div class="title">${esc(c.name)}</div>
         <div class="meta">${fmtDate(c.competitionDate, true)} · prep from ${fmtDate(c.startDate, true)}</div></div>
       <div class="countdown">${daysLeft >= 0
         ? `<div class="num">${daysLeft}</div><div class="lbl">${daysLeft === 1 ? "day to go" : "days to go"}</div>`
@@ -276,21 +276,23 @@ async function renderDashboard() {
     })()}
     ${data.weeks === null ? `<p class="meta range-line">Starts ${fmtDate(data.range.from, true)}, nothing to show yet</p>` : `<div class="range-gap"></div>`}
 
-    <section class="statrow">
-      <h3 class="eyebrow">Team <span>· average per person</span></h3>
-      <div class="stats">
-        ${stat("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total, whole squad`)}
-        ${stat("Other workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total, whole squad`)}
+    <section class="card summary-card" aria-label="Team average per person">
+      <div class="summary-head"><span class="title">Team average</span><span class="meta">per person</span></div>
+      <div class="summary">
+        ${statCol("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total`)}
+        <span class="summary-divider" aria-hidden="true"></span>
+        ${statCol("Other workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total`)}
       </div>
     </section>
 
-    <section class="statrow">
-      <h3 class="eyebrow">You <span>· ${esc(me.member.name)}</span></h3>
-      ${mine ? `<div class="stats">
-        ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
-        ${stat("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
+    <section class="card summary-card you-card" aria-label="You">
+      <div class="summary-head">${avatar(me.member)}<span class="title">You</span></div>
+      ${mine ? `<div class="summary">
+        ${statCol("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
+        <span class="summary-divider" aria-hidden="true"></span>
+        ${statCol("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
       </div>
-      <p class="meta targets">Targets: at least ${plural(T.trainingsPerWeekMin, "training")} and ${plural(T.workoutsPerWeekMin, "other workout")} a week.</p>`
+      <p class="meta targets">Target: ${plural(T.trainingsPerWeekMin, "training")} + ${plural(T.workoutsPerWeekMin, "other workout")} a week</p>`
       : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
@@ -322,14 +324,14 @@ const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
  * With `meets`, the box is tinted green when the target is met and red when not.
  * The targets themselves are spelled out once, under the row.
  */
-function stat(label, perWeek, sub, meets) {
+function statCol(label, perWeek, sub, meets) {
   const has = perWeek !== null && perWeek !== undefined;
-  const cls = meets && has ? (meets(perWeek) ? " good" : " bad") : "";
-  const state = cls === " good" ? ", target met" : cls === " bad" ? ", below target" : "";
-  return `<div class="stat${cls}" aria-label="${esc(label)}: ${has ? perWeek.toFixed(1) + " per week" : "no data"}${state}">
-    <div class="stat-label">${esc(label)}</div>
-    <div class="stat-value">${has ? perWeek.toFixed(1) : "—"}<span class="unit">/wk</span></div>
-    <div class="stat-sub">${esc(sub)}</div>
+  const good = !!(meets && has && meets(perWeek));
+  const state = meets && has ? (good ? ", target met" : ", below target") : "";
+  return `<div class="stat-col" aria-label="${esc(label)}: ${has ? perWeek.toFixed(1) + " per week" : "no data"}${state}">
+    <div class="meta">${esc(label)}</div>
+    <div class="big${good ? " good" : ""}">${has ? perWeek.toFixed(1) : "—"}<span class="unit">/wk</span></div>
+    <div class="meta">${esc(sub)}</div>
   </div>`;
 }
 
