@@ -51,6 +51,11 @@ Admin (default 2 trainings and 1 other workout; `competitions.target_trainings` 
 week and other workouts **at least the target**. "Per week" means the total divided by the weeks
 elapsed in the period, with a minimum of 1 week.
 
+**Colours:** blue = regular trainings, amber = other workouts (bars and legend only).
+Numbers are **green when a target is met** and otherwise the normal text colour. There's no
+red for "below target": next to the series colours it read as part of the legend, and
+red/green can't be told apart by colour-blind viewers. Red is kept for Delete and errors.
+
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
 "today" is Singapore time.
 
@@ -79,7 +84,7 @@ right. Saving a workout shows a wiggling Puff.
   `/api/version` whenever it's reopened and reloads itself if a new version is live.
   Pull down at the top of the page to reload by hand (home-screen app only).
 - `manifest.webmanifest` makes "Add to Home Screen" open `/amager/` full-screen with the
-  red icon.
+  cruising-Puff icon.
 
 ## Access
 

@@ -12,9 +12,11 @@
   --warn: #F5C518;
   --danger: #E66767;
   --good: #4CAF50; /* design system --color-success */
-  /* Data series — validated pair for the #1E1E1E surface (dataviz validator: all pass). */
+  /* Data series: validated pair for the #1E1E1E surface (dataviz validator: all pass).
+     Other workouts are AMBER, not orange: orange sat next to the red/green target colours
+     and read as "below target" (orange vs red ΔE 7, under the 15 floor). */
   --series-training: #3987e5;
-  --series-workout: #d95926;
+  --series-workout: #c98500;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -201,8 +203,11 @@ button:disabled { opacity: .5; cursor: default; }
 .stat-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
 .stat.good { background: rgba(76, 175, 80, .13); }
 .stat.good .stat-value { color: var(--good); }
-.stat.bad { background: rgba(230, 103, 103, .13); }
-.stat.bad .stat-value { color: var(--danger); }
+/* Below target is the plain default (no red): only meeting a target is highlighted.
+   Red beside the series colours confused the legend, and red/green is unreadable for
+   colour-blind viewers (deutan ΔE 1.5). The aria-label still says "below target". */
+.stat.bad { background: var(--card); }
+.stat.bad .stat-value { color: var(--text); }
 .targets { margin: 8px 2px 0; font-size: 12px; }
 .board .counts b { font-weight: 600; color: var(--text); }
 
@@ -216,7 +221,7 @@ html, body { overscroll-behavior-y: contain; }
 
 /* Squad list: on/below target */
 .board .ok { color: var(--good) !important; font-weight: 600; }
-.board .low { color: var(--danger) !important; font-weight: 600; }
+.board .low { color: var(--text) !important; font-weight: 600; }   /* default, not red */
 
 /* ── Puff tab ───────────────────────────────────────────────────────────── */
 .cute { font-family: "Baloo 2", Inter, system-ui, sans-serif; font-weight: 700; letter-spacing: .01em; }
