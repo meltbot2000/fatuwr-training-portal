@@ -482,13 +482,15 @@ async function renderMember(id) {
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.kind === "t" ? -1 : 1));
   const mins = d.workouts.reduce((a, w) => a + w.durationMin, 0);
   const mine = me.member.id === d.member.id;
+  // Trainings beyond the weekly minimum count as other workouts (no double counting).
+  const asOther = d.trainings.filter((t) => t.countsAsOther).length;
 
   view.innerHTML = `
     <div class="card row">${avatar(d.member)}<div><div class="name" style="font-weight:500">${esc(d.member.name)}</div>
       <div class="meta">${esc(d.periodLabel)} · ${fmtDate(d.range.from, true)} – ${fmtDate(d.range.to, true)}</div></div></div>
     <div class="tiles">
-      <div class="tile"><div class="num">${d.trainings.length}</div><div class="lbl">trainings</div></div>
-      <div class="tile"><div class="num">${d.workouts.length}</div><div class="lbl">other workouts</div></div>
+      <div class="tile"><div class="num">${d.trainings.length - asOther}</div><div class="lbl">trainings</div></div>
+      <div class="tile"><div class="num">${d.workouts.length + asOther}</div><div class="lbl">other workouts</div></div>
       <div class="tile"><div class="num">${fmtMins(mins)}</div><div class="lbl">other workout time</div></div>
     </div>
     ${d.syncError ? `<div class="banner">Training data last refreshed ${esc(ago(d.syncedAt))}; the latest refresh failed.</div>` : ""}
@@ -508,9 +510,9 @@ async function renderMember(id) {
 
 function trainingItem(t) {
   return `<li><div class="date">${fmtDate(t.date)}</div><div style="flex:1">
-    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-training)"></i>Training</span>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-${t.countsAsOther ? "workout" : "training"})"></i>Training</span>
     <span style="font-size:14px">${esc(t.pool)}${t.trainingTime ? ` · ${esc(t.trainingTime)}` : ""}</span></div>
-    <div class="meta">${esc(t.activity === "Regular Training" ? "Training" : t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}</div></div></li>`;
+    <div class="meta">${esc(t.activity === "Regular Training" ? "Training" : t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}${t.countsAsOther ? " · counted as other workout" : ""}</div></div></li>`;
 }
 
 function workoutItem(w, mine) {

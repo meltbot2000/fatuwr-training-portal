@@ -226,11 +226,13 @@ describe("Puff", () => {
   });
   it("tank order: glowing fish (2+ trainings and 1+ extra) furthest right, then by sessions", () => {
     const s = puffSummary(squad,
-      [...tr(1, 2), ...tr(2, 4), ...tr(3, 1)],      // Ann 2t, Bo 4t (no extra → not met), Cy 1t
-      [...tr(1, 1)],                                  // Ann met both
+      [...tr(1, 2), ...tr(2, 4), ...tr(3, 1)],      // Ann 2t, Bo 4t, Cy 1t
+      [...tr(1, 1)],                                  // Ann 1 other workout → met both
       today);
+    // Bo's 4 trainings = 2 trainings + 2 counted as other workouts (no double counting),
+    // so Bo meets both targets too, and with 4 sessions sits right of Ann's 3.
     const byRank = [...s.fish].sort((a, b) => a.rank - b.rank).map(f => `${f.name}:${f.status}`);
-    expect(byRank).toEqual(["Di:0", "Cy:1", "Bo:1", "Ann:2"]);
+    expect(byRank).toEqual(["Di:0", "Cy:1", "Ann:2", "Bo:2"]);
   });
 });
 
@@ -253,5 +255,46 @@ describe("weekly targets (per competition)", () => {
     expect([def.goal, def.fish[0].status, def.perPerson]).toEqual([3, 2, { trainings: 2, workouts: 1 }]);
     expect([c32.goal, c32.fish[0].status, c32.mood]).toEqual([5, 2, "sparkly"]);
     expect([c41.goal, c41.fish[0].status, c41.pct]).toEqual([5, 1, 1]);
+  });
+});
+
+import { mondayOf, splitTrainings } from "./stats";
+
+describe("no double counting: trainings beyond the weekly minimum count as other workouts", () => {
+  it("weeks run Monday to Sunday", () => {
+    expect(mondayOf("2026-11-02")).toBe("2026-11-02"); // Mon
+    expect(mondayOf("2026-11-08")).toBe("2026-11-02"); // Sun
+    expect(mondayOf("2026-11-01")).toBe("2026-10-26"); // Sun → previous Mon
+    expect(mondayOf("2027-01-01")).toBe("2026-12-28"); // across the year
+  });
+  it("first N each week stay trainings, the rest move; earliest first", () => {
+    const t = ["2026-11-02", "2026-11-04", "2026-11-06", "2026-11-08", "2026-11-10"].map(date => ({ date }));
+    const s = splitTrainings(t, 2);
+    expect(s.counted.map(x => x.date)).toEqual(["2026-11-02", "2026-11-04", "2026-11-10"]);
+    expect(s.overflow.map(x => x.date)).toEqual(["2026-11-06", "2026-11-08"]);
+  });
+  it("a big week can't make up for a missed one", () => {
+    const t = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map(date => ({ date }));   // 4 in week 1, 0 in week 2
+    expect(splitTrainings(t, 2).counted).toHaveLength(2);
+  });
+  it("Dashboard: 4 trainings + 0 workouts in a week shows 2 + 2", () => {
+    const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
+    const tr = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map(date => ({ member_id: 1, date }));
+    const [row] = buildDashboard(m, tr, [], { from: "2026-11-02", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([row.trainings, row.workouts, row.trainingsAsOther]).toEqual([2, 2, 2]);
+  });
+  it("the split uses the whole week even when the period starts mid-week", () => {
+    // Prep starts Wed 4 Nov; Mon+Tue trainings (before the period) fill the weekly minimum,
+    // so Wed's training is an extra one: it shows as an other workout inside the period.
+    const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
+    const tr = ["2026-11-02", "2026-11-03", "2026-11-04"].map(date => ({ member_id: 1, date }));
+    const [row] = buildDashboard(m, tr, [], { from: "2026-11-04", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([row.trainings, row.workouts]).toEqual([0, 1]);
+  });
+  it("Puff: extra trainings count toward the other-workout target", () => {
+    const m = [{ id: 1, name: "Ann", image: null }];
+    const tr = ["2026-11-02", "2026-11-03", "2026-11-04"].map(date => ({ member_id: 1, date }));
+    const s = puffSummary(m, tr, [], "2026-11-05", { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([s.fish[0].trainings, s.fish[0].workouts, s.fish[0].status, s.sessions]).toEqual([2, 1, 2, 3]);
   });
 });
