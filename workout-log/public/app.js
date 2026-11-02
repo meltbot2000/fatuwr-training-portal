@@ -256,7 +256,7 @@ async function renderDashboard() {
       <h3 class="eyebrow">Team <span>· average per person</span></h3>
       <div class="stats">
         ${stat("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total, whole squad`)}
-        ${stat("Extra workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total, whole squad`)}
+        ${stat("Other workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total, whole squad`)}
       </div>
     </section>
 
@@ -264,15 +264,15 @@ async function renderDashboard() {
       <h3 class="eyebrow">You <span>· ${esc(me.member.name)}</span></h3>
       ${mine ? `<div class="stats">
         ${stat("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
-        ${stat("Extra workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
+        ${stat("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
       </div>
-      <p class="meta targets">Targets: at least ${plural(T.trainingsPerWeekMin, "training")} and ${plural(T.workoutsPerWeekMin, "extra workout")} a week.</p>`
+      <p class="meta targets">Targets: at least ${plural(T.trainingsPerWeekMin, "training")} and ${plural(T.workoutsPerWeekMin, "other workout")} a week.</p>`
       : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
       <h2 style="margin:0 0 4px">Squad · ${rows.length}</h2>
-      <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Extra workouts</span></div>
+      <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Other workouts</span></div>
       ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max, T)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
       <p class="meta" style="margin:8px 0 0">Synced ${esc(ago(oldestSync))}</p>
     </div>`;
@@ -318,20 +318,20 @@ function boardRow(r, max, T) {
   const tCls = mark(r.avgTrainingsPerWeek, (v) => v >= T.trainingsPerWeekMin);
   const wCls = mark(r.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin);
   const avgs = r.avgTrainingsPerWeek === null || r.avgTrainingsPerWeek === undefined ? ""
-    : `<span class="${tCls}">${r.avgTrainingsPerWeek.toFixed(1)}</span> trainings/wk · <span class="${wCls}">${r.avgWorkoutsPerWeek.toFixed(1)}</span> extra/wk`;
+    : `<span class="${tCls}">${r.avgTrainingsPerWeek.toFixed(1)}</span> trainings/wk · <span class="${wCls}">${r.avgWorkoutsPerWeek.toFixed(1)}</span> other/wk`;
   const bits = [
-    r.workouts ? fmtMins(r.workoutMinutes) + " extra" : "",
+    r.workouts ? fmtMins(r.workoutMinutes) + " other" : "",
     r.lastActive ? `last ${fmtDate(r.lastActive)}` : "no activity yet",
   ].filter(Boolean).join(" · ");
-  const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} extra workouts`;
+  const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} other workouts`;
   return `<li><a class="item" href="#/member/${r.member.id}" aria-label="${esc(label)}">
     <div class="row">${avatar(r.member)}
       <div style="flex:1;min-width:0"><div class="name">${esc(r.member.name)}</div></div>
-      <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">extra</span></div>
+      <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">other</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">
       ${r.trainings ? `<span class="t" style="width:${pct(r.trainings)}%" data-tip="${r.trainings} regular training${r.trainings === 1 ? "" : "s"}"></span>` : ""}
-      ${r.workouts ? `<span class="w" style="width:${pct(r.workouts)}%" data-tip="${r.workouts} extra workout${r.workouts === 1 ? "" : "s"} · ${fmtMins(r.workoutMinutes)}"></span>` : ""}
+      ${r.workouts ? `<span class="w" style="width:${pct(r.workouts)}%" data-tip="${r.workouts} other workout${r.workouts === 1 ? "" : "s"} · ${fmtMins(r.workoutMinutes)}"></span>` : ""}
     </div>` : ""}
     <div class="meta sub">${avgs ? `${avgs}<br>` : ""}${esc(bits)}${types ? `<br>${types}` : ""}${r.syncError ? `<br><span style="color:var(--warn)">training sync failing</span>` : ""}</div>
   </a></li>`;
@@ -405,7 +405,7 @@ async function renderPuff() {
       }).join("")}</div>
       <details class="how">
         <summary>How it works</summary>
-        <p>Sessions the squad logged in the last 7 days ÷ the team goal of ${d.perPerson.trainings + d.perPerson.workouts} per person (${plural(d.perPerson.trainings, "training")} + ${plural(d.perPerson.workouts, "extra workout")}). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
+        <p>Sessions the squad logged in the last 7 days ÷ the team goal of ${d.perPerson.trainings + d.perPerson.workouts} per person (${plural(d.perPerson.trainings, "training")} + ${plural(d.perPerson.workouts, "other workout")}). It's a rolling 7 days, so Puff doesn't crash every Monday.</p>
       </details>
       ${me.canLog ? `<a class="btn full" href="#/log" style="text-align:center;text-decoration:none">+ Log a workout</a>` : ""}
     </section>
@@ -420,9 +420,9 @@ async function renderPuff() {
           const size = 38 + Math.min(f.sessions, 6) * 3;
           const sprite = f.status === 2 ? "puffed" : f.status === 1 ? "small" : "snoozing";
           const isMe = f.id === me.member.id;
-          const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} extra in the last 7 days${f.status === 2 ? ", met both targets" : ""}`;
+          const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} other workouts in the last 7 days${f.status === 2 ? ", met both targets" : ""}`;
           return `<button type="button" class="fish s${f.status}${isMe ? " me" : ""}" style="left:${x}%;top:${y}%"
-              data-tip="${esc(`${f.name} · ${f.trainings} trainings, ${f.workouts} extra${f.status === 2 ? " ✓" : ""}`)}" aria-label="${esc(label)}">
+              data-tip="${esc(`${f.name} · ${f.trainings} trainings, ${f.workouts} other${f.status === 2 ? " ✓" : ""}`)}" aria-label="${esc(label)}">
             <span class="swim" style="animation-duration:${3 + (f.rank % 4) * 0.9}s;animation-delay:-${f.rank * 0.7}s">${puffImg(sprite, size)}</span>
             <span class="nm">${isMe ? "You" : esc(f.name.split(" ")[0])}</span></button>`;
         }).join("")}
@@ -466,8 +466,8 @@ async function renderMember(id) {
       <div class="meta">${esc(d.periodLabel)} · ${fmtDate(d.range.from, true)} – ${fmtDate(d.range.to, true)}</div></div></div>
     <div class="tiles">
       <div class="tile"><div class="num">${d.trainings.length}</div><div class="lbl">trainings</div></div>
-      <div class="tile"><div class="num">${d.workouts.length}</div><div class="lbl">extra workouts</div></div>
-      <div class="tile"><div class="num">${fmtMins(mins)}</div><div class="lbl">extra time</div></div>
+      <div class="tile"><div class="num">${d.workouts.length}</div><div class="lbl">other workouts</div></div>
+      <div class="tile"><div class="num">${fmtMins(mins)}</div><div class="lbl">other workout time</div></div>
     </div>
     ${d.syncError ? `<div class="banner">Training data last refreshed ${esc(ago(d.syncedAt))}; the latest refresh failed.</div>` : ""}
     <div class="card">
@@ -569,7 +569,7 @@ async function renderAdmin() {
       </div>
       <div class="grid2">
         <div><label for="ct">Trainings per week</label><input id="ct" type="number" inputmode="numeric" min="0" max="14" step="1" required value="2"></div>
-        <div><label for="cw">Extra workouts per week</label><input id="cw" type="number" inputmode="numeric" min="0" max="14" step="1" required value="1"></div>
+        <div><label for="cw">Other workouts per week</label><input id="cw" type="number" inputmode="numeric" min="0" max="14" step="1" required value="1"></div>
       </div>
       <p class="meta" style="margin:0">Weekly targets per person. They set the green/red on the Dashboard and Puff's team goal.</p>
       <p class="error" id="cerr"></p>
@@ -586,7 +586,7 @@ async function renderAdmin() {
         </div>
       <div class="grid2">
         <div><label for="et">Trainings per week</label><input id="et" type="number" inputmode="numeric" min="0" max="14" step="1" required value="${selected.targets.trainingsPerWeek}"></div>
-        <div><label for="ew">Extra workouts per week</label><input id="ew" type="number" inputmode="numeric" min="0" max="14" step="1" required value="${selected.targets.workoutsPerWeek}"></div>
+        <div><label for="ew">Other workouts per week</label><input id="ew" type="number" inputmode="numeric" min="0" max="14" step="1" required value="${selected.targets.workoutsPerWeek}"></div>
       </div>
       <p class="meta" style="margin:0">Weekly targets per person. They set the green/red on the Dashboard and Puff's team goal.</p>
         <p class="error" id="eerr"></p>

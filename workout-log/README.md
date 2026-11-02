@@ -1,5 +1,8 @@
 # Puff: FATUWR competition prep (workout log)
 
+Workouts outside regular training are called **other workouts** in the app (the code
+calls them `workouts`; regular trainings come from the portal).
+
 A separate small app for squads preparing for a competition:
 
 - **Log workouts** outside regular training (type: Run, Swim, Gym/Strength, HIIT, Mobility,
@@ -8,7 +11,7 @@ A separate small app for squads preparing for a competition:
 - **Training attendance syncs in automatically** from the portal through its partner API
   (`API.md`).
 - **Dashboard** for the squad: each squad member's regular trainings and
-  extra workouts, with period chips in one row: Prep (default, prep start to today) · the calendar year of the prep start (e.g. 2026) | one chip per month from prep start up to the competition month, plus a per-person
+  other workouts, with period chips in one row: Prep (default, prep start to today) · the calendar year of the prep start (e.g. 2026) | one chip per month from prep start up to the competition month, plus a per-person
   timeline with workout details.
 - **Admin** (only the login emails in `ADMIN_EMAILS`, default `tanmelanie@gmail.com`;
   **not** the portal's Admin role): create competitions (name, prep start, competition
@@ -40,12 +43,12 @@ when an admin adds someone, and on the admin "Sync now" button.
 Training data. Syncs for one person never overlap (they share a run), and a portal blip
 or a database deadlock gets one automatic retry before it is recorded as a failure.
 
-**Dashboard stats** (for the selected chip): **Team** shows the average trainings and extra
+**Dashboard stats** (for the selected chip): **Team** shows the average trainings and other
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
 The averages are coloured against the competition's **weekly targets**, set per competition in
-Admin (default 2 trainings and 1 extra workout; `competitions.target_trainings` /
+Admin (default 2 trainings and 1 other workout; `competitions.target_trainings` /
 `target_workouts`). Puff's team goal uses the same targets. Trainings must be **at least the target** a
-week and extra workouts **at least 1**. "Per week" means the total divided by the weeks
+week and other workouts **at least the target**. "Per week" means the total divided by the weeks
 elapsed in the period, with a minimum of 1 week.
 
 Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings and
@@ -55,8 +58,8 @@ Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings a
 
 The second tab. **Puff** (artwork in `public/puff/`, see `design/README.md`) shows the
 whole squad's mood over the **last 7 days, rolling**: sessions logged (regular trainings
-plus extra workouts) ÷ a team goal of the competition's weekly targets per person (default
-2 trainings + 1 extra). Under 40% is
+plus other workouts) ÷ a team goal of the competition's weekly targets per person (default
+2 trainings + 1 other). Under 40% is
 snoozing, 40–79% cruising, 80–99% puffed up, 100%+ sparkly (`PUFF` in `src/stats.ts`).
 
 **The tank:** one fish per squad member. Glowing and puffed means they met both weekly

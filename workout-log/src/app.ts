@@ -161,7 +161,7 @@ export function createApp() {
     const targetTrainings = body?.targetTrainings === undefined ? DEFAULT_TARGETS.trainingsPerWeekMin
       : intIn(body.targetTrainings, "Trainings per week", 0, 14);
     const targetWorkouts = body?.targetWorkouts === undefined ? DEFAULT_TARGETS.workoutsPerWeekMin
-      : intIn(body.targetWorkouts, "Extra workouts per week", 0, 14);
+      : intIn(body.targetWorkouts, "Other workouts per week", 0, 14);
     if (targetTrainings + targetWorkouts === 0) throw new BadRequest("Set at least one weekly target above 0");
     return { name, startDate, competitionDate, targetTrainings, targetWorkouts };
   };
