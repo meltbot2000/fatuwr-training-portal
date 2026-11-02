@@ -43,6 +43,10 @@ when an admin adds someone, and on the admin "Sync now" button.
 Training data. Syncs for one person never overlap (they share a run), and a portal blip
 or a database deadlock gets one automatic retry before it is recorded as a failure.
 
+**Trainings** = every portal session the person signed up for that has passed its sign-up
+cutoff, whatever their role: regular training, swims only, first timer, **and trainer**
+(coaching counts). Refunds and membership fees never count. See `API.md`.
+
 **Dashboard stats** (for the selected chip): **Team** shows the average trainings and other
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
 The averages are coloured against the competition's **weekly targets**, set per competition in
@@ -51,7 +55,7 @@ Admin (default 2 trainings and 1 other workout; `competitions.target_trainings` 
 week and other workouts **at least the target**. "Per week" means the total divided by the weeks
 elapsed in the period, with a minimum of 1 week.
 
-**Colours:** blue = regular trainings, purple = other workouts (bars and legend only).
+**Colours:** blue = trainings, purple = other workouts (bars and legend only).
 Numbers are **green when a target is met** and otherwise the normal text colour. There's no
 red for "below target": next to the series colours it read as part of the legend, and
 red/green can't be told apart by colour-blind viewers. Red is kept for Delete and errors.

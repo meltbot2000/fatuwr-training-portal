@@ -28,6 +28,14 @@ describe("deriveTrainingRecords", () => {
     expect(out).toEqual([]);
   });
 
+  it("counts trainer sessions (coaching counts as a training)", () => {
+    const out = deriveTrainingRecords(
+      [{ id: 7, pool: "CCAB", dateOfTraining: "2026-10-04", activity: "Trainer" }],
+      [session()], OPTS,
+    );
+    expect(out.map(r => [r.signupId, r.activity])).toEqual([[7, "Trainer"]]);
+  });
+
   it("accepts free-text session dates", () => {
     const out = deriveTrainingRecords(
       [{ id: 2, pool: "ccab ", dateOfTraining: "2026-03-01", activity: "Swims only" }],

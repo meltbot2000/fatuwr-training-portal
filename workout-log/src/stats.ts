@@ -81,7 +81,7 @@ export function periodRange(period: Period, today: string, prepStart: string): R
 }
 
 /**
- * Weekly targets per person: at least N regular trainings and M extra workouts. Set per
+ * Weekly targets per person: at least N trainings (incl. trainer sessions) and M other workouts. Set per
  * competition in Admin (competitions.target_trainings / target_workouts); these are the
  * defaults. ONE source for both screens: the Dashboard colours averages green when they
  * meet them, and Puff's team goal / glowing fish use the same numbers.
@@ -196,7 +196,7 @@ export function buildDashboard(
 /**
  * Puff's mood = how the whole squad did over the LAST 7 DAYS (rolling, so Puff doesn't
  * fall asleep every Monday): sessions logged ÷ team goal, where the goal per person is
- * the competition's weekly targets (default 2 regular trainings + 1 extra workout).
+ * the competition's weekly targets (default 2 trainings + 1 other workout).
  */
 export const PUFF = {
   windowDays: 7,

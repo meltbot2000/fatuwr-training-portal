@@ -293,7 +293,7 @@ async function renderDashboard() {
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
       <h2 style="margin:0 0 4px">Squad · ${rows.length}</h2>
-      <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Regular trainings</span><span><i style="background:var(--series-workout)"></i>Other workouts</span></div>
+      <div class="legend" aria-hidden="true"><span><i style="background:var(--series-training)"></i>Trainings</span><span><i style="background:var(--series-workout)"></i>Other workouts</span></div>
       ${rows.length ? `<ul class="board">${rows.map((r) => boardRow(r, max, T)).join("")}</ul>` : `<p class="meta">No one in this squad yet.</p>`}
       <p class="meta" style="margin:8px 0 0">Synced ${esc(ago(oldestSync))}</p>
     </div>`;
@@ -352,7 +352,7 @@ function boardRow(r, max, T) {
       <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">other</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">
-      ${r.trainings ? `<span class="t" style="width:${pct(r.trainings)}%" data-tip="${r.trainings} regular training${r.trainings === 1 ? "" : "s"}"></span>` : ""}
+      ${r.trainings ? `<span class="t" style="width:${pct(r.trainings)}%" data-tip="${r.trainings} training${r.trainings === 1 ? "" : "s"}"></span>` : ""}
       ${r.workouts ? `<span class="w" style="width:${pct(r.workouts)}%" data-tip="${r.workouts} other workout${r.workouts === 1 ? "" : "s"} · ${fmtMins(r.workoutMinutes)}"></span>` : ""}
     </div>` : ""}
     <div class="meta sub">${avgs ? `${avgs}<br>` : ""}${esc(bits)}${types ? `<br>${types}` : ""}${r.syncError ? `<br><span style="color:var(--warn)">training sync failing</span>` : ""}</div>
@@ -510,7 +510,7 @@ function trainingItem(t) {
   return `<li><div class="date">${fmtDate(t.date)}</div><div style="flex:1">
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-training)"></i>Training</span>
     <span style="font-size:14px">${esc(t.pool)}${t.trainingTime ? ` · ${esc(t.trainingTime)}` : ""}</span></div>
-    <div class="meta">${esc(t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}</div></div></li>`;
+    <div class="meta">${esc(t.activity === "Regular Training" ? "Training" : t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}</div></div></li>`;
 }
 
 function workoutItem(w, mine) {
