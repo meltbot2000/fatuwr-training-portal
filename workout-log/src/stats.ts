@@ -285,9 +285,14 @@ export function puffSummary(
   workouts: { member_id: number; date: string }[],
   today: string,
   targets: Targets = DEFAULT_TARGETS,
+  prepStart?: string,
 ) {
-  const from = addDays(today, -(PUFF.windowDays - 1));
+  // Last 7 days, but never before prep started: sessions from before the competition's
+  // prep don't count (the tank used to glow for October training when prep began 1 Nov).
+  const last7 = addDays(today, -(PUFF.windowDays - 1));
+  const from = prepStart && prepStart > last7 ? prepStart : last7;
   const win = { from, to: today };
+  const days = Math.max(1, dayNum(today) - dayNum(from) + 1);   // 1–7
   // Same no-double-counting rule as the Dashboard, with the rolling 7 days as the week:
   // trainings fill the training target first, any beyond it count as other workouts.
   const { counted, overflow } = splitByMember(trainings.filter(t => inRange(t.date, win)), targets.trainingsPerWeekMin, () => "window");
@@ -305,12 +310,13 @@ export function puffSummary(
     .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings || b.name.localeCompare(a.name))
     .forEach((f, i) => { f.rank = i; });
 
-  const goal = members.length * (targets.trainingsPerWeekMin + targets.workoutsPerWeekMin);
+  // A full week's goal, scaled down while prep is less than a week old (2 days in = 2/7).
+  const goal = members.length * (targets.trainingsPerWeekMin + targets.workoutsPerWeekMin) * (days / PUFF.windowDays);
   const sessions = fish.reduce((a, f) => a + f.sessions, 0);
   const pct = goal ? sessions / goal : 0;
   const mood = [...PUFF.moods].reverse().find(m => pct >= m.from)!;
   return {
-    window: win, goal, sessions, pct: Math.round(pct * 100) / 100,
+    window: win, days, sincePrepStart: from !== last7, goal: Math.round(goal * 10) / 10, sessions, pct: Math.round(pct * 100) / 100,
     perPerson: { trainings: targets.trainingsPerWeekMin, workouts: targets.workoutsPerWeekMin },
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,

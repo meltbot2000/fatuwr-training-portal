@@ -311,3 +311,21 @@ describe("no double counting: trainings beyond the weekly minimum count as other
     expect([s.fish[0].trainings, s.fish[0].workouts, s.fish[0].status, s.sessions]).toEqual([2, 1, 2, 3]);
   });
 });
+
+describe("Puff never counts sessions from before prep started", () => {
+  const m = [{ id: 1, name: "Ann", image: null }, { id: 2, name: "Bo", image: null }];
+  it("window starts at prep start in the first week, goal scaled to the days", () => {
+    // prep starts Sun 1 Nov; today Mon 2 Nov. Oct sessions must not count.
+    const tr = ["2026-10-28", "2026-10-30", "2026-11-01"].map(date => ({ member_id: 1, date }));
+    const s = puffSummary(m, tr, [{ member_id: 1, date: "2026-10-31" }], "2026-11-02",
+      { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 }, "2026-11-01");
+    expect(s.window).toEqual({ from: "2026-11-01", to: "2026-11-02" });
+    expect([s.days, s.sincePrepStart, s.sessions]).toEqual([2, true, 1]);
+    expect(s.goal).toBeCloseTo(2 * 3 * 2 / 7, 1);   // 2 people × 3 sessions × 2/7 of a week
+    expect(s.fish.find(f => f.name === "Ann")!.status).toBe(1);   // 1 training, not glowing
+  });
+  it("after the first week it's the normal last 7 days", () => {
+    const s = puffSummary(m, [], [], "2026-11-20", { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 }, "2026-11-01");
+    expect([s.window.from, s.days, s.sincePrepStart, s.goal]).toEqual(["2026-11-14", 7, false, 6]);
+  });
+});

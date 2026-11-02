@@ -390,6 +390,9 @@ function bindSignOut() {
 const puffImg = (name, size, cls = "") =>
   `<img class="puff-img ${cls}" src="puff/puff-${name}.webp" width="${size}" height="${size}" alt="" draggable="false">`;
 
+/** "in the last 7 days", or "since prep started" while prep is less than a week old. */
+const windowText = (d) => (d.sincePrepStart ? (d.days === 1 ? "since prep started today" : `in the ${d.days} days since prep started`) : "in the last 7 days");
+
 async function renderPuff() {
   const d = await api(`/puff${state.competitionId ? `?competitionId=${state.competitionId}` : ""}`);
   if (!d.competition) {
@@ -409,12 +412,12 @@ async function renderPuff() {
 
   view.innerHTML = `
     <section class="card puff-card">
-      <p class="eyebrow">Puff · last 7 days</p>
+      <p class="eyebrow">Puff · ${esc(windowText(d).replace(/^in /, ""))}</p>
       <div class="puff-stage">${bubbles}
         <div class="puff-wrap ${d.mood}"><div class="puff-bob">${puffImg(d.mood, 200)}</div></div>
       </div>
       <div class="mood-line"><div class="mood-name cute">${esc(d.moodLabel)}</div><div class="mood-pct">${pct}%</div></div>
-      <p class="meta">${esc(text)} The squad has done ${d.sessions} of ${d.goal} sessions in the last 7 days.</p>
+      <p class="meta">${esc(text)} The squad has done ${d.sessions} of ${Math.round(d.goal)} sessions ${esc(windowText(d))}.</p>
       <div>
         <div class="meter" aria-hidden="true"><i style="width:${Math.min(100, pct)}%"></i>
           ${d.thresholds.slice(1, 3).map((t) => `<span class="tick" style="left:${t.from * 100}%"></span>`).join("")}</div>
@@ -433,7 +436,7 @@ async function renderPuff() {
     </section>
 
     <section class="card">
-      <p class="eyebrow">The tank · last 7 days</p>
+      <p class="eyebrow">The tank · ${esc(windowText(d).replace(/^in /, ""))}</p>
       <div class="tank" id="tank">
         ${d.fish.map((f) => {
           const x = n > 1 ? 9 + (f.rank * 82) / (n - 1) : 50;     // most active → furthest right

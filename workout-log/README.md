@@ -75,7 +75,9 @@ Counts are computed on read (`src/stats.ts`). Dates are `CHAR(10)` ISO strings a
 ## Puff tab
 
 The second tab. **Puff** (artwork in `public/puff/`, see `design/README.md`) shows the
-whole squad's mood over the **last 7 days, rolling**: sessions logged (regular trainings
+whole squad's mood over the **last 7 days, rolling, never before prep start** (in the
+first week of prep it covers just the days since prep started, and the goal is scaled to
+those days): sessions logged (regular trainings
 plus other workouts) ÷ a team goal of the competition's weekly targets per person (default
 2 trainings + 1 other). Under 40% is
 snoozing, 40–79% cruising, 80–99% puffed up, 100%+ sparkly (`PUFF` in `src/stats.ts`).

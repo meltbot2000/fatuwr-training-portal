@@ -322,14 +322,15 @@ export function createApp() {
     const members = await query<any>(
       `SELECT m.id, m.name, m.image FROM squad_members s JOIN members m ON m.id = s.member_id WHERE s.competition_id = ?`, [comp.id]);
     const ids = members.map(m => m.id);
-    const from = addDays(today, -(PUFF.windowDays - 1));
+    const last7 = addDays(today, -(PUFF.windowDays - 1));
+    const from = comp.start_date > last7 ? comp.start_date : last7;   // never before prep start
     const [trainings, workouts] = ids.length
       ? await Promise.all([
           query<any>("SELECT member_id, date FROM training_records WHERE member_id IN (?) AND date >= ?", [ids, from]),
           query<any>("SELECT member_id, date FROM workouts WHERE member_id IN (?) AND date >= ?", [ids, from]),
         ])
       : [[], []];
-    res.json({ competition: competitionDto(comp), today, ...puffSummary(members, trainings, workouts, today, targetsOf(comp)) });
+    res.json({ competition: competitionDto(comp), today, ...puffSummary(members, trainings, workouts, today, targetsOf(comp), comp.start_date) });
   }));
 
   app.get("/api/dashboard", wrap(async (req, res) => {
