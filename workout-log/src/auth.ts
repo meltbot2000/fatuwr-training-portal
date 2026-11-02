@@ -104,15 +104,28 @@ export function viewerIdFrom(req: Request): number | null {
   return verifyToken(h.startsWith("Bearer ") ? h.slice(7) : "") ?? verifyToken(readCookie(req, SESSION_COOKIE));
 }
 
+/**
+ * Why a request isn't signed in, sent as `reason` with the 401 so the login screen can
+ * say why someone was signed out (makes "I got logged out" diagnosable from a screenshot):
+ *   no_saved_login  nothing arrived (device storage and cookie both gone, e.g. the
+ *                   home-screen icon was removed and re-added)
+ *   login_invalid   something arrived but didn't verify (expired after 90 days unused,
+ *                   or SESSION_SECRET changed on the server)
+ */
+function signedOutReason(req: Request): "no_saved_login" | "login_invalid" {
+  const h = req.headers.authorization || "";
+  return (h.startsWith("Bearer ") && h.length > 7) || readCookie(req, SESSION_COOKIE) ? "login_invalid" : "no_saved_login";
+}
+
 export async function requireViewer(req: Request, res: Response, next: NextFunction) {
   const id = viewerIdFrom(req);
-  if (!id) { res.status(401).json({ error: "not_signed_in" }); return; }
+  if (!id) { res.status(401).json({ error: "not_signed_in", reason: signedOutReason(req) }); return; }
   try {
     const [m] = await query<{ id: number; name: string; image: string | null; club_role: string; is_admin: number }>(
       "SELECT id, name, image, club_role, is_admin FROM members WHERE id = ?", [id]);
-    if (!m) { res.status(401).json({ error: "not_signed_in" }); return; }
+    if (!m) { res.status(401).json({ error: "not_signed_in", reason: "account_missing" }); return; }
     if (!(await hasAccess(m.id, !!m.is_admin))) {
-      res.status(401).json({ error: "not_signed_in", message: "This app is for the competition squad only." });
+      res.status(401).json({ error: "not_signed_in", reason: "not_in_squad", message: "This app is for the competition squad only." });
       return;
     }
     req.viewer = { id: m.id, name: m.name, image: m.image, clubRole: m.club_role, isAdmin: !!m.is_admin };

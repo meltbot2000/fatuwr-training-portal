@@ -12,11 +12,11 @@
   --warn: #F5C518;
   --danger: #E66767;
   --good: #4CAF50; /* design system --color-success */
-  /* Data series: validated pair for the #1E1E1E surface (dataviz validator: all pass).
-     Other workouts are AMBER, not orange: orange sat next to the red/green target colours
-     and read as "below target" (orange vs red ΔE 7, under the 15 floor). */
+  /* Data series: validated pair for the #1E1E1E surface (dataviz validator: all checks
+     pass, incl. colour-blind ΔE 8.1 and normal-vision 20.8). Other workouts are PURPLE:
+     orange read as "below target" next to red, and amber didn't look right. */
   --series-training: #3987e5;
-  --series-workout: #c98500;
+  --series-workout: #c45cb8;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -308,3 +308,5 @@ html, body { overscroll-behavior-y: contain; }
 .chips.one-row::-webkit-scrollbar { display: none; }
 .chips.one-row .chip { flex: none; font-size: 13px; font-weight: 500; padding: 7px 8px; text-align: center; }
 .chip-divider { flex: none; width: 1px; height: 20px; background: #3A3A3A; margin: 0 1px; }
+
+.signout-note { text-align: center; margin: -6px 8px 14px; font-size: 12px; }

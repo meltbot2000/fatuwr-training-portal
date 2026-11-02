@@ -46,7 +46,14 @@ async function api(path, { method = "GET", body } = {}) {
   // Relative on purpose: resolves against <base href>, so the app works under /amager/.
   const res = await fetch(`api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && data.error === "not_signed_in") { setToken(null); me = null; location.hash = "#/login"; throw new Error(data.message || "Please sign in."); }
+  if (res.status === 401 && data.error === "not_signed_in") {
+    // Remember why, so the login screen can say it (see signedOutReason in src/auth.ts).
+    // A first visit with nothing saved isn't a sign-out, so that one isn't shown.
+    let hadLogin = !!getToken();
+    try { hadLogin = hadLogin || localStorage.getItem("wl_was_signed_in") === "1"; } catch {}
+    if (hadLogin && data.reason) { try { localStorage.setItem("wl_signout", JSON.stringify({ reason: data.reason, at: Date.now() })); } catch {} }
+    setToken(null); me = null; location.hash = "#/login"; throw new Error(data.message || "Please sign in.");
+  }
   // Admin rights changed under a page that was already open: forget the cached "me" so the
   // next screen re-reads it (and the Admin tab disappears if it no longer applies).
   if (res.status === 403 && data.error === "admin_only") me = null;
@@ -117,6 +124,7 @@ async function route() {
     try {
       me = await api("/me");
       if (me.token) setToken(me.token); // renewed on every open
+      try { localStorage.setItem("wl_was_signed_in", "1"); localStorage.removeItem("wl_signout"); } catch {}
     } catch (e) {
       if (location.hash !== "#/login") view.innerHTML = `<p class="error">${esc(e.message)}</p>`;
       return;
@@ -158,12 +166,28 @@ $("#back").addEventListener("click", () => {
   else location.hash = location.hash.startsWith("#/log/") ? "#/log" : "#/";
 });
 
+// Why the last sign-out happened, if we know (one quiet line on the login screen).
+function signoutNote() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem("wl_signout") || "null"); } catch {}
+  if (!s) return "";
+  const why = {
+    login_invalid: "your saved sign-in was no longer valid (expired, or reset on the server)",
+    account_missing: "your account wasn't found in the app",
+    not_in_squad: "you're no longer in a competition squad",
+  }[s.reason];
+  if (!why) return "";
+  const when = new Date(s.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `<p class="meta signout-note">Signed out ${esc(when)}: ${esc(why)}.</p>`;
+}
+
 // ── Login ────────────────────────────────────────────────────────────────────
 function renderLogin() {
   let email = "";
   const step1 = () => {
     view.innerHTML = `
       <div class="login-brand">${puffImg("cruising", 120)}<div class="cute">Puff</div><p class="meta">FATUWR competition prep</p></div>
+      ${signoutNote()}
       <div class="card stack">
         <h2>Sign in with your FATUWR portal account</h2>
         <p class="meta">For the competition squad. We'll email you a 6-digit code — the same login as the training portal.</p>
@@ -359,7 +383,7 @@ function bindSignOut() {
   $("#signout")?.addEventListener("click", async () => {
     try { await fetch("api/auth/logout", { method: "POST" }); } catch {}
     setToken(null); me = null;
-    try { localStorage.removeItem("wl_email"); } catch {}
+    try { localStorage.removeItem("wl_email"); localStorage.removeItem("wl_was_signed_in"); localStorage.removeItem("wl_signout"); } catch {}
     location.hash = "#/login";
   });
 }
