@@ -7,7 +7,7 @@ import { clearSessionCookie, hasAccess, requireAdmin, requireViewer, setSessionC
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, DEFAULT_TARGETS, inRange, mondayOf, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, splitTrainings, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, DEFAULT_TARGETS, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, splitTrainings, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -325,8 +325,7 @@ export function createApp() {
     const from = addDays(today, -(PUFF.windowDays - 1));
     const [trainings, workouts] = ids.length
       ? await Promise.all([
-          // From the Monday of the window's first week, so the weekly training split sees whole weeks.
-          query<any>("SELECT member_id, date FROM training_records WHERE member_id IN (?) AND date >= ?", [ids, mondayOf(from)]),
+          query<any>("SELECT member_id, date FROM training_records WHERE member_id IN (?) AND date >= ?", [ids, from]),
           query<any>("SELECT member_id, date FROM workouts WHERE member_id IN (?) AND date >= ?", [ids, from]),
         ])
       : [[], []];
@@ -385,7 +384,8 @@ export function createApp() {
     ]);
     // Mark trainings beyond the weekly minimum: they count as other workouts.
     const minPerWeek = comp ? targetsOf(comp).trainingsPerWeekMin : DEFAULT_TARGETS.trainingsPerWeekMin;
-    const asOther = new Set(splitTrainings(trainings as any[], minPerWeek).overflow.map((t: any) => t.signup_id));
+    const inPeriod = (trainings as any[]).filter((t: any) => inRange(t.date, range));
+    const asOther = new Set(splitTrainings(inPeriod, minPerWeek).overflow.map((t: any) => t.signup_id));
     res.json({
       member: { id: m.id, name: m.name, image: m.image },
       syncedAt: m.trainings_synced_at, syncError: m.trainings_sync_error,

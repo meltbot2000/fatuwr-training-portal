@@ -110,15 +110,22 @@ export function mondayOf(iso: string): string {
 }
 
 /**
- * No double counting: in each Mon–Sun week, a person's first `minPerWeek` trainings
- * count as trainings; any beyond that count as OTHER WORKOUTS instead (the club's rule:
- * extra UWR sessions are extra work). Run on ALL of a person's trainings, then filter by
- * period, so a chip that starts mid-week still sees the whole week's split.
+ * No double counting: in each Mon–Sun week, a person's trainings FIRST fill the training
+ * target (`minPerWeek`); only trainings beyond it count as OTHER WORKOUTS (the club's
+ * rule: extra UWR sessions are extra work).
+ *
+ * Callers pass only the trainings INSIDE what's being shown (the chip's period, Puff's
+ * 7 days). Splitting whole calendar weeks that stick out of the period was a bug: Mon/Tue
+ * trainings before a Wednesday prep start "used up" the target, so the first training
+ * inside the period showed as an other workout and trainings read 0.
+ * `weekKey` lets Puff treat its rolling 7 days as one week.
  */
-export function splitTrainings<T extends { date: string }>(rows: T[], minPerWeek: number): { counted: T[]; overflow: T[] } {
+export function splitTrainings<T extends { date: string }>(
+  rows: T[], minPerWeek: number, weekKey: (date: string) => string = mondayOf,
+): { counted: T[]; overflow: T[] } {
   const byWeek = new Map<string, T[]>();
   for (const r of rows) {
-    const k = mondayOf(r.date);
+    const k = weekKey(r.date);
     (byWeek.get(k) ?? byWeek.set(k, []).get(k)!).push(r);
   }
   const counted: T[] = [], overflow: T[] = [];
@@ -130,12 +137,14 @@ export function splitTrainings<T extends { date: string }>(rows: T[], minPerWeek
 }
 
 /** splitTrainings for many people at once (rows carry member_id). */
-export function splitByMember<T extends { member_id: number; date: string }>(rows: T[], minPerWeek: number) {
+export function splitByMember<T extends { member_id: number; date: string }>(
+  rows: T[], minPerWeek: number, weekKey: (date: string) => string = mondayOf,
+) {
   const byMember = new Map<number, T[]>();
   for (const r of rows) (byMember.get(r.member_id) ?? byMember.set(r.member_id, []).get(r.member_id)!).push(r);
   const counted: T[] = [], overflow: T[] = [];
   for (const list of byMember.values()) {
-    const s = splitTrainings(list, minPerWeek);
+    const s = splitTrainings(list, minPerWeek, weekKey);
     counted.push(...s.counted); overflow.push(...s.overflow);
   }
   return { counted, overflow };
@@ -201,7 +210,8 @@ export function buildDashboard(
   }
   const touch = (r: DashboardRow, date: string) => { if (!r.lastActive || date > r.lastActive) r.lastActive = date; };
 
-  const { counted, overflow } = splitByMember(trainings, targets.trainingsPerWeekMin);
+  // Only trainings inside the period take part (see splitTrainings for why).
+  const { counted, overflow } = splitByMember(trainings.filter(t => inRange(t.date, range)), targets.trainingsPerWeekMin);
   for (const t of counted) {
     const r = rows.get(t.member_id);
     if (!r || !inRange(t.date, range)) continue;
@@ -278,9 +288,9 @@ export function puffSummary(
 ) {
   const from = addDays(today, -(PUFF.windowDays - 1));
   const win = { from, to: today };
-  // Same no-double-counting split as the Dashboard (per Mon–Sun week, over every training
-  // passed in; the caller fetches from the Monday before the window so weeks are whole).
-  const { counted, overflow } = splitByMember(trainings, targets.trainingsPerWeekMin);
+  // Same no-double-counting rule as the Dashboard, with the rolling 7 days as the week:
+  // trainings fill the training target first, any beyond it count as other workouts.
+  const { counted, overflow } = splitByMember(trainings.filter(t => inRange(t.date, win)), targets.trainingsPerWeekMin, () => "window");
   const fish = members.map(m => {
     const t = counted.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
     const w = workouts.filter(x => x.member_id === m.id && inRange(x.date, win)).length

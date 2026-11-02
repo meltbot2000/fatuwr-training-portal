@@ -47,13 +47,14 @@ or a database deadlock gets one automatic retry before it is recorded as a failu
 cutoff, whatever their role: regular training, swims only, first timer, **and trainer**
 (coaching counts). Refunds and membership fees never count. See `API.md`.
 
-**No double counting:** in each Mon–Sun week, a person's first N trainings (N = the
-competition's training target) count as trainings; any **beyond N count as other
-workouts** instead (`splitTrainings` in `src/stats.ts`). So 4 trainings and 0 workouts in a
-week show as 2 + 2. The split runs per calendar week over all of a person's trainings,
-then the chip's period is applied, so a period starting mid-week still sees whole weeks.
-A big week can't make up for a missed one. Applied on the Dashboard, the squad list, a
-person's page (marked "counted as other workout"), Puff's mood and the tank.
+**No double counting:** within each Mon–Sun week of what's being shown, a person's
+trainings **fill the training target first** (N = the competition's training target); only
+trainings **beyond N count as other workouts** (`splitTrainings` in `src/stats.ts`). So 4
+trainings and 0 workouts in a week show as 2 + 2. Only sessions inside the selected period
+take part: a week cut by the period's start or end counts only its days inside the period,
+so trainings outside the period never use up the target. Puff treats its rolling 7 days
+as one week. A big week can't make up for a missed one. Applied on the Dashboard, the
+squad list, a person's page (marked "counted as other workout"), Puff's mood and the tank.
 
 **Dashboard stats** (for the selected chip): **Team** shows the average trainings and other
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.

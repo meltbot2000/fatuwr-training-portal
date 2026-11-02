@@ -283,13 +283,26 @@ describe("no double counting: trainings beyond the weekly minimum count as other
     const [row] = buildDashboard(m, tr, [], { from: "2026-11-02", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
     expect([row.trainings, row.workouts, row.trainingsAsOther]).toEqual([2, 2, 2]);
   });
-  it("the split uses the whole week even when the period starts mid-week", () => {
-    // Prep starts Wed 4 Nov; Mon+Tue trainings (before the period) fill the weekly minimum,
-    // so Wed's training is an extra one: it shows as an other workout inside the period.
+  it("trainings fill the training target first, even when the period starts mid-week", () => {
+    // Regression: prep starts Wed 4 Nov. Mon+Tue trainings are OUTSIDE the period and must
+    // not use up the target, so Wed's training is a training, not an other workout.
     const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
     const tr = ["2026-11-02", "2026-11-03", "2026-11-04"].map(date => ({ member_id: 1, date }));
     const [row] = buildDashboard(m, tr, [], { from: "2026-11-04", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
-    expect([row.trainings, row.workouts]).toEqual([0, 1]);
+    expect([row.trainings, row.workouts]).toEqual([1, 0]);
+  });
+  it("a period of one training never shows it as an other workout", () => {
+    const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
+    const tr = ["2026-10-28", "2026-10-30", "2026-11-01"].map(date => ({ member_id: 1, date }));   // Wed, Fri, Sun
+    const [row] = buildDashboard(m, tr, [], { from: "2026-11-01", to: "2026-11-02" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([row.trainings, row.workouts]).toEqual([1, 0]);
+  });
+  it("Puff: trainings before the 7-day window don't use up the target", () => {
+    const m = [{ id: 1, name: "Ann", image: null }];
+    // window = 7–13 Dec; 30 Nov/1 Dec are outside; 8, 9 Dec inside → both are trainings
+    const tr = ["2026-11-30", "2026-12-01", "2026-12-08", "2026-12-09"].map(date => ({ member_id: 1, date }));
+    const s = puffSummary(m, tr, [], "2026-12-13", { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
+    expect([s.fish[0].trainings, s.fish[0].workouts]).toEqual([2, 0]);
   });
   it("Puff: extra trainings count toward the other-workout target", () => {
     const m = [{ id: 1, name: "Ann", image: null }];
