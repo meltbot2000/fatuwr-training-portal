@@ -322,15 +322,14 @@ html, body { overscroll-behavior-y: contain; }
 .board .counts { font-size: 13px; }
 .board .counts b { font-weight: 600; }
 
-/* Team vs You: the squad's card is plain; yours is outlined and tinted blue. */
-.summary-card { display: grid; gap: 12px; }
-.summary-head { display: flex; align-items: center; gap: 8px; }
-.summary-head .meta { margin-left: auto; }
-.summary-head .avatar { width: 26px; height: 26px; }
-.summary { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); gap: 16px; }
-.summary-divider { background: var(--divider); }
-.stat-col { display: grid; gap: 2px; }
-.stat-col .meta { margin: 0; }
-.you-card { background: rgba(33, 150, 243, .07); box-shadow: inset 0 0 0 1px rgba(33, 150, 243, .45); }
-.you-card .summary-divider { background: rgba(33, 150, 243, .25); }
-.you-card .targets { margin: 0; font-size: 13px; }
+/* Team vs You in ONE row: four equal boxes, Team's pair on the left, yours (outlined
+   blue) on the right. "/wk" and your target live in the small heading above each pair. */
+.kpis { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin: 4px 0 16px; }
+.kpi-group { display: grid; gap: 6px; min-width: 0; }
+.kpi-head { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--text-2); padding: 0 2px; white-space: nowrap; }
+.kpi-head span:first-child { color: var(--text); font-weight: 500; }
+.kpi-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.kpi { background: var(--card); border-radius: 16px; padding: 12px; display: grid; gap: 2px; min-width: 0; }
+.kpi .meta { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-group.you .kpi { background: rgba(33, 150, 243, .07); box-shadow: inset 0 0 0 1px rgba(33, 150, 243, .45); }
+.kpi-empty { margin: 0; padding: 12px 2px; }

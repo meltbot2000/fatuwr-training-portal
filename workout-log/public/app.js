@@ -276,24 +276,21 @@ async function renderDashboard() {
     })()}
     ${data.weeks === null ? `<p class="meta range-line">Starts ${fmtDate(data.range.from, true)}, nothing to show yet</p>` : `<div class="range-gap"></div>`}
 
-    <section class="card summary-card" aria-label="Team average per person">
-      <div class="summary-head"><span class="title">Team average</span><span class="meta">per person</span></div>
-      <div class="summary">
-        ${statCol("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total`)}
-        <span class="summary-divider" aria-hidden="true"></span>
-        ${statCol("Other workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total`)}
+    <section class="kpis" aria-label="Weekly averages">
+      <div class="kpi-group">
+        <div class="kpi-head"><span>Team avg</span><span>/wk</span></div>
+        <div class="kpi-pair">
+          ${kpi("Trainings", data.team.avgTrainingsPerWeek)}
+          ${kpi("Other", data.team.avgWorkoutsPerWeek)}
+        </div>
       </div>
-    </section>
-
-    <section class="card summary-card you-card" aria-label="You">
-      <div class="summary-head">${avatar(me.member)}<span class="title">You</span></div>
-      ${mine ? `<div class="summary">
-        ${statCol("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
-        <span class="summary-divider" aria-hidden="true"></span>
-        ${statCol("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
+      <div class="kpi-group you">
+        <div class="kpi-head"><span>You</span><span>target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
+        ${mine ? `<div class="kpi-pair">
+          ${kpi("Trainings", mine.avgTrainingsPerWeek, (v) => v >= T.trainingsPerWeekMin)}
+          ${kpi("Other", mine.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin)}
+        </div>` : `<p class="meta kpi-empty">Not in this squad</p>`}
       </div>
-      <p class="meta targets">Target: ${plural(T.trainingsPerWeekMin, "training")} + ${plural(T.workoutsPerWeekMin, "other workout")} a week</p>`
-      : `<p class="meta">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
     <div class="card">
@@ -324,14 +321,13 @@ const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
  * With `meets`, the box is tinted green when the target is met and red when not.
  * The targets themselves are spelled out once, under the row.
  */
-function statCol(label, perWeek, sub, meets) {
+/** One small number box: label + weekly average; green when it meets the target. */
+function kpi(label, perWeek, meets) {
   const has = perWeek !== null && perWeek !== undefined;
   const good = !!(meets && has && meets(perWeek));
   const state = meets && has ? (good ? ", target met" : ", below target") : "";
-  return `<div class="stat-col" aria-label="${esc(label)}: ${has ? perWeek.toFixed(1) + " per week" : "no data"}${state}">
-    <div class="meta">${esc(label)}</div>
-    <div class="big${good ? " good" : ""}">${has ? perWeek.toFixed(1) : "—"}<span class="unit">/wk</span></div>
-    <div class="meta">${esc(sub)}</div>
+  return `<div class="kpi" aria-label="${esc(label)}: ${has ? perWeek.toFixed(1) + " per week" : "no data"}${state}">
+    <div class="meta">${esc(label)}</div><div class="big${good ? " good" : ""}">${has ? perWeek.toFixed(1) : "—"}</div>
   </div>`;
 }
 
