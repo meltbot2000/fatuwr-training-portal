@@ -250,6 +250,7 @@ async function renderDashboard() {
   if (data.period !== state.period) { state.period = data.period; saveState(); }
   const daysLeft = daysBetween(data.today, c.competitionDate);
   const rows = data.rows;
+  const sum = (k) => rows.reduce((a, r) => a + r[k], 0);
   const mine = rows.find((r) => r.member.id === me.member.id);
   const T = data.targets;
   const max = Math.max(1, ...rows.map((r) => r.trainings + r.workouts));
@@ -279,15 +280,15 @@ async function renderDashboard() {
     <section aria-label="Team average per person">
       <div class="sec-title"><span class="title">Team average</span><span class="meta">per person</span></div>
       <div class="boxes">
-        ${box("Trainings", data.team.avgTrainingsPerWeek, `${rows.reduce((a, r) => a + r.trainings, 0)} total`)}
-        ${box("Other workouts", data.team.avgWorkoutsPerWeek, `${rows.reduce((a, r) => a + r.workouts, 0)} total`)}
+        ${box("Trainings", data.team.avgTrainingsPerWeek, trainingsSub(sum("trainings"), sum("extraTrainings")))}
+        ${box("Other workouts", data.team.avgWorkoutsPerWeek, workoutsSub(sum("workouts"), sum("extraTrainings")))}
       </div>
     </section>
     <section aria-label="You">
       <div class="sec-title"><span class="title">You</span><span class="meta">target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
       ${mine ? `<div class="boxes you">
-        ${box("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
-        ${box("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
+        ${box("Trainings", mine.target.avgTrainingsPerWeek, trainingsSub(mine.trainings, mine.extraTrainings), (v) => v >= T.trainingsPerWeekMin)}
+        ${box("Other workouts", mine.target.avgWorkoutsPerWeek, workoutsSub(mine.workouts, mine.extraTrainings), (v) => v >= T.workoutsPerWeekMin)}
       </div>` : `<p class="meta" style="margin:0 2px 16px">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
@@ -319,6 +320,11 @@ const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
  * With `meets`, the box is tinted green when the target is met and red when not.
  * The targets themselves are spelled out once, under the row.
  */
+// Target boxes: trainings beyond the weekly training target stand in for other workouts,
+// and the small line says so, so the numbers still add up to what people attended.
+const trainingsSub = (total, extra) => (extra ? `${total} total · ${extra} as other` : `${total} total`);
+const workoutsSub = (logged, extra) => (extra ? `${logged} logged + ${plural(extra, "training")}` : `${logged} total`);
+
 /** One stat box: label, weekly average (green when it meets the target), total. */
 function box(label, perWeek, sub, meets) {
   const has = perWeek !== null && perWeek !== undefined;
@@ -334,8 +340,8 @@ function box(label, perWeek, sub, meets) {
 function boardRow(r, max, T) {
   const pct = (n) => (n / max) * 100;
   const types = r.topTypes.map((t) => `${esc(t.type)} ×${t.count}`).join(" · ");
-  // Green/red against the same targets as the "You" boxes; plain when there's no
-  // average yet (a period that hasn't started).
+  // Green when the person's own numbers meet the targets (real counts, no stand-ins, so a
+  // green number always matches what's shown); plain when there's no average yet.
   const mark = (v, ok) => (v === null || v === undefined ? "" : ok(v) ? "ok" : "low");
   const tCls = mark(r.avgTrainingsPerWeek, (v) => v >= T.trainingsPerWeekMin);
   const wCls = mark(r.avgWorkoutsPerWeek, (v) => v >= T.workoutsPerWeekMin);
@@ -485,15 +491,13 @@ async function renderMember(id) {
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.kind === "t" ? -1 : 1));
   const mins = d.workouts.reduce((a, w) => a + w.durationMin, 0);
   const mine = me.member.id === d.member.id;
-  // Trainings beyond the weekly minimum count as other workouts (no double counting).
-  const asOther = d.trainings.filter((t) => t.countsAsOther).length;
 
   view.innerHTML = `
     <div class="card row">${avatar(d.member)}<div><div class="name" style="font-weight:500">${esc(d.member.name)}</div>
       <div class="meta">${esc(d.periodLabel)} · ${fmtDate(d.range.from, true)} – ${fmtDate(d.range.to, true)}</div></div></div>
     <div class="tiles">
-      <div class="tile"><div class="num">${d.trainings.length - asOther}</div><div class="lbl">trainings</div></div>
-      <div class="tile"><div class="num">${d.workouts.length + asOther}</div><div class="lbl">other workouts</div></div>
+      <div class="tile"><div class="num">${d.trainings.length}</div><div class="lbl">trainings</div></div>
+      <div class="tile"><div class="num">${d.workouts.length}</div><div class="lbl">other workouts</div></div>
       <div class="tile"><div class="num">${fmtMins(mins)}</div><div class="lbl">other workout time</div></div>
     </div>
     ${d.syncError ? `<div class="banner">Training data last refreshed ${esc(ago(d.syncedAt))}; the latest refresh failed.</div>` : ""}
@@ -513,9 +517,9 @@ async function renderMember(id) {
 
 function trainingItem(t) {
   return `<li><div class="date">${fmtDate(t.date)}</div><div style="flex:1">
-    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-${t.countsAsOther ? "workout" : "training"})"></i>Training</span>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--series-training)"></i>Training</span>
     <span style="font-size:14px">${esc(t.pool)}${t.trainingTime ? ` · ${esc(t.trainingTime)}` : ""}</span></div>
-    <div class="meta">${esc(t.activity === "Regular Training" ? "Training" : t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}${t.countsAsOther ? " · counted as other workout" : ""}</div></div></li>`;
+    <div class="meta">${esc(t.activity === "Regular Training" ? "Training" : t.activity)}${t.rainOff === "half" ? " · half rain-off" : ""}</div></div></li>`;
 }
 
 function workoutItem(w, mine) {

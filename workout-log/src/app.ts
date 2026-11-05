@@ -7,7 +7,7 @@ import { clearSessionCookie, hasAccess, requireAdmin, requireViewer, setSessionC
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, DEFAULT_TARGETS, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, splitTrainings, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, DEFAULT_TARGETS, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -360,6 +360,11 @@ export function createApp() {
       ...r,
       avgTrainingsPerWeek: perWeek(r.trainings, weeks),
       avgWorkoutsPerWeek: perWeek(r.workouts, weeks),
+      // For the "You" target boxes: extra trainings stand in for other workouts.
+      target: {
+        avgTrainingsPerWeek: perWeek(r.trainings - r.extraTrainings, weeks),
+        avgWorkoutsPerWeek: perWeek(r.workouts + r.extraTrainings, weeks),
+      },
     }));
     res.json({
       competition: competitionDto(comp), periods, period, range, today,
@@ -383,16 +388,11 @@ export function createApp() {
       query("SELECT * FROM training_records WHERE member_id = ? ORDER BY date DESC", [id]),
       query("SELECT * FROM workouts WHERE member_id = ? ORDER BY date DESC, id DESC", [id]),
     ]);
-    // Mark trainings beyond the weekly minimum: they count as other workouts.
-    const minPerWeek = comp ? targetsOf(comp).trainingsPerWeekMin : DEFAULT_TARGETS.trainingsPerWeekMin;
-    const inPeriod = (trainings as any[]).filter((t: any) => inRange(t.date, range));
-    const asOther = new Set(splitTrainings(inPeriod, minPerWeek).overflow.map((t: any) => t.signup_id));
     res.json({
       member: { id: m.id, name: m.name, image: m.image },
       syncedAt: m.trainings_synced_at, syncError: m.trainings_sync_error,
       period, periodLabel: periods.find(o => o.key === period)?.label ?? "", range,
-      trainings: trainings.filter((t: any) => inRange(t.date, range))
-        .map((t: any) => ({ ...trainingDto(t), countsAsOther: asOther.has(t.signup_id) })),
+      trainings: trainings.filter((t: any) => inRange(t.date, range)).map(trainingDto),
       workouts: workouts.filter((w: any) => inRange(w.date, range)).map(workoutDto),
     });
   }));

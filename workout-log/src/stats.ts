@@ -158,11 +158,14 @@ export interface Summary {
   team: { avgTrainingsPerWeek: number | null; avgWorkoutsPerWeek: number | null };
 }
 
-/** Team = per person per week, averaged over the whole squad. */
-export function summarise(rows: { trainings: number; workouts: number }[], weeks: number | null): Summary {
+/**
+ * Team = per person per week, averaged over the whole squad, for the TARGET boxes: extra
+ * trainings (beyond the weekly training target) stand in for other workouts here.
+ */
+export function summarise(rows: { trainings: number; workouts: number; extraTrainings?: number }[], weeks: number | null): Summary {
   const n = rows.length;
-  const t = rows.reduce((a, r) => a + r.trainings, 0);
-  const w = rows.reduce((a, r) => a + r.workouts, 0);
+  const t = rows.reduce((a, r) => a + r.trainings - (r.extraTrainings ?? 0), 0);
+  const w = rows.reduce((a, r) => a + r.workouts + (r.extraTrainings ?? 0), 0);
   return {
     weeks: weeks === null ? null : round1(weeks),
     team: {
@@ -180,11 +183,16 @@ export interface WorkoutLite { member_id: number; date: string; type: string; du
 
 export interface DashboardRow {
   member: { id: number; name: string; image: string | null };
+  /** every training attended in the period (raw, what people see) */
   trainings: number;
-  /** includes trainingsAsOther */
+  /** other workouts actually logged (raw) */
   workouts: number;
-  /** trainings beyond the weekly minimum, counted as other workouts */
-  trainingsAsOther: number;
+  /**
+   * Trainings beyond the weekly training target. They stay in `trainings` everywhere a
+   * person's numbers are shown; only target checks (the Team/You boxes, the glowing fish)
+   * let them stand in for other workouts.
+   */
+  extraTrainings: number;
   workoutMinutes: number;
   avgIntensity: number | null;
   topTypes: { type: string; count: number }[];
@@ -204,27 +212,24 @@ export function buildDashboard(
   for (const m of members) {
     rows.set(m.id, {
       member: { id: m.id, name: m.name, image: m.image },
-      trainings: 0, workouts: 0, trainingsAsOther: 0, workoutMinutes: 0, avgIntensity: null, topTypes: [], lastActive: null,
+      trainings: 0, workouts: 0, extraTrainings: 0, workoutMinutes: 0, avgIntensity: null, topTypes: [], lastActive: null,
       syncedAt: m.syncedAt, syncError: m.syncError, _rpe: [], _types: new Map(),
     });
   }
   const touch = (r: DashboardRow, date: string) => { if (!r.lastActive || date > r.lastActive) r.lastActive = date; };
 
   // Only trainings inside the period take part (see splitTrainings for why).
-  const { counted, overflow } = splitByMember(trainings.filter(t => inRange(t.date, range)), targets.trainingsPerWeekMin);
-  for (const t of counted) {
+  const inPeriod = trainings.filter(t => inRange(t.date, range));
+  for (const t of inPeriod) {
     const r = rows.get(t.member_id);
-    if (!r || !inRange(t.date, range)) continue;
+    if (!r) continue;
     r.trainings++;
     touch(r, t.date);
   }
-  // Trainings beyond the weekly minimum count as other workouts (no double counting).
-  for (const t of overflow) {
+  // Trainings beyond the weekly target can stand in for other workouts, for targets only.
+  for (const t of splitByMember(inPeriod, targets.trainingsPerWeekMin).overflow) {
     const r = rows.get(t.member_id);
-    if (!r || !inRange(t.date, range)) continue;
-    r.workouts++;
-    r.trainingsAsOther++;
-    touch(r, t.date);
+    if (r) r.extraTrainings++;
   }
   for (const w of workouts) {
     const r = rows.get(w.member_id);
@@ -293,14 +298,15 @@ export function puffSummary(
   const from = prepStart && prepStart > last7 ? prepStart : last7;
   const win = { from, to: today };
   const days = Math.max(1, dayNum(today) - dayNum(from) + 1);   // 1–7
-  // Same no-double-counting rule as the Dashboard, with the rolling 7 days as the week:
-  // trainings fill the training target first, any beyond it count as other workouts.
-  const { counted, overflow } = splitByMember(trainings.filter(t => inRange(t.date, win)), targets.trainingsPerWeekMin, () => "window");
+  // Captions show the real counts. For "met both targets" (the glow), trainings beyond the
+  // training target stand in for other workouts, as on the Dashboard's target boxes; the
+  // rolling 7 days count as one week.
+  const T = targets.trainingsPerWeekMin;
   const fish = members.map(m => {
-    const t = counted.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
-    const w = workouts.filter(x => x.member_id === m.id && inRange(x.date, win)).length
-            + overflow.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
-    const met = t >= targets.trainingsPerWeekMin && w >= targets.workoutsPerWeekMin;
+    const t = trainings.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
+    const w = workouts.filter(x => x.member_id === m.id && inRange(x.date, win)).length;
+    const extra = Math.max(0, t - T);
+    const met = t >= T && w + extra >= targets.workoutsPerWeekMin;
     return { id: m.id, name: m.name, image: m.image, trainings: t, workouts: w, sessions: t + w,
              status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0 };
   });

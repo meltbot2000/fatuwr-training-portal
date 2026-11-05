@@ -47,14 +47,17 @@ or a database deadlock gets one automatic retry before it is recorded as a failu
 cutoff, whatever their role: regular training, swims only, first timer, **and trainer**
 (coaching counts). Refunds and membership fees never count. See `API.md`.
 
-**No double counting:** within each Mon–Sun week of what's being shown, a person's
-trainings **fill the training target first** (N = the competition's training target); only
-trainings **beyond N count as other workouts** (`splitTrainings` in `src/stats.ts`). So 4
-trainings and 0 workouts in a week show as 2 + 2. Only sessions inside the selected period
-take part: a week cut by the period's start or end counts only its days inside the period,
-so trainings outside the period never use up the target. Puff treats its rolling 7 days
-as one week. A big week can't make up for a missed one. Applied on the Dashboard, the
-squad list, a person's page (marked "counted as other workout"), Puff's mood and the tank.
+**Real counts, with stand-ins only for targets:** a person's numbers are always what they
+actually did. Trainings are always blue with the true count (squad list, a person's page,
+the tank captions) and other workouts are only what they logged. Only the **target checks**
+let a training stand in for an other workout: within each Mon–Sun week, trainings fill the
+training target first (N = the competition's training target) and any beyond N count
+toward the other-workout target (`splitTrainings` in `src/stats.ts`, `extraTrainings` on a
+dashboard row). That applies to the Team average and You boxes (their small line says e.g.
+"6 total · 2 as other" and "1 logged + 2 trainings") and to a fish glowing in the tank.
+The squad list's green numbers use the real counts. Only sessions inside the selected
+period take part, so a week cut by the period's start or end counts only its days inside
+it. Puff treats its rolling 7 days as one week. A big week can't make up for a missed one.
 
 **Dashboard stats** (for the selected chip): **Team** shows the average trainings and other
 workouts per person per week. **Individual** shows the viewer's totals and weekly averages.
