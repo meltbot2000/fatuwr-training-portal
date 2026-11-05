@@ -86,16 +86,26 @@ project **`motivated-nature`** (Singapore, env `production`):
 | Service | What it is | Talks to | ~Memory |
 |---|---|---|---|
 | `thorough-adventure` | **The portal** (repo root, `railway.toml`) | `MySQL` privately; `workout-log` privately via `WORKOUT_LOG_URL` | ~150 MB |
-| `MySQL` | Portal database | | ~430 MB |
+| `MySQL` | Portal database | | ~315 MB (was ~440) |
 | `workout-log` | **The workout-log app, also called "Puff"** (its title, and the squad-mood tab). Code in `workout-log/` in this repo (§15) | `workout-db` privately; the portal privately via `PORTAL_URL` | ~50 MB |
-| `workout-db` | workout-log's own MySQL | | ~400 MB |
+| `workout-db` | workout-log's own MySQL | | ~220 MB (was ~395) |
 
 Other projects: **`skillful-imagination`** = the old US West MySQL from before the 2026-09-26
 move. Its deployment was removed (stopped, volume kept) on 2026-11-05 as a test, and the project is
 due for deletion. **`resourceful-forgiveness`** is empty.
 
-- **Bill:** Hobby plan, ~$10/month, ~96% of it memory. Each MySQL holds ~400 MB however small
-  its data, so a new database adds roughly $4/month. Egress is under a cent.
+- **Bill:** Hobby plan, ~$10/month before 2026-11-05, ~96% of it memory. Each MySQL holds
+  200-400 MB however small its data, so a new database adds roughly $2-4/month. Egress is
+  under a cent.
+- **MySQL start command** (both databases, Settings → Deploy → Custom Start Command):
+  `docker-entrypoint.sh mysqld --innodb-use-native-aio=0 --disable-log-bin --performance_schema=0 --innodb-buffer-pool-size=128M`.
+  Railway's template sets a **1G** buffer pool. Lowering it to 128M (MySQL's own default) on
+  2026-11-05 cut ~300 MB across the two databases. The data is under 1 MB, so 128M is
+  plenty; raise it only if the data grows past ~100 MB. `performance_schema` was already off.
+  The memory figures above were taken minutes after the restart. Check them again a day later.
+- **MySQL versions aren't pinned.** Any restart pulls the template's latest image and
+  upgrades the data files in place: the 2026-11-05 restart took the portal DB from 9.7.2
+  to 9.7.4 (fine, ~13s). A restart means ~20s of portal 503s from `/api/health/db`.
 - **All service-to-service traffic must use `*.railway.internal`**, never the public
   `fatuwr.up.railway.app` or a `*.rlwy.net` proxy. Build it from references, e.g.
   `http://${{thorough-adventure.RAILWAY_PRIVATE_DOMAIN}}:${{thorough-adventure.PORT}}`.
