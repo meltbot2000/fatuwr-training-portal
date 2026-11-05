@@ -10,4 +10,6 @@
 - **Before diagnosing any payment-write bug, check which GAS version is actually live:** `curl -sL "$(grep '^GOOGLE_APPS_SCRIPT_URL=' .env | cut -d= -f2-)"` returns the version string (the var is not exported in a plain shell; `-L` is required for the GAS redirect). The repo shows what was *written*, never what is *deployed*. A stale deployment looks exactly like a logic error — this cost 3 months of silently failing payment edits (SYSTEM.md §14).
 - **Counts and totals in the app are derived at read time, not stored.** `sheet_sessions.attendance` is dead data that nothing maintains — never read it (SYSTEM.md §5).
 - **Git:** push direct to `main`; no PRs unless asked.
+- **`git fetch` and fast-forward `main` before searching the repo or answering "where is X".** Cloud Claude Code sessions (claude.ai/code) push to `main` too, so this checkout can be far behind. On 2026-11-05 it was 37 commits behind, and the whole `workout-log/` app ("Puff") looked like it didn't exist.
+- **Railway names are random** (`thorough-adventure` is the portal). SYSTEM.md §3 "Railway map" says which service is which and what each costs. Services talk to each other only over `*.railway.internal`.
 - Surface findings directly in chat; don't make the user dig.

@@ -1,5 +1,9 @@
 [build]
 builder = "DOCKERFILE"
+# workout-log/ is a separate Railway service (its own railway.toml watches only that folder).
+# Without this, every workout-log commit also rebuilt and restarted the portal.
+# Patterns are anchored at the repo root; the negation needs the preceding "**".
+watchPatterns = ["**", "!/workout-log/**"]
 
 [deploy]
 startCommand = "node dist/index.js"

@@ -132,7 +132,11 @@ retried at every sync, so someone who signs up to the portal later is picked up.
      folder's `Dockerfile` and `railway.toml`.
    - Variables:
      - `DATABASE_URL` = `${{workout-db.MYSQL_URL}}`
-     - `PORTAL_URL` = `https://fatuwr.up.railway.app`
+     - `PORTAL_URL` = `http://${{thorough-adventure.RAILWAY_PRIVATE_DOMAIN}}:${{thorough-adventure.PORT}}`
+       (the portal's **private** address; `thorough-adventure` is the portal's service name).
+       Unset, it falls back to the public `https://fatuwr.up.railway.app`, which works but
+       goes out over the internet and through Railway's edge on every sync. That was the live
+       setting until 2026-11-05.
      - `PORTAL_API_KEY` = a long random string (`openssl rand -hex 32`)
      - `SESSION_SECRET` = a different long random string
      - `BASE_PATH` = `/amager`

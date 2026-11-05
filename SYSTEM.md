@@ -1,6 +1,6 @@
 # FATUWR Training Portal — System Reference
 
-*Last updated: 2026-11-01 (Partner API `/api/v1` + the separate workout-log app — §15)*
+*Last updated: 2026-11-05 (Railway map in §3: which random service name is which app, private networking, watch paths, costs)*
 
 ---
 
@@ -77,6 +77,36 @@ NEVER: DB → Sheet (except via the manual syncPaymentsFromDb GAS function — s
 | Alert email | Resend → SendGrid fallback → console.error | `sendAlertEmail()` in `server/email.ts`; sends to tanmelanie@gmail.com, fatuwr@gmail.com, fatuwrevents@gmail.com |
 | Backup | SMTP/Resend | Daily CSV email to fatuwrevents@gmail.com at 23:59 SGT. `startDailyBackup()` recomputes the delay to the next 23:59 SGT **on every boot**, so redeploys reschedule rather than postpone it. |
 | Healthcheck | `/api/health/db` | `railway.toml`. Does a real `SELECT 1` and returns 503 on failure, so **a deployment that cannot reach the database does not replace a working one**. `/api/health` still exists (no DB work) for uptime monitors. |
+
+### Railway map (checked in the dashboard 2026-11-05)
+
+Railway gives projects and services random names, so map them here. Everything live is in
+project **`motivated-nature`** (Singapore, env `production`):
+
+| Service | What it is | Talks to | ~Memory |
+|---|---|---|---|
+| `thorough-adventure` | **The portal** (repo root, `railway.toml`) | `MySQL` privately; `workout-log` privately via `WORKOUT_LOG_URL` | ~150 MB |
+| `MySQL` | Portal database | | ~430 MB |
+| `workout-log` | **The workout-log app, also called "Puff"** (its title, and the squad-mood tab). Code in `workout-log/` in this repo (§15) | `workout-db` privately; the portal privately via `PORTAL_URL` | ~50 MB |
+| `workout-db` | workout-log's own MySQL | | ~400 MB |
+
+Other projects: **`skillful-imagination`** = the old US West MySQL from before the 2026-09-26
+move. Its deployment was removed (stopped, volume kept) on 2026-11-05 as a test, and the project is
+due for deletion. **`resourceful-forgiveness`** is empty.
+
+- **Bill:** Hobby plan, ~$10/month, ~96% of it memory. Each MySQL holds ~400 MB however small
+  its data, so a new database adds roughly $4/month. Egress is under a cent.
+- **All service-to-service traffic must use `*.railway.internal`**, never the public
+  `fatuwr.up.railway.app` or a `*.rlwy.net` proxy. Build it from references, e.g.
+  `http://${{thorough-adventure.RAILWAY_PRIVATE_DOMAIN}}:${{thorough-adventure.PORT}}`.
+- **Watch paths:** the portal's `railway.toml` ignores `/workout-log/**`, and workout-log's
+  watches only `/workout-log/**`, so a commit redeploys only the app it touches. Until
+  2026-11-05 every workout-log commit also restarted the portal. Check it: after a
+  workout-log-only commit, the portal's deploy list shows that commit as **Skipped**.
+  If a portal-code commit is ever skipped, the pattern is wrong.
+- **Changing variables in the dashboard:** keyboard shortcuts are live when no field is
+  focused. Typing into an unfocused page once staged a stray new service. Check
+  **Apply changes → Details** lists only the intended change before **Deploy Changes**.
 
 ### Client delivery (rebuilt 2026-09-26)
 - **Dev tooling is excluded from production builds** (`vite.config.ts`, keyed on
