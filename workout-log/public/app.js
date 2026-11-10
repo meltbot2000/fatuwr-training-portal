@@ -442,7 +442,7 @@ async function renderPuff() {
     </section>
 
     <section class="card">
-      <p class="eyebrow">The tank · ${esc(windowText(d).replace(/^in /, ""))}</p>
+      <p class="eyebrow">The tank · ${esc(windowText(d).replace(/^in /, ""))} · ${esc(fmtDate(d.window.from))}–${esc(fmtDate(d.window.to))}</p>
       <div class="tank" id="tank">
         ${d.fish.map((f) => {
           const x = n > 1 ? 9 + (f.rank * 82) / (n - 1) : 50;     // most active → furthest right

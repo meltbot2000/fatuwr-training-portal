@@ -282,6 +282,8 @@ export interface PuffFish {
   status: 0 | 1 | 2;
   /** 0 = least active … n-1 = most active; the tank places fish left → right by this */
   rank: number;
+  /** sessions since prep started: breaks ties in the tank */
+  sessionsSincePrep: number;
 }
 
 export function puffSummary(
@@ -298,6 +300,7 @@ export function puffSummary(
   const from = prepStart && prepStart > last7 ? prepStart : last7;
   const win = { from, to: today };
   const days = Math.max(1, dayNum(today) - dayNum(from) + 1);   // 1–7
+  const prep = { from: prepStart ?? "", to: today };
   // Captions show the real counts. For "met both targets" (the glow), trainings beyond the
   // training target stand in for other workouts, as on the Dashboard's target boxes; the
   // rolling 7 days count as one week.
@@ -308,12 +311,18 @@ export function puffSummary(
     const extra = Math.max(0, t - T);
     const met = t >= T && w + extra >= targets.workoutsPerWeekMin;
     return { id: m.id, name: m.name, image: m.image, trainings: t, workouts: w, sessions: t + w,
-             status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0 };
+             status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0,
+             // Ties in the 7 days go to whoever has done more since prep started (callers pass
+             // rows back to prep start). Before, ties went by name, so "Melanie" lost to almost
+             // everyone with the same week while having done more overall.
+             _prep: trainings.filter(x => x.member_id === m.id && inRange(x.date, prep)).length
+                  + workouts.filter(x => x.member_id === m.id && inRange(x.date, prep)).length };
   });
   // Least → most: status first (glowing fish end up furthest right), then sessions, then
-  // trainings; name keeps ties stable.
+  // trainings, then sessions since prep start; name only for a full tie.
   [...fish]
-    .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings || b.name.localeCompare(a.name))
+    .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings
+      || a._prep - b._prep || b.name.localeCompare(a.name))
     .forEach((f, i) => { f.rank = i; });
 
   // A full week's goal, scaled down while prep is less than a week old (2 days in = 2/7).
@@ -327,6 +336,6 @@ export function puffSummary(
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,
     thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),
-    fish,
+    fish: fish.map(({ _prep, ...f }) => ({ ...f, sessionsSincePrep: _prep })),
   };
 }

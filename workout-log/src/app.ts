@@ -322,8 +322,9 @@ export function createApp() {
     const members = await query<any>(
       `SELECT m.id, m.name, m.image FROM squad_members s JOIN members m ON m.id = s.member_id WHERE s.competition_id = ?`, [comp.id]);
     const ids = members.map(m => m.id);
-    const last7 = addDays(today, -(PUFF.windowDays - 1));
-    const from = comp.start_date > last7 ? comp.start_date : last7;   // never before prep start
+    // Everything since prep start: the 7-day window is cut in puffSummary, and the rest
+    // breaks ties in the tank.
+    const from = comp.start_date;
     const [trainings, workouts] = ids.length
       ? await Promise.all([
           query<any>("SELECT member_id, date FROM training_records WHERE member_id IN (?) AND date >= ?", [ids, from]),

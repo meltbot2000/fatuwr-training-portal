@@ -330,3 +330,16 @@ describe("Puff never counts sessions from before prep started", () => {
     expect([s.window.from, s.days, s.sincePrepStart, s.goal]).toEqual(["2026-11-14", 7, false, 6]);
   });
 });
+
+describe("tank ties", () => {
+  it("a tie in the 7 days goes to whoever has done more since prep started, not by name", () => {
+    const m = [{ id: 1, name: "Melanie", image: null }, { id: 2, name: "Annabel", image: null }];
+    // Both: 1 training in the last 7 days. Melanie also trained and worked out earlier in prep.
+    const tr = [{ member_id: 1, date: "2026-11-10" }, { member_id: 1, date: "2026-11-03" }, { member_id: 2, date: "2026-11-08" }];
+    const wo = [{ member_id: 1, date: "2026-11-02" }];
+    const s = puffSummary(m, tr, wo, "2026-11-11", { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 }, "2026-11-01");
+    const rank = Object.fromEntries(s.fish.map(f => [f.name, f.rank]));
+    expect(rank).toEqual({ Annabel: 0, Melanie: 1 });
+    expect(s.fish.map(f => [f.name, f.trainings, f.workouts, f.sessionsSincePrep])).toEqual([["Melanie", 1, 0, 3], ["Annabel", 1, 0, 1]]);
+  });
+});
