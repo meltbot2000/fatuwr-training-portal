@@ -446,8 +446,12 @@ async function renderPuff() {
       <div class="tank" id="tank">
         ${d.fish.map((f) => {
           const x = n > 1 ? 9 + (f.rank * 82) / (n - 1) : 50;     // most active → furthest right
-          const band = f.status === 2 ? [13, 29] : f.status === 1 ? [44, 58] : [74, 84];
-          const y = band[f.rank % 2];
+          // Height means something too: within a group, the more active fish sits higher, so
+          // "above" is never "behind" (it used to zig-zag, which put less active fish higher).
+          const [top, bottom] = f.status === 2 ? [13, 29] : f.status === 1 ? [42, 60] : [74, 84];
+          const group = d.fish.filter((g) => g.status === f.status).sort((a, b) => a.rank - b.rank);
+          const i = group.indexOf(f), k = group.length;
+          const y = k > 1 ? bottom - (i * (bottom - top)) / (k - 1) : (top + bottom) / 2;
           const size = 38 + Math.min(f.sessions, 6) * 3;
           const sprite = f.status === 2 ? "puffed" : f.status === 1 ? "small" : "snoozing";
           const isMe = f.id === me.member.id;
