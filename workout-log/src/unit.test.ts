@@ -332,14 +332,19 @@ describe("Puff never counts sessions from before prep started", () => {
 });
 
 describe("tank ties", () => {
-  it("a tie in the 7 days goes to whoever has done more since prep started, not by name", () => {
+  const T = { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 };
+  const ranks = (s: ReturnType<typeof puffSummary>) => Object.fromEntries(s.fish.map(f => [f.name, f.rank]));
+  it("same sessions in the 7 days: more trainings wins", () => {
+    const m = [{ id: 1, name: "Ann", image: null }, { id: 2, name: "Zoe", image: null }];
+    const s = puffSummary(m, [{ member_id: 2, date: "2026-11-08" }], [{ member_id: 1, date: "2026-11-09" }], "2026-11-10", T, "2026-11-01");
+    expect(ranks(s)).toEqual({ Ann: 0, Zoe: 1 });
+  });
+  it("same sessions and trainings: more other workouts since prep start wins, not the name", () => {
     const m = [{ id: 1, name: "Melanie", image: null }, { id: 2, name: "Annabel", image: null }];
-    // Both: 1 training in the last 7 days. Melanie also trained and worked out earlier in prep.
-    const tr = [{ member_id: 1, date: "2026-11-10" }, { member_id: 1, date: "2026-11-03" }, { member_id: 2, date: "2026-11-08" }];
-    const wo = [{ member_id: 1, date: "2026-11-02" }];
-    const s = puffSummary(m, tr, wo, "2026-11-11", { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 }, "2026-11-01");
-    const rank = Object.fromEntries(s.fish.map(f => [f.name, f.rank]));
-    expect(rank).toEqual({ Annabel: 0, Melanie: 1 });
-    expect(s.fish.map(f => [f.name, f.trainings, f.workouts, f.sessionsSincePrep])).toEqual([["Melanie", 1, 0, 3], ["Annabel", 1, 0, 1]]);
+    const tr = [{ member_id: 1, date: "2026-11-10" }, { member_id: 2, date: "2026-11-08" }];
+    const wo = [{ member_id: 1, date: "2026-11-02" }];   // before the 7 days, after prep start
+    const s = puffSummary(m, tr, wo, "2026-11-11", T, "2026-11-01");
+    expect(ranks(s)).toEqual({ Annabel: 0, Melanie: 1 });
+    expect(s.fish.map(f => [f.name, f.trainings, f.workouts, f.workoutsSincePrep])).toEqual([["Melanie", 1, 0, 1], ["Annabel", 1, 0, 0]]);
   });
 });

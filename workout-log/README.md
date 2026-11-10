@@ -87,8 +87,9 @@ snoozing, 40–79% cruising, 80–99% puffed up, 100%+ sparkly (`PUFF` in `src/s
 
 **The tank:** one fish per squad member. Glowing and puffed means they met both weekly
 targets, small and swimming means some sessions, and dozing on the sand means none yet.
-Fish are placed left to right from least to most active, so the glowing ones end up top
-right. Saving a workout shows a wiggling Puff.
+Fish are placed left to right, and lower to higher, from least to most active, so the
+glowing ones end up top right. Order: met both targets, then sessions in the 7 days, then
+trainings in the 7 days (trainings win ties), then other workouts since prep start. Saving a workout shows a wiggling Puff.
 
 ## On phones (home-screen web app)
 

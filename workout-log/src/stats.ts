@@ -282,8 +282,8 @@ export interface PuffFish {
   status: 0 | 1 | 2;
   /** 0 = least active … n-1 = most active; the tank places fish left → right by this */
   rank: number;
-  /** sessions since prep started: breaks ties in the tank */
-  sessionsSincePrep: number;
+  /** other workouts since prep started: the tank's last tie-break */
+  workoutsSincePrep: number;
 }
 
 export function puffSummary(
@@ -312,14 +312,13 @@ export function puffSummary(
     const met = t >= T && w + extra >= targets.workoutsPerWeekMin;
     return { id: m.id, name: m.name, image: m.image, trainings: t, workouts: w, sessions: t + w,
              status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0,
-             // Ties in the 7 days go to whoever has done more since prep started (callers pass
-             // rows back to prep start). Before, ties went by name, so "Melanie" lost to almost
-             // everyone with the same week while having done more overall.
-             _prep: trainings.filter(x => x.member_id === m.id && inRange(x.date, prep)).length
-                  + workouts.filter(x => x.member_id === m.id && inRange(x.date, prep)).length };
+             // Last tie-break: other workouts logged since prep started (callers pass rows
+             // back to prep start).
+             _prep: workouts.filter(x => x.member_id === m.id && inRange(x.date, prep)).length };
   });
-  // Least → most: status first (glowing fish end up furthest right), then sessions, then
-  // trainings, then sessions since prep start; name only for a full tie.
+  // Least → most: status first (glowing fish end up furthest right), then sessions in the
+  // 7 days, then trainings in the 7 days (trainings win ties), then other workouts since
+  // prep start; name only for a full tie.
   [...fish]
     .sort((a, b) => a.status - b.status || a.sessions - b.sessions || a.trainings - b.trainings
       || a._prep - b._prep || b.name.localeCompare(a.name))
@@ -336,6 +335,6 @@ export function puffSummary(
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,
     thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),
-    fish: fish.map(({ _prep, ...f }) => ({ ...f, sessionsSincePrep: _prep })),
+    fish: fish.map(({ _prep, ...f }) => ({ ...f, workoutsSincePrep: _prep })),
   };
 }
