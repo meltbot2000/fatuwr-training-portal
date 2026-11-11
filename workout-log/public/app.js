@@ -399,6 +399,32 @@ const puffImg = (name, size, cls = "") =>
 /** "in the last 7 days", or "since prep started" while prep is less than a week old. */
 const windowText = (d) => (d.sincePrepStart ? (d.days === 1 ? "since prep started today" : `in the ${d.days} days since prep started`) : "in the last 7 days");
 
+/**
+ * Where a fish swims in the tank. Three depths: glowing fish near the surface, swimming fish
+ * in mid-water, dozing fish on the sand. Within a depth the fish form a loose school around
+ * one spot (glowing top right, dozing bottom left), in a hand-placed, slightly irregular
+ * pattern so it reads as a shoal rather than a ranked line or a graph.
+ */
+const SCHOOL = [[0, 0], [-17, 7], [17, -5], [-34, -4], [33, 7], [-50, 6], [50, -4], [-9, -10], [9, 12], [-26, 13], [26, -12]];
+function fishSpot(f, all) {
+  const group = all.filter((g) => g.status === f.status).sort((a, b) => b.rank - a.rank);
+  const i = group.indexOf(f), k = group.length;
+  if (f.status === 0) {
+    // Dozing fish lie spread along the sand, a little unevenly.
+    // With many of them, every other one lies a little further back so names don't collide.
+    const x = k > 1 ? 10 + (i * 80) / (k - 1) : 30;
+    return { x: x + (((i * 37) % 3) - 1), y: k > 6 ? (i % 2 ? 80 : 86) : 85 - ((i * 13) % 3) };
+  }
+  const slots = SCHOOL.slice(0, Math.min(k, SCHOOL.length));
+  const [dx, dy] = SCHOOL[i % SCHOOL.length];
+  // Glowing school sits up and to the right, swimming school in the middle; shift a school
+  // sideways if it would run off the tank.
+  let cx = f.status === 2 ? 64 : 48;
+  const lo = Math.min(...slots.map((p) => p[0])), hi = Math.max(...slots.map((p) => p[0]));
+  cx = Math.max(10 - lo, Math.min(90 - hi, cx));
+  return { x: Math.max(9, Math.min(91, cx + dx)), y: (f.status === 2 ? 22 : 52) + dy };
+}
+
 async function renderPuff() {
   const d = await api(`/puff${state.competitionId ? `?competitionId=${state.competitionId}` : ""}`);
   if (!d.competition) {
@@ -412,7 +438,6 @@ async function renderPuff() {
     puffed: "Puff is puffed up and happy.",
     sparkly: "Target smashed. Puff is glowing!",
   }[d.mood];
-  const n = d.fish.length;
   const bubbles = Array.from({ length: 8 }, (_, i) =>
     `<span class="bubble-dot" style="left:${8 + i * 12}%;animation-duration:${5 + (i % 4) * 1.7}s;animation-delay:-${i * 1.3}s"></span>`).join("");
 
@@ -445,14 +470,8 @@ async function renderPuff() {
       <p class="eyebrow">The tank · ${esc(windowText(d).replace(/^in /, ""))} · ${esc(fmtDate(d.window.from))}–${esc(fmtDate(d.window.to))}</p>
       <div class="tank" id="tank">
         ${d.fish.map((f) => {
-          const x = n > 1 ? 9 + (f.rank * 82) / (n - 1) : 50;     // most active → furthest right
-          // Height means something too: within a group, the more active fish sits higher, so
-          // "above" is never "behind" (it used to zig-zag, which put less active fish higher).
-          const [top, bottom] = f.status === 2 ? [13, 29] : f.status === 1 ? [42, 60] : [74, 84];
-          const group = d.fish.filter((g) => g.status === f.status).sort((a, b) => a.rank - b.rank);
-          const i = group.indexOf(f), k = group.length;
-          const y = k > 1 ? bottom - (i * (bottom - top)) / (k - 1) : (top + bottom) / 2;
-          const size = 38 + Math.min(f.sessions, 6) * 3;
+          const { x, y } = fishSpot(f, d.fish);
+          const size = [40, 46, 54][f.status];
           const sprite = f.status === 2 ? "puffed" : f.status === 1 ? "small" : "snoozing";
           const isMe = f.id === me.member.id;
           const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} other workouts in the last 7 days${f.status === 2 ? ", met both targets" : ""}`;
