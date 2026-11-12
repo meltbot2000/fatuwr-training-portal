@@ -415,7 +415,7 @@ const windowText = (d) => (d.sincePrepStart ? (d.days === 1 ? "since prep starte
 
 /**
  * Where every fish swims in the tank. Two meanings, one per axis:
- * - Height = this week (the tank's 7 days), in thirds: glowing fish that met both targets at
+ * - Height = the tank's 7 days, in thirds: glowing fish that met both targets at
  *   the top, fish with some sessions in the middle, fish with none dozing on the sand.
  * - Left → right = sessions since prep started, so further right means more done overall.
  * Fish never line up by rank inside a third: each starts at a slightly different height, and
@@ -514,7 +514,12 @@ async function renderPuff() {
         }).join(""))(tankLayout(d.fish))}
         <div class="fish-tip" id="fishTip" hidden></div>
       </div>
-      <p class="meta" style="margin:0">Higher = more this week · further right = more since prep started</p>
+      <ul class="tank-key">
+        <li>${puffImg("puffed", 26)}<span><b>Top</b> · met both targets in these 7 days: ${plural(d.perPerson.trainings, "training")} + ${plural(d.perPerson.workouts, "other workout")} (extra trainings count as other workouts)</span></li>
+        <li>${puffImg("small", 26)}<span><b>Middle</b> · some sessions in these 7 days</span></li>
+        <li>${puffImg("snoozing", 26)}<span><b>Sand</b> · no sessions in these 7 days</span></li>
+        <li><span class="arrow" aria-hidden="true">→</span><span><b>Further right</b> · more sessions since prep started (${esc(fmtDate(d.competition.startDate))})</span></li>
+      </ul>
 
     </section>`;
 
