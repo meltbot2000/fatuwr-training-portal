@@ -414,29 +414,47 @@ const puffImg = (name, size, cls = "") =>
 const windowText = (d) => (d.sincePrepStart ? (d.days === 1 ? "since prep started today" : `in the ${d.days} days since prep started`) : "in the last 7 days");
 
 /**
- * Where a fish swims in the tank. Three depths: glowing fish near the surface, swimming fish
- * in mid-water, dozing fish on the sand. Within a depth the fish form a loose school around
- * one spot (glowing top right, dozing bottom left), in a hand-placed, slightly irregular
- * pattern so it reads as a shoal rather than a ranked line or a graph.
+ * Where every fish swims in the tank. Two meanings, one per axis:
+ * - Height = this week (the tank's 7 days), in thirds: glowing fish that met both targets at
+ *   the top, fish with some sessions in the middle, fish with none dozing on the sand.
+ * - Left → right = sessions since prep started, so further right means more done overall.
+ * Fish never line up by rank inside a third: each starts at a slightly different height, and
+ * fish that would overlap are moved up or down within their third (like a beeswarm), keeping
+ * their left → right spot.
  */
-const SCHOOL = [[0, 0], [-17, 7], [17, -5], [-34, -4], [33, 7], [-50, 6], [50, -4], [-9, -10], [9, 12], [-26, 13], [26, -12]];
-function fishSpot(f, all) {
-  const group = all.filter((g) => g.status === f.status).sort((a, b) => b.rank - a.rank);
-  const i = group.indexOf(f), k = group.length;
-  if (f.status === 0) {
-    // Dozing fish lie spread along the sand, a little unevenly.
-    // With many of them, every other one lies a little further back so names don't collide.
-    const x = k > 1 ? 10 + (i * 80) / (k - 1) : 30;
-    return { x: x + (((i * 37) % 3) - 1), y: k > 6 ? (i % 2 ? 80 : 86) : 85 - ((i * 13) % 3) };
+function tankLayout(fish) {
+  const max = Math.max(1, ...fish.map((f) => f.sessionsSincePrep || 0));
+  const bands = { 2: [9, 30], 1: [40, 62], 0: [72, 88] };     // % of tank height, by thirds
+  const rnd = (id, salt) => (((id * 9301 + salt * 49297) % 233280) + 233280) % 233280 / 233280;   // stable per person
+  const clampX = (x) => Math.max(10, Math.min(90, x));
+  const placed = [], spots = new Map();
+  // Lay out the busiest fish first so they get the cleanest spots.
+  for (const f of [...fish].sort((a, b) => b.sessionsSincePrep - a.sessionsSincePrep || a.id - b.id)) {
+    const [top, bottom] = bands[f.status];
+    // Each fish has its own resting height somewhere in its third, so a third never reads as a row.
+    const home = top + rnd(f.id, 1) * (bottom - top);
+    const x = 12 + (76 * (f.sessionsSincePrep || 0)) / max;
+    const gap = f.status === 0 ? 11 : 13;   // dozing fish are smaller
+    const free = (cx, cy) => placed.every((p) => Math.abs(p.x - cx) >= gap || Math.abs(p.y - cy) >= 16);
+    const heights = (f.status === 0 ? [top + 1, bottom - 1] : [home, top, bottom, (top + bottom) / 2, top + (bottom - top) / 4, bottom - (bottom - top) / 4])
+      .sort((a, b) => Math.abs(a - home) - Math.abs(b - home));
+    let spot = null;
+    for (let nudge = 0; !spot && nudge < 50; nudge++) {
+      const cx = clampX(x + (nudge ? (nudge % 2 ? 1 : -1) * Math.ceil(nudge / 2) * 4 : 0));
+      for (const cy of heights) if (free(cx, cy)) { spot = { x: cx, y: cy }; break; }
+    }
+    // A packed tank: take the spot that overlaps least.
+    if (!spot) {
+      let best = Infinity;
+      for (let cx = 10; cx <= 90; cx += 2) for (const cy of heights) {
+        const near = Math.min(...placed.map((p) => Math.max(Math.abs(p.x - cx) / 13, Math.abs(p.y - cy) / 16)));
+        const score = -near + Math.abs(cx - x) / 200;
+        if (score < best) { best = score; spot = { x: cx, y: cy }; }
+      }
+    }
+    placed.push(spot); spots.set(f.id, spot);
   }
-  const slots = SCHOOL.slice(0, Math.min(k, SCHOOL.length));
-  const [dx, dy] = SCHOOL[i % SCHOOL.length];
-  // Glowing school sits up and to the right, swimming school in the middle; shift a school
-  // sideways if it would run off the tank.
-  let cx = f.status === 2 ? 64 : 48;
-  const lo = Math.min(...slots.map((p) => p[0])), hi = Math.max(...slots.map((p) => p[0]));
-  cx = Math.max(10 - lo, Math.min(90 - hi, cx));
-  return { x: Math.max(9, Math.min(91, cx + dx)), y: (f.status === 2 ? 22 : 52) + dy };
+  return spots;
 }
 
 async function renderPuff() {
@@ -483,19 +501,20 @@ async function renderPuff() {
     <section class="card">
       <p class="eyebrow">The tank · ${esc(windowText(d).replace(/^in /, ""))} · ${esc(fmtDate(d.window.from))}–${esc(fmtDate(d.window.to))}</p>
       <div class="tank" id="tank">
-        ${d.fish.map((f) => {
-          const { x, y } = fishSpot(f, d.fish);
+        ${((spots) => d.fish.map((f) => {
+          const { x, y } = spots.get(f.id);
           const size = [40, 46, 54][f.status];
           const sprite = f.status === 2 ? "puffed" : f.status === 1 ? "small" : "snoozing";
           const isMe = f.id === me.member.id;
-          const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} other workouts in the last 7 days${f.status === 2 ? ", met both targets" : ""}`;
+          const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} other workouts in the last 7 days${f.status === 2 ? ", met both targets" : ""}, ${f.sessionsSincePrep} sessions since prep started`;
           return `<button type="button" class="fish s${f.status}${isMe ? " me" : ""}" style="left:${x}%;top:${y}%"
-              data-tip="${esc(`${f.name} · ${f.trainings} trainings, ${f.workouts} other${f.status === 2 ? " ✓" : ""}`)}" aria-label="${esc(label)}">
+              data-tip="${esc(`${f.name} · this week ${f.trainings} trainings, ${f.workouts} other${f.status === 2 ? " ✓" : ""} · ${f.sessionsSincePrep} since prep`)}" aria-label="${esc(label)}">
             <span class="swim" style="animation-duration:${3 + (f.rank % 4) * 0.9}s;animation-delay:-${f.rank * 0.7}s">${puffImg(sprite, size)}</span>
             <span class="nm">${isMe ? "You" : esc(f.name.split(" ")[0])}</span></button>`;
-        }).join("")}
+        }).join(""))(tankLayout(d.fish))}
         <div class="fish-tip" id="fishTip" hidden></div>
       </div>
+      <p class="meta" style="margin:0">Higher = more this week · further right = more since prep started</p>
 
     </section>`;
 

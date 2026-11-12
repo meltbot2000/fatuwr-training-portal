@@ -284,6 +284,8 @@ export interface PuffFish {
   rank: number;
   /** other workouts since prep started: the tank's last tie-break */
   workoutsSincePrep: number;
+  /** trainings + other workouts since prep started: the tank's left → right */
+  sessionsSincePrep: number;
 }
 
 export function puffSummary(
@@ -314,7 +316,8 @@ export function puffSummary(
              status: (met ? 2 : t + w > 0 ? 1 : 0) as 0 | 1 | 2, rank: 0,
              // Last tie-break: other workouts logged since prep started (callers pass rows
              // back to prep start).
-             _prep: workouts.filter(x => x.member_id === m.id && inRange(x.date, prep)).length };
+             _prep: workouts.filter(x => x.member_id === m.id && inRange(x.date, prep)).length,
+             _prepAll: trainings.filter(x => x.member_id === m.id && inRange(x.date, prep)).length };
   });
   // Least → most: status first (glowing fish end up furthest right), then sessions in the
   // 7 days, then trainings in the 7 days (trainings win ties), then other workouts since
@@ -335,6 +338,6 @@ export function puffSummary(
     mood: mood.key, moodLabel: mood.label,
     metCount: fish.filter(f => f.status === 2).length,
     thresholds: PUFF.moods.map(m => ({ key: m.key, label: m.label, from: m.from })),
-    fish: fish.map(({ _prep, ...f }) => ({ ...f, workoutsSincePrep: _prep })),
+    fish: fish.map(({ _prep, _prepAll, ...f }) => ({ ...f, workoutsSincePrep: _prep, sessionsSincePrep: _prepAll + _prep })),
   };
 }
