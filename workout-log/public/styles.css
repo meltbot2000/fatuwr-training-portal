@@ -264,7 +264,8 @@ html, body { overscroll-behavior-y: contain; }
 .fish.s0 .puff-img { opacity: .8; filter: saturate(.75); }
 .fish .nm { display: block; font-size: 10.5px; color: rgba(255,255,255,.78); margin-top: -4px; text-align: center; white-space: nowrap; }
 .fish.me .nm { color: #F6C34A; font-weight: 700; }
-.fish-tip { position: absolute; z-index: 5; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(17,17,17,.92); border: 1px solid var(--divider); border-radius: 10px; padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.fish-tip { position: absolute; z-index: 5; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(17,17,17,.92); border: 1px solid var(--divider); border-radius: 10px; padding: 6px 12px; font-size: 13px; pointer-events: none; width: max-content; max-width: calc(100% - 24px); text-align: center; line-height: 1.4; }
+.fish-tip .tip2 { color: var(--text-2); }
 .legend3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 11.5px; color: var(--text-2); margin-bottom: 8px; }
 .legend3 div { background: var(--modal); border-radius: 10px; padding: 6px 8px; }
 .legend3 b { color: var(--text); font-weight: 600; display: block; font-size: 12px; }

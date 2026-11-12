@@ -508,7 +508,8 @@ async function renderPuff() {
           const isMe = f.id === me.member.id;
           const label = `${f.name}: ${f.trainings} trainings and ${f.workouts} other workouts in the last 7 days${f.status === 2 ? ", met both targets" : ""}, ${f.sessionsSincePrep} sessions since prep started`;
           return `<button type="button" class="fish s${f.status}${isMe ? " me" : ""}" style="left:${x}%;top:${y}%"
-              data-tip="${esc(`${f.name} · this week ${f.trainings} trainings, ${f.workouts} other${f.status === 2 ? " ✓" : ""} · ${f.sessionsSincePrep} since prep`)}" aria-label="${esc(label)}">
+              data-tip="${esc(`${f.name} · last 7 days: ${plural(f.trainings, "training")}, ${f.workouts} other${f.status === 2 ? " ✓" : ""}`)}"
+              data-tip2="${esc(`Since prep started: ${plural(f.sessionsSincePrep - f.workoutsSincePrep, "training")}, ${f.workoutsSincePrep} other`)}" aria-label="${esc(label)}">
             <span class="swim" style="animation-duration:${3 + (f.rank % 4) * 0.9}s;animation-delay:-${f.rank * 0.7}s">${puffImg(sprite, size)}</span>
             <span class="nm">${isMe ? "You" : esc(f.name.split(" ")[0])}</span></button>`;
         }).join(""))(tankLayout(d.fish))}
@@ -525,8 +526,9 @@ async function renderPuff() {
 
   const tip = $("#fishTip");
   view.querySelectorAll(".fish").forEach((b) => (b.onclick = () => {
-    tip.textContent = b.dataset.tip; tip.hidden = false;
-    clearTimeout(tip._t); tip._t = setTimeout(() => (tip.hidden = true), 2600);
+    // Two rows: the tank's 7 days, then since prep started.
+    tip.innerHTML = `<div>${esc(b.dataset.tip)}</div><div class="tip2">${esc(b.dataset.tip2)}</div>`; tip.hidden = false;
+    clearTimeout(tip._t); tip._t = setTimeout(() => (tip.hidden = true), 3500);
   }));
 }
 
