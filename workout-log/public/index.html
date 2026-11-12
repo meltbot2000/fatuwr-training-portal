@@ -44,5 +44,14 @@
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" hidden></div>
   <script src="app.js" type="module"></script>
+  <script>
+    // If the app's code never starts (a download failed, e.g. mid-update), show a way out
+    // instead of a blank black screen.
+    setTimeout(function () {
+      if (window.__puffStarted) return;
+      document.getElementById("view").innerHTML = '<div class="card"><p class="error">Puff didn\'t load properly.</p>'
+        + '<button class="btn" type="button" onclick="location.reload()">Try again</button></div>';
+    }, 10000);
+  </script>
 </body>
 </html>

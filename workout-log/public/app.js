@@ -44,7 +44,16 @@ async function api(path, { method = "GET", body } = {}) {
   const t = getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
   // Relative on purpose: resolves against <base href>, so the app works under /amager/.
-  const res = await fetch(`api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  // Never wait forever: a request that hangs (e.g. while Puff is restarting after an update)
+  // used to leave a blank black screen with nothing to tap.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  let res;
+  try {
+    res = await fetch(`api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+  } catch {
+    throw new Error("Couldn't reach Puff. Check your connection and try again.");
+  } finally { clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && data.error === "not_signed_in") {
     // Remember why, so the login screen can say it (see signedOutReason in src/auth.ts).
@@ -113,6 +122,10 @@ const routes = [
   [/^#\/admin$/, renderAdmin, "Admin"],
 ];
 
+// An error with a way out: reloading fetches everything again.
+const errorCard = (msg) => `<div class="card"><p class="error">${esc(msg)}</p>
+  <button class="btn" type="button" onclick="location.reload()">Try again</button></div>`;
+
 async function route() {
   const hash = location.hash || "#/";
   if (route.last && route.last !== hash) route.navigated = true;
@@ -121,12 +134,13 @@ async function route() {
   // Even with nothing stored on the page, the server's session cookie may still sign us
   // in (iOS can wipe page storage), so always ask before showing the login screen.
   if (!me && hash !== "#/login") {
+    view.innerHTML = `<p class="meta">Loading…</p>`;
     try {
       me = await api("/me");
       if (me.token) setToken(me.token); // renewed on every open
       try { localStorage.setItem("wl_was_signed_in", "1"); localStorage.removeItem("wl_signout"); } catch {}
     } catch (e) {
-      if (location.hash !== "#/login") view.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+      if (location.hash !== "#/login") view.innerHTML = errorCard(e.message);
       return;
     }
   }
@@ -151,7 +165,7 @@ async function route() {
       if (me) { av.href = `#/member/${me.member.id}`; av.innerHTML = avatar(me.member); }
       document.title = title === "Puff" ? "Puff" : `${title} · Puff`;
       view.innerHTML = `<p class="meta">Loading…</p>`;
-      try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = `<div class="card"><p class="error">${esc(e.message)}</p></div>`; }
+      try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = errorCard(e.message); }
       window.scrollTo(0, 0);
       return;
     }
@@ -793,4 +807,5 @@ document.addEventListener("visibilitychange", () => {
   });
 })();
 
+window.__puffStarted = true;
 route();
