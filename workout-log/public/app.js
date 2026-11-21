@@ -595,6 +595,14 @@ function workoutItem(w, mine) {
   </div></li>`;
 }
 
+// Today in Singapore, worked out now rather than when the app was opened: a home-screen
+// app can sit open in the background for days, and a stale "today" blocked saving any
+// workout dated after it (the date box's max).
+function todayNow() {
+  try { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Singapore" }).format(new Date()); }
+  catch { return me.today; }
+}
+
 // ── Log a workout ────────────────────────────────────────────────────────────
 async function renderLog(editId) {
   if (!me.canLog) {
@@ -604,13 +612,13 @@ async function renderLog(editId) {
   const { workouts } = await api("/workouts");
   const editing = editId ? workouts.find((w) => w.id === Number(editId)) : null;
   if (editId && !editing) throw new Error("Workout not found.");
-  const w = editing || { date: me.today, type: me.workoutTypes[0], durationMin: "", notes: "" };
+  const w = editing || { date: todayNow(), type: me.workoutTypes[0], durationMin: "", notes: "" };
 
   view.innerHTML = `
     <form id="f" class="card stack">
       <h2>${editing ? "Edit workout" : "Log a workout"}</h2>
       <div class="grid2">
-        <div><label for="date">Date</label><input id="date" type="date" max="${me.today}" required value="${esc(w.date)}"></div>
+        <div><label for="date">Date</label><input id="date" type="date" max="${todayNow()}" required value="${esc(w.date)}"></div>
         <div><label for="dur">Duration (minutes)</label><input id="dur" type="number" inputmode="numeric" min="1" max="600" required value="${esc(w.durationMin)}"></div>
       </div>
       <div><label for="type">Type</label><select id="type">${me.workoutTypes.map((t) => `<option ${t === w.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
@@ -658,7 +666,7 @@ async function renderAdmin() {
       <h2>New competition</h2>
       <div><label for="cn">Name</label><input id="cn" required maxlength="200" placeholder="e.g. Asia Pacific Champs 2027"></div>
       <div class="grid2">
-        <div><label for="cs">Prep starts</label><input id="cs" type="date" required value="${me.today}"></div>
+        <div><label for="cs">Prep starts</label><input id="cs" type="date" required value="${todayNow()}"></div>
         <div><label for="cd">Competition date</label><input id="cd" type="date" required></div>
       </div>
       <div class="grid2">
@@ -800,7 +808,8 @@ document.addEventListener("visibilitychange", () => {
   if (Date.now() - lastCheck < 30_000) return;
   lastCheck = Date.now();
   checkForUpdate();
-  if (getToken() && me) route(); // fresh numbers too
+  // Fresh numbers, and fresh sign-in details (squad, admin, today) after time away.
+  if (getToken() && me) { me = null; route(); }
 });
 
 (function pullToRefresh() {
