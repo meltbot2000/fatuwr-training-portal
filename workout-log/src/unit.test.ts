@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { issueToken, verifyToken } from "./auth";
 import { addDays, todaySgt } from "./config";
-import { buildDashboard, parsePeriod, periodOptions, periodRange, summarise, weeksElapsed } from "./stats";
+import { buildDashboard, meetsTargets, parsePeriod, periodOptions, periodRange, summarise, weeksElapsed } from "./stats";
 import { BadRequest, workoutInput } from "./validate";
 
 const SECRET = "x".repeat(40);
@@ -277,12 +277,12 @@ describe("no double counting: trainings beyond the weekly minimum count as other
     const t = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map(date => ({ date }));   // 4 in week 1, 0 in week 2
     expect(splitTrainings(t, 2).counted).toHaveLength(2);
   });
-  it("Dashboard: 4 trainings + 0 workouts shows 4 + 0, but the target boxes read 2 + 2", () => {
+  it("Dashboard numbers are always the true counts", () => {
     const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
     const tr = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map(date => ({ member_id: 1, date }));
     const rows = buildDashboard(m, tr, [], { from: "2026-11-02", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
-    expect([rows[0].trainings, rows[0].workouts, rows[0].extraTrainings]).toEqual([4, 0, 2]);
-    expect(summarise(rows, 1).team).toEqual({ avgTrainingsPerWeek: 2, avgWorkoutsPerWeek: 2 });
+    expect([rows[0].trainings, rows[0].workouts]).toEqual([4, 0]);
+    expect(summarise(rows, 1).team).toEqual({ avgTrainingsPerWeek: 4, avgWorkoutsPerWeek: 0 });
   });
   it("trainings fill the training target first, even when the period starts mid-week", () => {
     // Regression: prep starts Wed 4 Nov. Mon+Tue trainings are OUTSIDE the period and must
@@ -290,7 +290,7 @@ describe("no double counting: trainings beyond the weekly minimum count as other
     const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
     const tr = ["2026-11-02", "2026-11-03", "2026-11-04"].map(date => ({ member_id: 1, date }));
     const [row] = buildDashboard(m, tr, [], { from: "2026-11-04", to: "2026-11-08" }, { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 });
-    expect([row.trainings, row.workouts, row.extraTrainings]).toEqual([1, 0, 0]);
+    expect([row.trainings, row.workouts]).toEqual([1, 0]);
   });
   it("a period of one training never shows it as an other workout", () => {
     const m = [{ id: 1, name: "Ann", image: null, syncedAt: null, syncError: null }];
@@ -347,4 +347,19 @@ describe("tank ties", () => {
     expect(ranks(s)).toEqual({ Annabel: 0, Melanie: 1 });
     expect(s.fish.map(f => [f.name, f.trainings, f.workouts, f.workoutsSincePrep])).toEqual([["Melanie", 1, 0, 1], ["Annabel", 1, 0, 0]]);
   });
+});
+
+describe("overall targets (name in green)", () => {
+  const T = { trainingsPerWeekMin: 2, workoutsPerWeekMin: 1 };
+  it("judged on the period's averages, not week by week", () => {
+    expect(meetsTargets(2, 1, T)).toBe(true);
+    expect(meetsTargets(2.1, 2.6, T)).toBe(true);    // plenty of both; one big training week moves nothing
+    expect(meetsTargets(1.9, 5, T)).toBe(false);     // trainings short: other workouts can't cover trainings
+  });
+  it("spare trainings above the target can cover missing other workouts", () => {
+    expect(meetsTargets(3, 0, T)).toBe(true);
+    expect(meetsTargets(2.5, 0.4, T)).toBe(false);   // 0.5 spare + 0.4 = 0.9, still short
+    expect(meetsTargets(2.5, 0.5, T)).toBe(true);
+  });
+  it("nothing to judge yet", () => expect(meetsTargets(null, null, T)).toBe(false));
 });

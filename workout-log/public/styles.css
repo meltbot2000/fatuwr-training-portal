@@ -337,3 +337,6 @@ html, body { overscroll-behavior-y: contain; }
 .tank-key b { color: var(--text); font-weight: 600; }
 .tank-key .puff-img, .tank-key .arrow { flex: 0 0 26px; width: 26px; text-align: center; }
 .tank-key .arrow { font-size: 18px; color: var(--text); }
+
+/* Overall targets met (spare trainings can cover missing other workouts): the name goes green, the numbers stay true. */
+.sec-title .title.ok { color: var(--good); }

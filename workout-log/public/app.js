@@ -294,15 +294,15 @@ async function renderDashboard() {
     <section aria-label="Team average per person">
       <div class="sec-title"><span class="title">Team average</span><span class="meta">per person</span></div>
       <div class="boxes">
-        ${box("Trainings", data.team.avgTrainingsPerWeek, trainingsSub(sum("trainings"), sum("extraTrainings")))}
-        ${box("Other workouts", data.team.avgWorkoutsPerWeek, workoutsSub(sum("workouts"), sum("extraTrainings")))}
+        ${box("Trainings", data.team.avgTrainingsPerWeek, `${sum("trainings")} total`)}
+        ${box("Other workouts", data.team.avgWorkoutsPerWeek, `${sum("workouts")} total`)}
       </div>
     </section>
     <section aria-label="You">
-      <div class="sec-title"><span class="title">You</span><span class="meta">target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
+      <div class="sec-title"><span class="title${mine?.metTargets ? " ok" : ""}">You${mine?.metTargets ? " · targets met" : ""}</span><span class="meta">target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
       ${mine ? `<div class="boxes you">
-        ${box("Trainings", mine.target.avgTrainingsPerWeek, trainingsSub(mine.trainings, mine.extraTrainings), (v) => v >= T.trainingsPerWeekMin)}
-        ${box("Other workouts", mine.target.avgWorkoutsPerWeek, workoutsSub(mine.workouts, mine.extraTrainings), (v) => v >= T.workoutsPerWeekMin)}
+        ${box("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
+        ${box("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
       </div>` : `<p class="meta" style="margin:0 2px 16px">You're not in this squad, so there are no personal numbers.</p>`}
     </section>
     ${failing ? `<div class="banner">Training data couldn't be refreshed for ${failing} ${failing === 1 ? "person" : "people"} — showing the last good copy.</div>` : ""}
@@ -334,10 +334,6 @@ const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
  * With `meets`, the box is tinted green when the target is met and red when not.
  * The targets themselves are spelled out once, under the row.
  */
-// Target boxes: trainings beyond the weekly training target stand in for other workouts,
-// and the small line says so, so the numbers still add up to what people attended.
-const trainingsSub = (total, extra) => (extra ? `${total} total · ${extra} as other` : `${total} total`);
-const workoutsSub = (logged, extra) => (extra ? `${logged} logged + ${plural(extra, "training")}` : `${logged} total`);
 
 /** One stat box: label, weekly average (green when it meets the target), total. */
 function box(label, perWeek, sub, meets) {
@@ -365,10 +361,10 @@ function boardRow(r, max, T) {
     r.workouts ? fmtMins(r.workoutMinutes) + " other" : "",
     r.lastActive ? `last ${fmtDate(r.lastActive)}` : "no activity yet",
   ].filter(Boolean).join(" · ");
-  const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} other workouts`;
+  const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} other workouts${r.metTargets ? ", targets met" : ""}`;
   return `<li><a class="item" href="#/member/${r.member.id}" aria-label="${esc(label)}">
     <div class="row">${avatar(r.member)}
-      <div style="flex:1;min-width:0"><div class="name">${esc(r.member.name)}</div></div>
+      <div style="flex:1;min-width:0"><div class="name${r.metTargets ? " ok" : ""}">${esc(r.member.name)}</div></div>
       <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">other</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">

@@ -7,7 +7,7 @@ import { clearSessionCookie, hasAccess, requireAdmin, requireViewer, setSessionC
 import { addDays, config, todaySgt } from "./config";
 import { exec, getPool, query } from "./db";
 import { portal, PortalError } from "./portal";
-import { buildDashboard, DEFAULT_TARGETS, inRange, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
+import { buildDashboard, DEFAULT_TARGETS, inRange, meetsTargets, parsePeriod, periodOptions, periodRange, perWeek, PUFF, puffSummary, summarise, type Targets, weeksElapsed, WORKOUT_TYPES } from "./stats";
 import { resolvePendingInvites } from "./invites";
 import { syncAll, syncMember, upsertMember } from "./sync";
 import { BadRequest, intIn, isoDate, text, workoutInput } from "./validate";
@@ -361,11 +361,9 @@ export function createApp() {
       ...r,
       avgTrainingsPerWeek: perWeek(r.trainings, weeks),
       avgWorkoutsPerWeek: perWeek(r.workouts, weeks),
-      // For the "You" target boxes: extra trainings stand in for other workouts.
-      target: {
-        avgTrainingsPerWeek: perWeek(r.trainings - r.extraTrainings, weeks),
-        avgWorkoutsPerWeek: perWeek(r.workouts + r.extraTrainings, weeks),
-      },
+      // Name in green: overall targets met on these averages (spare trainings can cover
+      // missing other workouts). The averages themselves stay true.
+      metTargets: meetsTargets(perWeek(r.trainings, weeks), perWeek(r.workouts, weeks), targetsOf(comp)),
     }));
     res.json({
       competition: competitionDto(comp), periods, period, range, today,

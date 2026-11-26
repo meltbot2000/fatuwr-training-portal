@@ -150,6 +150,18 @@ export function splitByMember<T extends { member_id: number; date: string }>(
   return { counted, overflow };
 }
 
+/**
+ * Has someone met their targets over a period? Judged on the period's true weekly
+ * averages, never week by week: trainings must reach the training target, and other
+ * workouts the other-workout target, where any trainings ABOVE the training target can
+ * make up a shortfall in other workouts. The numbers shown are never changed by this.
+ */
+export function meetsTargets(avgTrainings: number | null, avgWorkouts: number | null, t: Targets): boolean {
+  if (avgTrainings === null || avgWorkouts === null) return false;
+  const spare = Math.max(0, avgTrainings - t.trainingsPerWeekMin);
+  return avgTrainings >= t.trainingsPerWeekMin && avgWorkouts + spare >= t.workoutsPerWeekMin;
+}
+
 const round1 = (n: number) => Math.round(n * 10) / 10;
 export const perWeek = (total: number, weeks: number | null) => (weeks ? round1(total / weeks) : null);
 
@@ -158,14 +170,11 @@ export interface Summary {
   team: { avgTrainingsPerWeek: number | null; avgWorkoutsPerWeek: number | null };
 }
 
-/**
- * Team = per person per week, averaged over the whole squad, for the TARGET boxes: extra
- * trainings (beyond the weekly training target) stand in for other workouts here.
- */
-export function summarise(rows: { trainings: number; workouts: number; extraTrainings?: number }[], weeks: number | null): Summary {
+/** Team = true per person per week, averaged over the whole squad. */
+export function summarise(rows: { trainings: number; workouts: number }[], weeks: number | null): Summary {
   const n = rows.length;
-  const t = rows.reduce((a, r) => a + r.trainings - (r.extraTrainings ?? 0), 0);
-  const w = rows.reduce((a, r) => a + r.workouts + (r.extraTrainings ?? 0), 0);
+  const t = rows.reduce((a, r) => a + r.trainings, 0);
+  const w = rows.reduce((a, r) => a + r.workouts, 0);
   return {
     weeks: weeks === null ? null : round1(weeks),
     team: {
@@ -187,12 +196,6 @@ export interface DashboardRow {
   trainings: number;
   /** other workouts actually logged (raw) */
   workouts: number;
-  /**
-   * Trainings beyond the weekly training target. They stay in `trainings` everywhere a
-   * person's numbers are shown; only target checks (the Team/You boxes, the glowing fish)
-   * let them stand in for other workouts.
-   */
-  extraTrainings: number;
   workoutMinutes: number;
   avgIntensity: number | null;
   topTypes: { type: string; count: number }[];
@@ -212,7 +215,7 @@ export function buildDashboard(
   for (const m of members) {
     rows.set(m.id, {
       member: { id: m.id, name: m.name, image: m.image },
-      trainings: 0, workouts: 0, extraTrainings: 0, workoutMinutes: 0, avgIntensity: null, topTypes: [], lastActive: null,
+      trainings: 0, workouts: 0, workoutMinutes: 0, avgIntensity: null, topTypes: [], lastActive: null,
       syncedAt: m.syncedAt, syncError: m.syncError, _rpe: [], _types: new Map(),
     });
   }
@@ -225,11 +228,6 @@ export function buildDashboard(
     if (!r) continue;
     r.trainings++;
     touch(r, t.date);
-  }
-  // Trainings beyond the weekly target can stand in for other workouts, for targets only.
-  for (const t of splitByMember(inPeriod, targets.trainingsPerWeekMin).overflow) {
-    const r = rows.get(t.member_id);
-    if (r) r.extraTrainings++;
   }
   for (const w of workouts) {
     const r = rows.get(w.member_id);
