@@ -53,7 +53,7 @@ did: trainings are always blue with the true count, other workouts are only what
 Whether someone **met their targets** is judged on the selected period's weekly averages,
 never week by week: trainings must reach the training target, and any trainings ABOVE it can
 make up a shortfall in other workouts (`meetsTargets` in `src/stats.ts`). Someone who met
-their targets overall has their **name in green** (and "You · targets met" on the Dashboard).
+their targets overall gets a **tiny puffed-up Puff** after their name (and after "You").
 Each number is green only when it meets its own target by itself. Puff's tank uses the same
 rule over its 7 days for a fish's glow.
 

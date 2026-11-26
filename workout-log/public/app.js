@@ -299,7 +299,7 @@ async function renderDashboard() {
       </div>
     </section>
     <section aria-label="You">
-      <div class="sec-title"><span class="title${mine?.metTargets ? " ok" : ""}">You${mine?.metTargets ? " · targets met" : ""}</span><span class="meta">target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
+      <div class="sec-title"><span class="title">You${mine?.metTargets ? metBadge() : ""}</span><span class="meta">target ${T.trainingsPerWeekMin} + ${T.workoutsPerWeekMin} /wk</span></div>
       ${mine ? `<div class="boxes you">
         ${box("Trainings", mine.avgTrainingsPerWeek, `${mine.trainings} total`, (v) => v >= T.trainingsPerWeekMin)}
         ${box("Other workouts", mine.avgWorkoutsPerWeek, `${mine.workouts} total`, (v) => v >= T.workoutsPerWeekMin)}
@@ -327,6 +327,8 @@ async function renderDashboard() {
   bindTooltips();
 }
 
+// A tiny puffed-up Puff next to a name: targets met for the selected period.
+const metBadge = () => `<img class="met-badge" src="puff/puff-puffed.webp" width="18" height="18" alt="targets met" title="Targets met">`;
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const fmtAvg = (v) => (v === null || v === undefined ? "—" : v.toFixed(1));
 /**
@@ -364,7 +366,7 @@ function boardRow(r, max, T) {
   const label = `${r.member.name}: ${r.trainings} trainings, ${r.workouts} other workouts${r.metTargets ? ", targets met" : ""}`;
   return `<li><a class="item" href="#/member/${r.member.id}" aria-label="${esc(label)}">
     <div class="row">${avatar(r.member)}
-      <div style="flex:1;min-width:0"><div class="name${r.metTargets ? " ok" : ""}">${esc(r.member.name)}</div></div>
+      <div style="flex:1;min-width:0"><div class="name">${esc(r.member.name)}${r.metTargets ? metBadge() : ""}</div></div>
       <div class="counts"><b class="${tCls}">${r.trainings}</b> <span class="muted">${r.trainings === 1 ? "training" : "trainings"}</span> · <b class="${wCls}">${r.workouts}</b> <span class="muted">other</span></div>
     </div>
     ${r.trainings + r.workouts ? `<div class="bar">

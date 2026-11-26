@@ -338,5 +338,5 @@ html, body { overscroll-behavior-y: contain; }
 .tank-key .puff-img, .tank-key .arrow { flex: 0 0 26px; width: 26px; text-align: center; }
 .tank-key .arrow { font-size: 18px; color: var(--text); }
 
-/* Overall targets met (spare trainings can cover missing other workouts): the name goes green, the numbers stay true. */
-.sec-title .title.ok { color: var(--good); }
+/* Overall targets met (spare trainings can cover missing other workouts): a tiny Puff after the name; the numbers stay true. */
+.met-badge { display: inline-block; width: 18px; height: 18px; margin-left: 6px; vertical-align: -3px; filter: drop-shadow(0 0 3px rgba(255, 226, 120, .7)); }
